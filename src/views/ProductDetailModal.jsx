@@ -1,12 +1,29 @@
-import React, { useState } from 'react';
-import { X, Star, ShoppingBag, Truck, ShieldCheck, Plus, Minus } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Star, ShoppingBag, Truck, Plus, Minus, ArrowLeft } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 
 export default function ProductDetailModal() {
   const { selectedProduct, setSelectedProduct, addToCart, setActiveTab } = useApp();
   const [qty, setQty] = useState(1);
 
+  // Press Escape key to close modal
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        setSelectedProduct(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [setSelectedProduct]);
+
   if (!selectedProduct) return null;
+
+  const handleBackdropClick = (e) => {
+    if (e.target === e.currentTarget) {
+      setSelectedProduct(null);
+    }
+  };
 
   const handleAddToCart = () => {
     addToCart(selectedProduct, qty);
@@ -20,62 +37,68 @@ export default function ProductDetailModal() {
   };
 
   return (
-    <div className="modal-overlay">
-      <div className="modal-card" style={{ maxWidth: '500px' }}>
-        <button className="modal-close" onClick={() => setSelectedProduct(null)}>
-          <X size={18} />
+    <div className="modal-overlay" onClick={handleBackdropClick}>
+      <div className="modal-card max-w-md" onClick={(e) => e.stopPropagation()}>
+        {/* Prominent Close X Button */}
+        <button
+          className="modal-close"
+          onClick={() => setSelectedProduct(null)}
+          title="Close Quick View (Esc)"
+          aria-label="Close modal"
+        >
+          <X size={20} />
         </button>
 
-        <div style={{ height: '220px', borderRadius: 'var(--radius-md)', overflow: 'hidden', marginBottom: '16px' }}>
+        <div className="h-52 w-full rounded-2xl overflow-hidden mb-4">
           <img
             src={selectedProduct.image}
             alt={selectedProduct.name}
-            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            className="w-full h-full object-cover"
           />
         </div>
 
-        <span className="badge badge-in-stock" style={{ marginBottom: '8px' }}>
+        <span className="badge badge-in-stock mb-2">
           {selectedProduct.category}
         </span>
 
-        <h2 style={{ fontSize: '1.35rem', color: '#fff', marginBottom: '8px' }}>{selectedProduct.name}</h2>
+        <h2 className="text-xl font-bold text-white mb-2">{selectedProduct.name}</h2>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '12px' }}>
-          <span className="price-tag" style={{ fontSize: '1.3rem' }}>K {selectedProduct.price}</span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#FFB800', fontSize: '0.85rem' }}>
+        <div className="flex items-center gap-4 mb-3">
+          <span className="price-tag text-xl">K {selectedProduct.price}</span>
+          <div className="flex items-center gap-1 text-amber-400 text-sm">
             <Star size={16} fill="#FFB800" />
-            <span style={{ fontWeight: 700 }}>{selectedProduct.rating}</span>
-            <span style={{ color: 'var(--text-muted)' }}>({selectedProduct.reviewsCount} reviews)</span>
+            <span className="font-bold">{selectedProduct.rating}</span>
+            <span className="text-slate-400">({selectedProduct.reviewsCount} reviews)</span>
           </div>
         </div>
 
-        <p style={{ fontSize: '0.88rem', color: 'var(--text-muted)', marginBottom: '16px' }}>
+        <p className="text-xs sm:text-sm text-slate-300 mb-4">
           {selectedProduct.description}
         </p>
 
         {/* Delivery perk info */}
-        <div style={{ background: 'rgba(15, 23, 42, 0.8)', padding: '12px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', marginBottom: '20px', fontSize: '0.82rem', display: 'flex', gap: '10px', alignItems: 'center' }}>
-          <Truck size={20} style={{ color: 'var(--primary)' }} />
+        <div className="bg-slate-900/80 p-3 rounded-xl border border-white/10 mb-4 text-xs flex gap-2.5 items-center">
+          <Truck size={20} className="text-amber-400 shrink-0" />
           <div>
-            <p style={{ color: '#fff', fontWeight: 600, margin: 0 }}>Campus Hostel Delivery Available</p>
-            <p style={{ color: 'var(--text-muted)', margin: 0 }}>Delivered to your room or available for salon pickup!</p>
+            <p className="text-white font-semibold m-0">Campus Hostel Delivery Available</p>
+            <p className="text-slate-400 m-0">Delivered directly to your hostel room or salon pickup!</p>
           </div>
         </div>
 
         {/* Quantity selector */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
-          <span style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--text-muted)' }}>Quantity:</span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'rgba(15, 23, 42, 0.8)', padding: '6px 12px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)' }}>
+        <div className="flex items-center justify-between mb-5">
+          <span className="text-xs font-semibold text-slate-400">Quantity:</span>
+          <div className="flex items-center gap-3 bg-slate-900/80 px-3 py-1.5 rounded-lg border border-white/10">
             <button
               onClick={() => setQty(Math.max(1, qty - 1))}
-              style={{ background: 'none', color: '#fff', display: 'flex' }}
+              className="text-white hover:text-amber-400 bg-transparent border-0"
             >
               <Minus size={16} />
             </button>
-            <span style={{ fontWeight: 700, minWidth: '20px', textAlign: 'center' }}>{qty}</span>
+            <span className="font-bold text-sm min-w-5 text-center">{qty}</span>
             <button
               onClick={() => setQty(qty + 1)}
-              style={{ background: 'none', color: '#fff', display: 'flex' }}
+              className="text-white hover:text-amber-400 bg-transparent border-0"
             >
               <Plus size={16} />
             </button>
@@ -83,14 +106,23 @@ export default function ProductDetailModal() {
         </div>
 
         {/* Action Buttons */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-          <button className="btn-secondary" onClick={handleAddToCart}>
+        <div className="grid grid-cols-2 gap-2.5 mb-3">
+          <button className="btn-secondary text-xs" onClick={handleAddToCart}>
             Add to Cart
           </button>
-          <button className="btn-primary" onClick={handleBuyNow}>
+          <button className="btn-primary text-xs" onClick={handleBuyNow}>
             Buy Now
           </button>
         </div>
+
+        {/* Prominent Footer Close Button */}
+        <button
+          onClick={() => setSelectedProduct(null)}
+          className="w-full text-center text-xs text-slate-400 hover:text-white py-2 flex items-center justify-center gap-1 bg-transparent border-0"
+        >
+          <ArrowLeft size={14} />
+          <span>Close & Continue Browsing</span>
+        </button>
       </div>
     </div>
   );

@@ -4,53 +4,49 @@ import { useApp } from '../context/AppContext';
 
 export default function AboutView() {
   const { lusakaUniversities, currentCampus, setCurrentCampus, addToast } = useApp();
+  const whatsappNumber = "260772822579";
 
   return (
-    <div style={{ maxWidth: '800px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+    <div className="w-full max-w-3xl mx-auto flex flex-col gap-6">
       <div>
-        <h1 style={{ fontSize: '1.8rem', color: '#fff' }}>UniHairShop Lusaka Campuses</h1>
-        <p style={{ color: 'var(--text-muted)', fontSize: '0.92rem' }}>
+        <h1 className="text-2xl sm:text-3xl font-bold text-white mb-1">UniHairShop Lusaka Campuses</h1>
+        <p className="text-slate-400 text-sm">
           On-campus grooming, hair dressing, nail tech, and e-commerce for university students across Lusaka, Zambia.
         </p>
       </div>
 
       {/* Lusaka Universities List with UNILUS Silverest at Top */}
-      <div className="card" style={{ padding: '20px', border: '1px solid rgba(255, 184, 0, 0.4)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
-          <GraduationCap size={24} style={{ color: 'var(--primary)' }} />
+      <div className="card p-5 border border-amber-400/40">
+        <div className="flex items-center gap-2.5 mb-4">
+          <GraduationCap size={24} className="text-amber-400" />
           <div>
-            <h3 style={{ fontSize: '1.15rem', color: '#fff' }}>Supported Lusaka Universities & Campuses</h3>
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Fast hostel delivery & bookable salon branches</p>
+            <h3 className="text-base font-bold text-white">Supported Lusaka Universities & Campuses</h3>
+            <p className="text-xs text-slate-400">Fast hostel delivery & bookable salon branches</p>
           </div>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        <div className="flex flex-col gap-2">
           {lusakaUniversities.map((uni, idx) => (
             <div
               key={uni.id}
-              style={{
-                padding: '12px 14px',
-                borderRadius: 'var(--radius-sm)',
-                background: idx === 0 ? 'rgba(255, 184, 0, 0.15)' : 'rgba(15, 23, 42, 0.6)',
-                border: idx === 0 ? '1px solid var(--primary)' : '1px solid var(--border-color)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between'
-              }}
+              className={`p-3 rounded-xl border flex items-center justify-between transition-colors ${
+                idx === 0
+                  ? 'bg-amber-400/15 border-amber-400'
+                  : 'bg-slate-900/60 border-white/10'
+              }`}
             >
               <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <h4 style={{ fontSize: '0.98rem', color: idx === 0 ? 'var(--primary)' : '#fff' }}>{uni.name}</h4>
+                <div className="flex items-center gap-2">
+                  <h4 className={`text-sm font-bold ${idx === 0 ? 'text-amber-400' : 'text-white'}`}>{uni.name}</h4>
                   {idx === 0 && (
-                    <span className="badge badge-low-stock" style={{ fontSize: '0.7rem' }}>Primary Hub</span>
+                    <span className="badge badge-low-stock text-[10px] py-0.5 px-1.5">Primary Hub</span>
                   )}
                 </div>
-                <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: 0 }}>Area: {uni.area}</p>
+                <p className="text-xs text-slate-400 m-0">Area: {uni.area}</p>
               </div>
 
               <button
-                className={currentCampus === uni.name ? 'btn-primary' : 'btn-secondary'}
-                style={{ padding: '6px 12px', fontSize: '0.78rem' }}
+                className={currentCampus === uni.name ? 'btn-primary text-xs px-3 py-1.5' : 'btn-secondary text-xs px-3 py-1.5'}
                 onClick={() => {
                   setCurrentCampus(uni.name);
                   addToast(`Selected ${uni.name}!`, 'success');
@@ -64,58 +60,58 @@ export default function AboutView() {
       </div>
 
       <div className="grid-2">
-        <div className="card" style={{ padding: '20px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '14px' }}>
-            <MapPin size={24} style={{ color: 'var(--primary)' }} />
+        <div className="card p-5">
+          <div className="flex items-center gap-3 mb-3">
+            <MapPin size={24} className="text-amber-400" />
             <div>
-              <h3 style={{ fontSize: '1.1rem', color: '#fff' }}>UNILUS Silverest Main Hub</h3>
-              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>University of Lusaka — Silverest Campus, Student Centre</p>
+              <h3 className="text-base font-bold text-white">UNILUS Silverest Main Hub</h3>
+              <p className="text-xs text-slate-400">University of Lusaka — Silverest Campus, Student Centre</p>
             </div>
           </div>
-          <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+          <p className="text-xs text-slate-400">
             Our main flagship campus salon location at Silverest Campus! Quick delivery to all hostel blocks.
           </p>
         </div>
 
-        <div className="card" style={{ padding: '20px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '14px' }}>
-            <Clock size={24} style={{ color: '#00E676' }} />
+        <div className="card p-5">
+          <div className="flex items-center gap-3 mb-3">
+            <Clock size={24} className="text-emerald-400" />
             <div>
-              <h3 style={{ fontSize: '1.1rem', color: '#fff' }}>Opening Hours</h3>
-              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Monday – Saturday: 08:00 AM – 19:30 PM</p>
+              <h3 className="text-base font-bold text-white">Opening Hours</h3>
+              <p className="text-xs text-slate-400">Monday – Saturday: 08:00 AM – 19:30 PM</p>
             </div>
           </div>
-          <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+          <p className="text-xs text-slate-400">
             Open late for evening haircut appointments before weekend events!
           </p>
         </div>
       </div>
 
-      <div className="card" style={{ padding: '20px' }}>
-        <h3 style={{ fontSize: '1.2rem', color: '#fff', marginBottom: '14px' }}>Direct Campus Contact & Support</h3>
+      <div className="card p-5">
+        <h3 className="text-lg font-bold text-white mb-3">Direct Campus Contact & Support</h3>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        <div className="flex flex-col gap-3">
           <a
-            href="https://wa.me/260971234567"
+            href={`https://wa.me/${whatsappNumber}`}
             target="_blank"
             rel="noopener noreferrer"
-            style={{ display: 'flex', alignItems: 'center', gap: '12px', color: '#fff', fontSize: '0.9rem' }}
+            className="flex items-center gap-3 text-white text-sm hover:text-emerald-400 transition-colors"
           >
-            <div style={{ background: '#25D366', padding: '8px', borderRadius: '50%', color: '#fff' }}>
+            <div className="bg-emerald-500 p-2 rounded-full text-white">
               <MessageCircle size={18} />
             </div>
-            <span>WhatsApp Customer Desk: +260 971 234 567</span>
+            <span>WhatsApp Support Desk: +260 772 822579</span>
           </a>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', color: '#fff', fontSize: '0.9rem' }}>
-            <div style={{ background: 'rgba(255, 184, 0, 0.2)', padding: '8px', borderRadius: '50%', color: 'var(--primary)' }}>
+          <div className="flex items-center gap-3 text-white text-sm">
+            <div className="bg-amber-400/20 p-2 rounded-full text-amber-400">
               <Phone size={18} />
             </div>
-            <span>Airtel / MTN Helpline: 0971234567 / 0961234567</span>
+            <span>Phone Line: +260 772 822579</span>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', color: '#fff', fontSize: '0.9rem' }}>
-            <div style={{ background: 'rgba(255, 62, 108, 0.2)', padding: '8px', borderRadius: '50%', color: 'var(--accent)' }}>
+          <div className="flex items-center gap-3 text-white text-sm">
+            <div className="bg-pink-500/20 p-2 rounded-full text-pink-400">
               <Mail size={18} />
             </div>
             <span>Email: info@unihairshop.co.zm</span>

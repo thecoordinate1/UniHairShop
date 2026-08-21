@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { X, Shield, Smartphone, CreditCard, CheckCircle, Loader2, Lock, ArrowRight, Banknote } from 'lucide-react';
+import { X, Shield, Smartphone, CreditCard, CheckCircle, Loader2, Lock, ArrowRight, Banknote, ArrowLeft } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 
 export default function LencoCheckoutWizard({ amount, title, onSuccess, onClose, allowPayOnArrival = true }) {
   const { user, addToast } = useApp();
 
-  const [step, setStep] = useState(1); // 1: Select Method, 2: Enter Details, 3: Processing STK Push, 4: Success Receipt
-  const [method, setMethod] = useState('airtel'); // airtel, mtn, zamtel, card, arrival
+  const [step, setStep] = useState(1);
+  const [method, setMethod] = useState('airtel');
   const [phone, setPhone] = useState(user.phone || '0971234567');
   const [cardNumber, setCardNumber] = useState('');
   const [cardExpiry, setCardExpiry] = useState('');
@@ -15,6 +15,23 @@ export default function LencoCheckoutWizard({ amount, title, onSuccess, onClose,
   const [lencoRef, setLencoRef] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // Press Escape key to close modal
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
+  const handleBackdropClick = (e) => {
+    if (e.target === e.currentTarget) {
+      onClose();
+    }
+  };
+
   const handleStartPayment = () => {
     if ((method === 'airtel' || method === 'mtn' || method === 'zamtel') && (!phone || phone.length < 10)) {
       addToast('Please enter a valid Zambian phone number (e.g. 097xxxxxxx)', 'info');
@@ -22,17 +39,14 @@ export default function LencoCheckoutWizard({ amount, title, onSuccess, onClose,
     }
 
     if (method === 'arrival') {
-      // Direct completion for Pay on Arrival / Pickup
       const mockRef = `LNC-POA-${Math.floor(100000 + Math.random() * 900000)}`;
       onSuccess({ paymentMethod: 'Pay on Arrival / Pickup', lencoReference: mockRef });
       return;
     }
 
-    // Advance to STK Push / Processing step
     setStep(3);
     setLoading(true);
 
-    // Simulate Lenco API response after 2.5 seconds
     setTimeout(() => {
       setLoading(false);
       const generatedRef = `LNC-${Date.now().toString().slice(-6)}-${Math.floor(100 + Math.random() * 900)}`;
@@ -44,7 +58,7 @@ export default function LencoCheckoutWizard({ amount, title, onSuccess, onClose,
     setLoading(true);
     setTimeout(() => {
       setLoading(false);
-      setStep(4); // Success step
+      setStep(4);
     }, 1500);
   };
 
@@ -56,55 +70,56 @@ export default function LencoCheckoutWizard({ amount, title, onSuccess, onClose,
   };
 
   return (
-    <div className="modal-overlay">
-      <div className="modal-card" style={{ maxWidth: '480px', border: '1px solid rgba(27, 183, 132, 0.4)' }}>
-        <button className="modal-close" onClick={onClose}>
-          <X size={18} />
+    <div className="modal-overlay" onClick={handleBackdropClick}>
+      <div className="modal-card max-w-md border border-emerald-500/40" onClick={(e) => e.stopPropagation()}>
+        {/* Prominent Close X Button */}
+        <button className="modal-close" onClick={onClose} title="Close payment wizard (Esc)" aria-label="Close modal">
+          <X size={20} />
         </button>
 
         {/* Lenco Brand Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '16px', borderBottom: '1px solid var(--border-color)', marginBottom: '20px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div className="flex items-center justify-between pb-3 border-b border-white/10 mb-4">
+          <div className="flex items-center gap-2">
             <div className="momo-logo lenco-pay">LENCO</div>
             <div>
-              <h4 style={{ fontSize: '1rem', color: '#fff', margin: 0 }}>Lenco Pay Checkout</h4>
-              <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>Instant Zambian Mobile Money & Card Gateway</p>
+              <h4 className="text-sm font-bold text-white m-0">Lenco Pay Checkout</h4>
+              <p className="text-[11px] text-slate-400 m-0">Zambian Mobile Money & Card Gateway</p>
             </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#00E676', fontSize: '0.75rem', fontWeight: 600 }}>
+          <div className="flex items-center gap-1 text-emerald-400 text-xs font-semibold">
             <Lock size={12} />
             <span>256-bit SSL</span>
           </div>
         </div>
 
         {/* Amount Summary */}
-        <div style={{ background: 'rgba(15, 23, 42, 0.8)', padding: '12px 16px', borderRadius: 'var(--radius-sm)', marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div className="bg-slate-900/80 p-3 rounded-xl mb-4 flex justify-between items-center border border-white/10">
           <div>
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: 0 }}>Payment For:</p>
-            <p style={{ fontSize: '0.95rem', fontWeight: 700, color: '#fff', margin: 0 }}>{title}</p>
+            <p className="text-xs text-slate-400 m-0">Payment For:</p>
+            <p className="text-sm font-bold text-white m-0 truncate max-w-[200px]">{title}</p>
           </div>
-          <div style={{ textAlign: 'right' }}>
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: 0 }}>Total Amount:</p>
-            <p className="price-tag" style={{ margin: 0 }}>K {amount}</p>
+          <div className="text-right">
+            <p className="text-xs text-slate-400 m-0">Total Amount:</p>
+            <p className="price-tag m-0 text-base">K {amount}</p>
           </div>
         </div>
 
         {/* STEP 1 & 2: Select Payment Method & Phone */}
         {step === 1 && (
           <div>
-            <p style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '12px' }}>
+            <p className="text-xs font-semibold text-slate-400 mb-2.5">
               Select Payment Method:
             </p>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '20px' }}>
+            <div className="flex flex-col gap-2.5 mb-4">
               <div
                 className={`momo-option ${method === 'airtel' ? 'selected' : ''}`}
                 onClick={() => setMethod('airtel')}
               >
                 <div className="momo-logo airtel">Airtel</div>
-                <div style={{ flex: 1 }}>
-                  <p style={{ fontWeight: 600, fontSize: '0.9rem', margin: 0 }}>Airtel Money (Zambia)</p>
-                  <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>Direct mobile money STK prompt</p>
+                <div className="flex-1">
+                  <p className="font-semibold text-sm m-0">Airtel Money (Zambia)</p>
+                  <p className="text-[11px] text-slate-400 m-0">Direct mobile money STK prompt</p>
                 </div>
               </div>
 
@@ -113,9 +128,9 @@ export default function LencoCheckoutWizard({ amount, title, onSuccess, onClose,
                 onClick={() => setMethod('mtn')}
               >
                 <div className="momo-logo mtn">MTN</div>
-                <div style={{ flex: 1 }}>
-                  <p style={{ fontWeight: 600, fontSize: '0.9rem', margin: 0 }}>MTN Mobile Money</p>
-                  <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>Instant MoMo pin request</p>
+                <div className="flex-1">
+                  <p className="font-semibold text-sm m-0">MTN Mobile Money</p>
+                  <p className="text-[11px] text-slate-400 m-0">Instant MoMo pin request</p>
                 </div>
               </div>
 
@@ -124,9 +139,9 @@ export default function LencoCheckoutWizard({ amount, title, onSuccess, onClose,
                 onClick={() => setMethod('zamtel')}
               >
                 <div className="momo-logo zamtel">Zamtel</div>
-                <div style={{ flex: 1 }}>
-                  <p style={{ fontWeight: 600, fontSize: '0.9rem', margin: 0 }}>Zamtel Kwacha</p>
-                  <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>Zamtel mobile wallet push</p>
+                <div className="flex-1">
+                  <p className="font-semibold text-sm m-0">Zamtel Kwacha</p>
+                  <p className="text-[11px] text-slate-400 m-0">Zamtel mobile wallet push</p>
                 </div>
               </div>
 
@@ -134,12 +149,12 @@ export default function LencoCheckoutWizard({ amount, title, onSuccess, onClose,
                 className={`momo-option ${method === 'card' ? 'selected' : ''}`}
                 onClick={() => setMethod('card')}
               >
-                <div style={{ background: '#334155', padding: '4px 8px', borderRadius: '6px', display: 'flex', alignItems: 'center' }}>
-                  <CreditCard size={18} style={{ color: 'var(--primary)' }} />
+                <div className="bg-slate-700 p-1.5 rounded flex items-center">
+                  <CreditCard size={18} className="text-amber-400" />
                 </div>
-                <div style={{ flex: 1 }}>
-                  <p style={{ fontWeight: 600, fontSize: '0.9rem', margin: 0 }}>Bank Card (Visa / Mastercard)</p>
-                  <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>Processed by Lenco Gateway</p>
+                <div className="flex-1">
+                  <p className="font-semibold text-sm m-0">Bank Card (Visa / Mastercard)</p>
+                  <p className="text-[11px] text-slate-400 m-0">Processed by Lenco Gateway</p>
                 </div>
               </div>
 
@@ -148,18 +163,18 @@ export default function LencoCheckoutWizard({ amount, title, onSuccess, onClose,
                   className={`momo-option ${method === 'arrival' ? 'selected' : ''}`}
                   onClick={() => setMethod('arrival')}
                 >
-                  <div style={{ background: 'rgba(0, 200, 83, 0.2)', padding: '4px 8px', borderRadius: '6px' }}>
-                    <Banknote size={18} style={{ color: '#00E676' }} />
+                  <div className="bg-emerald-500/20 p-1.5 rounded">
+                    <Banknote size={18} className="text-emerald-400" />
                   </div>
-                  <div style={{ flex: 1 }}>
-                    <p style={{ fontWeight: 600, fontSize: '0.9rem', margin: 0 }}>Pay on Arrival / Cash on Pickup</p>
-                    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>Pay at salon counter or delivery</p>
+                  <div className="flex-1">
+                    <p className="font-semibold text-sm m-0">Pay on Arrival / Cash on Pickup</p>
+                    <p className="text-[11px] text-slate-400 m-0">Pay at salon counter or delivery</p>
                   </div>
                 </div>
               )}
             </div>
 
-            {/* Account input fields depending on method */}
+            {/* Input fields */}
             {(method === 'airtel' || method === 'mtn' || method === 'zamtel') && (
               <div className="form-group">
                 <label className="form-label">Zambian Mobile Money Number:</label>
@@ -185,7 +200,7 @@ export default function LencoCheckoutWizard({ amount, title, onSuccess, onClose,
                     onChange={(e) => setCardNumber(e.target.value)}
                   />
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <div className="grid grid-cols-2 gap-2.5">
                   <div className="form-group">
                     <label className="form-label">Expiry (MM/YY):</label>
                     <input
@@ -211,47 +226,53 @@ export default function LencoCheckoutWizard({ amount, title, onSuccess, onClose,
             )}
 
             <button
-              className="btn-success"
-              style={{ width: '100%', marginTop: '10px' }}
+              className="btn-success w-full mt-2"
               onClick={handleStartPayment}
             >
               <span>{method === 'arrival' ? 'Confirm Booking / Order' : `Pay K ${amount} via Lenco`}</span>
               <ArrowRight size={16} />
+            </button>
+
+            <button
+              onClick={onClose}
+              className="w-full text-center text-xs text-slate-400 hover:text-white mt-3 flex items-center justify-center gap-1 bg-transparent border-0"
+            >
+              <ArrowLeft size={14} />
+              <span>Cancel Payment</span>
             </button>
           </div>
         )}
 
         {/* STEP 3: STK Push / PIN Authorization Prompt */}
         {step === 3 && (
-          <div style={{ textAlign: 'center', padding: '10px 0' }}>
+          <div className="text-center py-2">
             {loading ? (
               <div>
-                <Loader2 size={40} className="spin" style={{ color: 'var(--primary)', animation: 'spin 1s linear infinite', marginBottom: '16px' }} />
-                <h4 style={{ fontSize: '1.1rem', marginBottom: '8px' }}>Initiating Lenco Payment...</h4>
-                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Sending STK Push prompt to {phone}...</p>
+                <Loader2 size={40} className="spin animate-spin text-amber-400 mx-auto mb-4" />
+                <h4 className="text-base font-bold text-white mb-2">Initiating Lenco Payment...</h4>
+                <p className="text-xs text-slate-400">Sending STK Push prompt to {phone}...</p>
               </div>
             ) : (
               <div>
-                <div style={{ background: 'rgba(0, 200, 83, 0.15)', color: '#00E676', width: '60px', height: '60px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
-                  <Smartphone size={32} />
+                <div className="bg-emerald-500/15 text-emerald-400 w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-3">
+                  <Smartphone size={30} />
                 </div>
-                <h4 style={{ fontSize: '1.1rem', marginBottom: '8px' }}>Check Your Phone!</h4>
-                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '16px' }}>
+                <h4 className="text-base font-bold text-white mb-1">Check Your Phone!</h4>
+                <p className="text-xs text-slate-400 mb-4">
                   Lenco has sent an STK prompt to <strong>{phone}</strong>. Enter your Mobile Money PIN on your handset or simulate authorization below:
                 </p>
 
-                <div style={{ background: 'rgba(15, 23, 42, 0.9)', padding: '16px', borderRadius: 'var(--radius-sm)', border: '1px dashed var(--primary)', marginBottom: '20px' }}>
-                  <p style={{ fontSize: '0.78rem', color: 'var(--primary)', fontWeight: 600, marginBottom: '8px' }}>
+                <div className="bg-slate-900/90 p-4 rounded-xl border border-dashed border-amber-400/50 mb-5">
+                  <p className="text-xs text-amber-400 font-semibold mb-1">
                     [Simulated Handset Prompt]
                   </p>
-                  <p style={{ fontSize: '0.88rem', color: '#fff', marginBottom: '12px' }}>
+                  <p className="text-xs text-white mb-3">
                     Authorize UniHairShop payment of K {amount}? Ref: {lencoRef}
                   </p>
                   <input
                     type="password"
                     maxLength={4}
-                    className="form-input"
-                    style={{ textAlign: 'center', letterSpacing: '8px', fontSize: '1.2rem', maxWidth: '180px', margin: '0 auto' }}
+                    className="form-input text-center tracking-[8px] text-lg max-w-[160px] mx-auto"
                     placeholder="PIN"
                     value={pinInput}
                     onChange={(e) => setPinInput(e.target.value)}
@@ -259,11 +280,18 @@ export default function LencoCheckoutWizard({ amount, title, onSuccess, onClose,
                 </div>
 
                 <button
-                  className="btn-primary"
-                  style={{ width: '100%' }}
+                  className="btn-primary w-full"
                   onClick={handleConfirmPin}
                 >
                   Authorize Payment (K {amount})
+                </button>
+
+                <button
+                  onClick={onClose}
+                  className="w-full text-center text-xs text-slate-400 hover:text-white mt-3 flex items-center justify-center gap-1 bg-transparent border-0"
+                >
+                  <ArrowLeft size={14} />
+                  <span>Cancel Payment</span>
                 </button>
               </div>
             )}
@@ -272,38 +300,37 @@ export default function LencoCheckoutWizard({ amount, title, onSuccess, onClose,
 
         {/* STEP 4: Success Receipt */}
         {step === 4 && (
-          <div style={{ textAlign: 'center', padding: '10px 0' }}>
-            <div style={{ background: 'rgba(0, 200, 83, 0.2)', color: '#00E676', width: '64px', height: '64px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+          <div className="text-center py-2">
+            <div className="bg-emerald-500/20 text-emerald-400 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
               <CheckCircle size={38} />
             </div>
 
-            <h3 style={{ fontSize: '1.25rem', color: '#fff', marginBottom: '6px' }}>Payment Approved!</h3>
-            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '16px' }}>
-              Lenco Transaction Reference: <strong style={{ color: 'var(--primary)' }}>{lencoRef}</strong>
+            <h3 className="text-lg font-bold text-white mb-1">Payment Approved!</h3>
+            <p className="text-xs text-slate-400 mb-4">
+              Lenco Transaction Reference: <strong className="text-amber-400">{lencoRef}</strong>
             </p>
 
-            <div style={{ background: 'rgba(15, 23, 42, 0.8)', padding: '14px', borderRadius: 'var(--radius-sm)', textAlign: 'left', fontSize: '0.82rem', marginBottom: '20px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-                <span style={{ color: 'var(--text-muted)' }}>Merchant:</span>
-                <span style={{ color: '#fff', fontWeight: 600 }}>UniHairShop Zambia</span>
+            <div className="bg-slate-900/80 p-3.5 rounded-xl text-left text-xs mb-5 space-y-1.5 border border-white/10">
+              <div className="flex justify-between">
+                <span className="text-slate-400">Merchant:</span>
+                <span className="text-white font-semibold">UniHairShop Zambia</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-                <span style={{ color: 'var(--text-muted)' }}>Amount Paid:</span>
-                <span style={{ color: 'var(--primary)', fontWeight: 700 }}>K {amount}</span>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Amount Paid:</span>
+                <span className="text-amber-400 font-bold">K {amount}</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-                <span style={{ color: 'var(--text-muted)' }}>Channel:</span>
-                <span style={{ color: '#fff', fontWeight: 600 }}>{method.toUpperCase()} via Lenco Pay</span>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Channel:</span>
+                <span className="text-white font-semibold">{method.toUpperCase()} via Lenco Pay</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--text-muted)' }}>Payer Phone:</span>
-                <span style={{ color: '#fff', fontWeight: 600 }}>{phone}</span>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Payer Phone:</span>
+                <span className="text-white font-semibold">{phone}</span>
               </div>
             </div>
 
             <button
-              className="btn-success"
-              style={{ width: '100%' }}
+              className="btn-success w-full"
               onClick={handleFinish}
             >
               Continue to Confirmation
