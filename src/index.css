@@ -14,21 +14,16 @@
     --text-main: #F8FAFC;
     --text-muted: #94A3B8;
     --text-dark: #0F172A;
-    --border-color: rgba(255, 255, 255, 0.1);
-    --glass-bg: rgba(30, 41, 59, 0.85);
-    --glass-border: rgba(255, 255, 255, 0.12);
-    --radius-sm: 8px;
-    --radius-md: 14px;
-    --radius-lg: 24px;
-    --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.15);
-    --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.35);
     --font-heading: 'Outfit', -apple-system, sans-serif;
     --font-body: 'Inter', -apple-system, sans-serif;
-    --max-width: 1200px;
+  }
+
+  html {
+    @apply w-full overflow-x-hidden scroll-smooth;
   }
 
   body {
-    @apply bg-slate-900 text-slate-100 font-body antialiased pb-20 md:pb-0 overflow-x-hidden;
+    @apply w-full min-h-screen bg-slate-900 text-slate-100 font-body antialiased pb-20 md:pb-0 overflow-x-hidden m-0 p-0;
   }
 
   h1, h2, h3, h4, h5, h6 {
@@ -49,53 +44,53 @@
 @layer components {
   /* Layout Utilities */
   .app-container {
-    @apply min-h-screen flex flex-col;
+    @apply w-full min-h-screen flex flex-col items-center overflow-x-hidden;
   }
 
   .main-content {
-    @apply flex-1 max-w-[1200px] w-full mx-auto p-4;
+    @apply w-full max-w-[1200px] mx-auto px-4 py-6 flex-1 flex flex-col box-border;
   }
 
   /* Header */
   .top-header {
-    @apply sticky top-0 z-50 bg-slate-900/85 backdrop-blur-md border-b border-white/10 px-5 py-3;
+    @apply w-full sticky top-0 z-50 bg-slate-900/90 backdrop-blur-md border-b border-white/10 px-4 py-3 shadow-md;
   }
 
   .header-inner {
-    @apply max-w-[1200px] mx-auto flex items-center justify-between gap-4;
+    @apply w-full max-w-[1200px] mx-auto flex items-center justify-between gap-2 sm:gap-4 box-border;
   }
 
   .brand-logo {
-    @apply flex items-center gap-2.5 text-xl font-extrabold text-amber-400 font-heading bg-transparent border-0;
+    @apply flex items-center gap-2 text-lg sm:text-xl font-extrabold text-amber-400 font-heading bg-transparent border-0 p-0;
   }
 
   .campus-badge {
-    @apply bg-amber-400/15 text-amber-400 border border-amber-400/30 text-xs font-semibold px-2.5 py-1 rounded-full flex items-center gap-1;
+    @apply bg-amber-400/15 text-amber-400 border border-amber-400/30 text-xs font-semibold px-2 py-1 rounded-full flex items-center gap-1;
   }
 
   .header-actions {
-    @apply flex items-center gap-3;
+    @apply flex items-center gap-2 sm:gap-3;
   }
 
   .icon-btn {
-    @apply bg-white/10 hover:bg-white/20 text-slate-100 w-10 h-10 rounded-full flex items-center justify-center relative transition-colors;
+    @apply bg-white/10 hover:bg-white/20 text-slate-100 w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center relative transition-colors border-0;
   }
 
   .badge-count {
-    @apply absolute -top-1 -right-1 bg-pink-600 text-white text-[11px] font-bold w-[18px] h-[18px] rounded-full flex items-center justify-center;
+    @apply absolute -top-1 -right-1 bg-pink-600 text-white text-[10px] font-bold w-[18px] h-[18px] rounded-full flex items-center justify-center;
   }
 
   .role-switcher-btn {
-    @apply bg-gradient-to-r from-amber-400 to-amber-600 text-slate-950 font-bold text-xs px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-md shadow-amber-500/20 hover:brightness-105 transition-all;
+    @apply bg-gradient-to-r from-amber-400 to-amber-600 text-slate-950 font-bold text-xs px-2.5 py-1.5 sm:px-3 rounded-full flex items-center gap-1 shadow-md shadow-amber-500/20 hover:brightness-105 transition-all border-0;
   }
 
   /* Bottom Navigation */
   .bottom-nav {
-    @apply fixed bottom-0 left-0 right-0 z-50 bg-slate-950/95 backdrop-blur-lg border-t border-white/10 flex justify-around py-2 md:hidden;
+    @apply fixed bottom-0 left-0 right-0 z-50 bg-slate-950/95 backdrop-blur-lg border-t border-white/10 flex justify-around py-2 md:hidden w-full;
   }
 
   .nav-item {
-    @apply flex flex-col items-center gap-0.5 text-slate-400 text-[11px] font-medium px-3 py-1 rounded-xl bg-transparent transition-colors;
+    @apply flex flex-col items-center gap-0.5 text-slate-400 text-[11px] font-medium px-3 py-1 rounded-xl bg-transparent transition-colors border-0;
   }
 
   .nav-item.active {
@@ -104,15 +99,15 @@
 
   /* Buttons & Badges */
   .btn-primary {
-    @apply bg-amber-400 hover:bg-amber-500 text-slate-950 font-bold px-5 py-2.5 rounded-xl inline-flex items-center justify-center gap-2 shadow-lg shadow-amber-500/25 transition-all active:scale-95;
+    @apply bg-amber-400 hover:bg-amber-500 text-slate-950 font-bold px-5 py-2.5 rounded-xl inline-flex items-center justify-center gap-2 shadow-lg shadow-amber-500/25 transition-all active:scale-95 border-0;
   }
 
   .btn-secondary {
-    @apply bg-white/10 hover:bg-white/20 text-slate-100 font-semibold px-5 py-2.5 rounded-xl inline-flex items-center justify-center gap-2 transition-all active:scale-95;
+    @apply bg-white/10 hover:bg-white/20 text-slate-100 font-semibold px-5 py-2.5 rounded-xl inline-flex items-center justify-center gap-2 transition-all active:scale-95 border-0;
   }
 
   .btn-success {
-    @apply bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-5 py-2.5 rounded-xl inline-flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/30 transition-all active:scale-95;
+    @apply bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-5 py-2.5 rounded-xl inline-flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/30 transition-all active:scale-95 border-0;
   }
 
   .price-tag {
@@ -137,34 +132,34 @@
 
   /* Modals */
   .modal-overlay {
-    @apply fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4;
+    @apply fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 w-full h-full;
   }
 
   .modal-card {
-    @apply bg-slate-800 border border-white/10 rounded-3xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6 shadow-2xl relative;
+    @apply bg-slate-800 border border-white/10 rounded-3xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6 shadow-2xl relative box-border mx-auto;
     animation: popIn 0.25s ease-out;
   }
 
   .modal-close {
-    @apply absolute top-4 right-4 bg-white/10 hover:bg-white/20 text-slate-400 hover:text-white w-8 h-8 rounded-full flex items-center justify-center transition-colors;
+    @apply absolute top-4 right-4 bg-white/10 hover:bg-white/20 text-slate-400 hover:text-white w-8 h-8 rounded-full flex items-center justify-center transition-colors border-0;
   }
 
   /* Cards & Grid */
   .grid-2 {
-    @apply grid grid-cols-1 sm:grid-cols-2 gap-4;
+    @apply w-full grid grid-cols-1 sm:grid-cols-2 gap-4;
   }
 
   .grid-3 {
-    @apply grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5;
+    @apply w-full grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5;
   }
 
   .card {
-    @apply bg-slate-800 border border-white/10 rounded-2xl overflow-hidden transition-all duration-200 hover:border-amber-400/40 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/40;
+    @apply w-full bg-slate-800 border border-white/10 rounded-2xl overflow-hidden transition-all duration-200 hover:border-amber-400/40 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/40 box-border;
   }
 
   /* Forms */
   .form-group {
-    @apply mb-4;
+    @apply w-full mb-4;
   }
 
   .form-label {
@@ -172,12 +167,12 @@
   }
 
   .form-input, .form-select, .form-textarea {
-    @apply w-full bg-slate-900/80 border border-white/10 rounded-lg text-slate-100 px-3.5 py-2.5 text-sm outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20 transition-all;
+    @apply w-full bg-slate-900/80 border border-white/10 rounded-lg text-slate-100 px-3.5 py-2.5 text-sm outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20 transition-all box-border;
   }
 
   /* Toast */
   .toast-container {
-    @apply fixed bottom-20 right-5 z-[60] flex flex-col gap-2 md:bottom-6;
+    @apply fixed bottom-20 right-5 z-[60] flex flex-col gap-2 md:bottom-6 max-w-sm w-full;
   }
 
   .toast {
@@ -196,7 +191,7 @@
 
   /* Mobile Money */
   .momo-option {
-    @apply flex items-center gap-3 p-3 border border-white/10 rounded-lg bg-slate-900/60 cursor-pointer transition-colors hover:border-amber-400/50;
+    @apply w-full flex items-center gap-3 p-3 border border-white/10 rounded-lg bg-slate-900/60 cursor-pointer transition-colors hover:border-amber-400/50;
   }
 
   .momo-option.selected {

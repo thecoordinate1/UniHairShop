@@ -4,110 +4,76 @@ import { useApp } from '../context/AppContext';
 import { initialTransformations } from '../data/mockData';
 
 export default function HomeView() {
-  const { setActiveTab, services, products, setBookingService, setSelectedProduct, toggleFavorite, user, addToCart } = useApp();
+  const { setActiveTab, services, products, setBookingService, setSelectedProduct, toggleFavorite, user, addToCart, currentCampus } = useApp();
 
   const featuredServices = services.slice(0, 4);
   const featuredProducts = products.filter((p) => p.featured).slice(0, 3);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+    <div className="w-full flex flex-col gap-8 mx-auto">
       {/* Hero Banner Section */}
       <section
+        className="w-full relative rounded-3xl overflow-hidden min-h-[380px] flex items-center p-6 sm:p-10 border border-white/10 shadow-2xl mx-auto"
         style={{
-          position: 'relative',
-          borderRadius: 'var(--radius-lg)',
-          overflow: 'hidden',
-          minHeight: '380px',
-          display: 'flex',
-          alignItems: 'center',
-          padding: '32px 24px',
-          background: `linear-gradient(90deg, rgba(15, 23, 42, 0.95) 0%, rgba(15, 23, 42, 0.6) 60%, rgba(15, 23, 42, 0.2) 100%), url('/images/hero_banner.jpg') center/cover no-repeat`,
-          border: '1px solid var(--glass-border)',
-          boxShadow: 'var(--shadow-lg)'
+          background: `linear-gradient(90deg, rgba(15, 23, 42, 0.95) 0%, rgba(15, 23, 42, 0.75) 55%, rgba(15, 23, 42, 0.3) 100%), url('/images/hero_banner.jpg') center/cover no-repeat`
         }}
       >
-        <div style={{ maxWidth: '540px', zIndex: 2 }}>
-          <div
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              background: 'rgba(255, 184, 0, 0.18)',
-              border: '1px solid rgba(255, 184, 0, 0.3)',
-              color: 'var(--primary)',
-              fontSize: '0.8rem',
-              fontWeight: 700,
-              padding: '6px 14px',
-              borderRadius: '20px',
-              marginBottom: '16px'
-            }}
-          >
+        <div className="max-w-xl w-full z-10">
+          <div className="inline-flex items-center gap-1.5 bg-amber-400/20 border border-amber-400/30 text-amber-400 text-xs font-bold px-3 py-1.5 rounded-full mb-4">
             <Sparkles size={14} />
-            <span>#1 Campus Salon & Grooming Shop Zambia</span>
+            <span>#1 Campus Salon & Shop — {currentCampus}</span>
           </div>
 
-          <h1 style={{ fontSize: '2.4rem', lineHeight: 1.15, marginBottom: '14px', color: '#fff' }}>
+          <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold leading-tight mb-4 text-white font-heading">
             Look Sharp on Campus <br />
-            <span style={{ color: 'var(--primary)' }}>Book Fast & Shop Local</span>
+            <span className="text-amber-400">Book Fast & Shop Local</span>
           </h1>
 
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.98rem', marginBottom: '24px' }}>
-            On-campus grooming, hair braiding, nail tech, glam makeup & premium products tailored for Zambian university students. Low data, fast booking with Airtel, MTN & Zamtel Kwacha.
+          <p className="text-slate-300 text-sm sm:text-base mb-6 max-w-lg">
+            On-campus hair grooming, knotless braids, nail tech, glam makeup & retail products tailored for Zambian university students. Low data, fast mobile booking with Airtel, MTN & Zamtel Kwacha.
           </p>
 
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
+          <div className="flex flex-wrap gap-3">
             <button className="btn-primary" onClick={() => setActiveTab('services')}>
               <Calendar size={18} />
               <span>Book Appointment</span>
             </button>
             <button className="btn-secondary" onClick={() => setActiveTab('shop')}>
               <ShoppingBag size={18} />
-              <span>Shop Hair & Products</span>
+              <span>Shop Products</span>
             </button>
           </div>
         </div>
       </section>
 
       {/* Student Referral & Loyalty Perks Banner */}
-      <section
-        style={{
-          background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.9) 0%, rgba(15, 23, 42, 0.9) 100%)',
-          border: '1px solid rgba(255, 184, 0, 0.3)',
-          borderRadius: 'var(--radius-md)',
-          padding: '20px',
-          display: 'flex',
-          flexWrap: 'wrap',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: '16px'
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-          <div style={{ background: 'rgba(255, 184, 0, 0.15)', padding: '12px', borderRadius: '50%', color: 'var(--primary)' }}>
-            <Gift size={28} />
+      <section className="w-full bg-gradient-to-r from-slate-800 to-slate-900 border border-amber-400/30 rounded-2xl p-5 flex flex-wrap items-center justify-between gap-4 mx-auto">
+        <div className="flex items-center gap-3.5">
+          <div className="bg-amber-400/15 p-3 rounded-full text-amber-400 shrink-0">
+            <Gift size={26} />
           </div>
           <div>
-            <h4 style={{ fontSize: '1.05rem', color: '#fff' }}>Student Loyalty & Referral Perks</h4>
-            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-              Earn 1 point per K10 spent! Balance: <strong style={{ color: 'var(--primary)' }}>{user.loyaltyPoints} Points</strong>. Share code <strong style={{ color: '#00E676' }}>{user.referralCode}</strong> to get K15 off.
+            <h4 className="text-base font-bold text-white">Student Loyalty & Referral Perks</h4>
+            <p className="text-xs sm:text-sm text-slate-300">
+              Earn 1 point per K10 spent! Balance: <strong className="text-amber-400">{user.loyaltyPoints} Points</strong>. Share code <strong className="text-emerald-400">{user.referralCode}</strong> for K15 off.
             </p>
           </div>
         </div>
-        <button className="btn-secondary" onClick={() => setActiveTab('account')} style={{ fontSize: '0.85rem', padding: '8px 16px' }}>
+        <button className="btn-secondary text-xs px-4 py-2 shrink-0" onClick={() => setActiveTab('account')}>
           View Rewards
         </button>
       </section>
 
       {/* Featured Services Section */}
-      <section>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '16px' }}>
+      <section className="w-full mx-auto">
+        <div className="flex justify-between items-end mb-4">
           <div>
-            <h2 style={{ fontSize: '1.5rem', color: '#fff' }}>Popular Campus Services</h2>
-            <p style={{ fontSize: '0.88rem', color: 'var(--text-muted)' }}>Book in less than 60 seconds</p>
+            <h2 className="text-xl sm:text-2xl font-bold text-white">Popular Campus Services</h2>
+            <p className="text-xs sm:text-sm text-slate-400">Book in less than 60 seconds</p>
           </div>
           <button
             onClick={() => setActiveTab('services')}
-            style={{ background: 'none', color: 'var(--primary)', fontWeight: 600, fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+            className="text-amber-400 font-semibold text-sm flex items-center gap-1 hover:underline bg-transparent border-0"
           >
             <span>See All ({services.length})</span>
             <ArrowRight size={16} />
@@ -116,62 +82,39 @@ export default function HomeView() {
 
         <div className="grid-2">
           {featuredServices.map((srv) => (
-            <div key={srv.id} className="card" style={{ display: 'flex', flexDirection: 'column' }}>
-              <div style={{ position: 'relative', height: '180px' }}>
+            <div key={srv.id} className="card flex flex-col justify-between">
+              <div className="relative h-44 w-full">
                 <img
                   src={srv.image}
                   alt={srv.name}
-                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  className="w-full h-full object-cover"
                 />
                 <button
                   onClick={() => toggleFavorite(srv.id)}
-                  style={{
-                    position: 'absolute',
-                    top: '12px',
-                    right: '12px',
-                    background: 'rgba(0, 0, 0, 0.6)',
-                    color: user.favorites.includes(srv.id) ? 'var(--accent)' : '#fff',
-                    padding: '8px',
-                    borderRadius: '50%'
-                  }}
+                  className="absolute top-3 right-3 bg-black/60 text-white p-2 rounded-full border-0"
                 >
-                  <Heart size={16} fill={user.favorites.includes(srv.id) ? 'var(--accent)' : 'none'} />
+                  <Heart size={16} fill={user.favorites.includes(srv.id) ? 'var(--accent)' : 'none'} className={user.favorites.includes(srv.id) ? 'text-pink-500' : 'text-white'} />
                 </button>
-                <div
-                  style={{
-                    position: 'absolute',
-                    bottom: '12px',
-                    left: '12px',
-                    background: 'rgba(15, 23, 42, 0.85)',
-                    padding: '4px 10px',
-                    borderRadius: '12px',
-                    fontSize: '0.75rem',
-                    fontWeight: 600,
-                    color: '#fff',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px'
-                  }}
-                >
+                <div className="absolute bottom-3 left-3 bg-slate-900/85 px-2.5 py-1 rounded-xl text-xs font-semibold text-white flex items-center gap-1">
                   <Clock size={12} />
                   <span>{srv.duration} mins</span>
                 </div>
               </div>
 
-              <div style={{ padding: '16px', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+              <div className="p-4 flex-1 flex flex-col justify-between">
                 <div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--primary)', fontWeight: 700, textTransform: 'uppercase', marginBottom: '4px' }}>
+                  <div className="text-xs text-amber-400 font-bold uppercase mb-1">
                     {srv.category}
                   </div>
-                  <h3 style={{ fontSize: '1.1rem', color: '#fff', marginBottom: '6px' }}>{srv.name}</h3>
-                  <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '14px' }}>
+                  <h3 className="text-lg font-bold text-white mb-1.5">{srv.name}</h3>
+                  <p className="text-xs text-slate-400 mb-4 line-clamp-2">
                     {srv.description}
                   </p>
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '12px', borderTop: '1px solid var(--border-color)' }}>
+                <div className="flex items-center justify-between pt-3 border-t border-white/10">
                   <span className="price-tag">K {srv.price}</span>
-                  <button className="btn-primary" onClick={() => setBookingService(srv)}>
+                  <button className="btn-primary text-xs px-4 py-2" onClick={() => setBookingService(srv)}>
                     <span>Book Now</span>
                   </button>
                 </div>
@@ -182,15 +125,15 @@ export default function HomeView() {
       </section>
 
       {/* Featured Retail Products */}
-      <section>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '16px' }}>
+      <section className="w-full mx-auto">
+        <div className="flex justify-between items-end mb-4">
           <div>
-            <h2 style={{ fontSize: '1.5rem', color: '#fff' }}>Trending Student Products</h2>
-            <p style={{ fontSize: '0.88rem', color: 'var(--text-muted)' }}>Hair oils, grooming kits & cosmetics delivered to your hostel</p>
+            <h2 className="text-xl sm:text-2xl font-bold text-white">Trending Student Products</h2>
+            <p className="text-xs sm:text-sm text-slate-400">Hair oils, grooming kits & cosmetics delivered to your hostel</p>
           </div>
           <button
             onClick={() => setActiveTab('shop')}
-            style={{ background: 'none', color: 'var(--primary)', fontWeight: 600, fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+            className="text-amber-400 font-semibold text-sm flex items-center gap-1 hover:underline bg-transparent border-0"
           >
             <span>Visit Shop</span>
             <ArrowRight size={16} />
@@ -199,35 +142,33 @@ export default function HomeView() {
 
         <div className="grid-3">
           {featuredProducts.map((prd) => (
-            <div key={prd.id} className="card" style={{ padding: '14px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+            <div key={prd.id} className="card p-3.5 flex flex-col justify-between">
               <div>
-                <div style={{ position: 'relative', height: '160px', borderRadius: 'var(--radius-sm)', overflow: 'hidden', marginBottom: '12px' }}>
-                  <img src={prd.image} alt={prd.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                <div className="relative h-40 w-full rounded-xl overflow-hidden mb-3">
+                  <img src={prd.image} alt={prd.name} className="w-full h-full object-cover" />
                   <span
-                    className={`badge ${prd.stock > 10 ? 'badge-in-stock' : prd.stock > 0 ? 'badge-low-stock' : 'badge-out-of-stock'}`}
-                    style={{ position: 'absolute', top: '8px', left: '8px' }}
+                    className={`badge ${prd.stock > 10 ? 'badge-in-stock' : prd.stock > 0 ? 'badge-low-stock' : 'badge-out-of-stock'} absolute top-2 left-2`}
                   >
                     {prd.stock > 10 ? 'In Stock' : prd.stock > 0 ? `Only ${prd.stock} left` : 'Out of Stock'}
                   </span>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem', color: '#FFB800', marginBottom: '4px' }}>
+                <div className="flex items-center gap-1 text-xs text-amber-400 mb-1">
                   <Star size={14} fill="#FFB800" />
-                  <span style={{ fontWeight: 700 }}>{prd.rating}</span>
-                  <span style={{ color: 'var(--text-muted)' }}>({prd.reviewsCount})</span>
+                  <span className="font-bold">{prd.rating}</span>
+                  <span className="text-slate-400">({prd.reviewsCount})</span>
                 </div>
                 <h4
-                  style={{ fontSize: '1rem', color: '#fff', marginBottom: '6px', cursor: 'pointer' }}
+                  className="text-sm font-bold text-white mb-1 cursor-pointer hover:text-amber-400"
                   onClick={() => setSelectedProduct(prd)}
                 >
                   {prd.name}
                 </h4>
               </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '12px' }}>
-                <span className="price-tag" style={{ fontSize: '1.05rem' }}>K {prd.price}</span>
+              <div className="flex items-center justify-between mt-3 pt-2 border-t border-white/10">
+                <span className="price-tag text-base">K {prd.price}</span>
                 <button
-                  className="btn-secondary"
-                  style={{ padding: '8px 12px', fontSize: '0.82rem' }}
+                  className="btn-secondary text-xs px-3 py-1.5"
                   onClick={() => addToCart(prd)}
                 >
                   Add to Cart
@@ -238,24 +179,24 @@ export default function HomeView() {
         </div>
       </section>
 
-      {/* Student Before & After Gallery */}
-      <section style={{ background: 'var(--card-bg)', borderRadius: 'var(--radius-lg)', padding: '24px', border: '1px solid var(--border-color)' }}>
-        <div style={{ textAlign: 'center', maxWidth: '500px', margin: '0 auto 20px' }}>
-          <h2 style={{ fontSize: '1.4rem', color: '#fff', marginBottom: '6px' }}>Campus Student Transformations</h2>
-          <p style={{ fontSize: '0.88rem', color: 'var(--text-muted)' }}>See real results from our campus stylists and barbers</p>
+      {/* Student Transformations */}
+      <section className="w-full bg-slate-800 rounded-3xl p-6 border border-white/10 mx-auto">
+        <div className="text-center max-w-md mx-auto mb-5">
+          <h2 className="text-xl font-bold text-white mb-1">Campus Student Transformations</h2>
+          <p className="text-xs text-slate-400">Real results from our campus stylists at {currentCampus}</p>
         </div>
 
         <div className="grid-2">
           {initialTransformations.map((item) => (
-            <div key={item.id} style={{ background: 'rgba(15, 23, 42, 0.7)', borderRadius: 'var(--radius-md)', padding: '14px', border: '1px solid var(--border-color)' }}>
-              <div style={{ display: 'flex', gap: '10px', height: '150px', marginBottom: '12px' }}>
-                <div style={{ flex: 1, borderRadius: 'var(--radius-sm)', overflow: 'hidden', position: 'relative' }}>
-                  <img src={item.beforeImg} alt="Before" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  <span style={{ position: 'absolute', bottom: '6px', left: '6px', background: 'rgba(0,0,0,0.7)', color: '#fff', fontSize: '0.68rem', padding: '2px 6px', borderRadius: '4px' }}>Result</span>
+            <div key={item.id} className="bg-slate-900/70 rounded-xl p-3.5 border border-white/10">
+              <div className="flex gap-2.5 h-36 mb-3">
+                <div className="flex-1 rounded-lg overflow-hidden relative">
+                  <img src={item.beforeImg} alt="Result" className="w-full h-full object-cover" />
+                  <span className="absolute bottom-1.5 left-1.5 bg-black/75 text-white text-[10px] px-1.5 py-0.5 rounded">Result</span>
                 </div>
               </div>
-              <h4 style={{ fontSize: '0.98rem', color: '#fff' }}>{item.title}</h4>
-              <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Client: {item.student}</p>
+              <h4 className="text-sm font-bold text-white">{item.title}</h4>
+              <p className="text-xs text-slate-400">Client: {item.student}</p>
             </div>
           ))}
         </div>
