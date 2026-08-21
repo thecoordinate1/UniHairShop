@@ -1,5 +1,18 @@
 // Initial Seed Data for UniHairShop
 
+export const lusakaUniversities = [
+  { id: 'uni-1', name: 'UNILUS Silverest Campus', shortName: 'UNILUS Silverest', area: 'Chongwe / Silverest, Lusaka' },
+  { id: 'uni-2', name: 'UNILUS Pioneer Campus', shortName: 'UNILUS Pioneer', area: 'Mass Media, Lusaka' },
+  { id: 'uni-3', name: 'UNZA Great East Road Campus', shortName: 'UNZA Great East', area: 'Great East Road, Lusaka' },
+  { id: 'uni-4', name: 'UNZA Ridgeway Campus', shortName: 'UNZA Ridgeway', area: 'Ridgeway, Lusaka' },
+  { id: 'uni-5', name: 'Cavendish University Zambia', shortName: 'Cavendish', area: 'Longacres / Main Campus, Lusaka' },
+  { id: 'uni-6', name: 'Lusaka Apex Medical University (LAMU)', shortName: 'Apex Medical', area: 'Chalala & Foxdale, Lusaka' },
+  { id: 'uni-7', name: 'Texila American University Zambia', shortName: 'Texila American', area: 'Lilayi, Lusaka' },
+  { id: 'uni-8', name: 'Zambia Open University (ZAOU)', shortName: 'ZAOU', area: 'Waterfalls, Lusaka' },
+  { id: 'uni-9', name: 'Information & Communications University (ICU)', shortName: 'ICU Zambia', area: 'Mass Media, Lusaka' },
+  { id: 'uni-10', name: 'National Institute of Public Administration (NIPA)', shortName: 'NIPA', area: 'Dapeza, Lusaka' }
+];
+
 export const initialServices = [
   {
     id: 'srv-1',
@@ -124,7 +137,7 @@ export const initialProducts = [
     category: 'Cosmetics',
     description: 'Oil-control setting spray keeping your campus makeup fresh all day in warm weather.',
     price: 110,
-    stock: 5, // Low stock demo
+    stock: 5,
     rating: 4.8,
     reviewsCount: 12,
     image: '/images/cosmetics_set.jpg',
@@ -143,7 +156,7 @@ export const initialTransformations = [
   {
     id: 'tr-1',
     title: 'Burst Fade & Lineup',
-    student: 'Mwamba (3rd Year Engineering)',
+    student: 'Mwamba (UNILUS Silverest)',
     service: 'Barbing',
     beforeImg: '/images/barber_service.jpg',
     afterImg: '/images/barber_service.jpg',
@@ -152,7 +165,7 @@ export const initialTransformations = [
   {
     id: 'tr-2',
     title: 'Knotless Boho Braids Transformation',
-    student: 'Thandiwe (2nd Year Law)',
+    student: 'Thandiwe (UNILUS Silverest)',
     service: 'Hair Dressing',
     beforeImg: '/images/hair_braids.jpg',
     afterImg: '/images/hair_braids.jpg',
@@ -172,7 +185,7 @@ export const initialBookings = [
     time: '14:00',
     customerName: 'Kondwani Phiri',
     customerPhone: '0971234567',
-    hostel: 'October Hall, Room 14',
+    hostel: 'UNILUS Silverest Hostel, Block C',
     paymentMethod: 'Airtel Money',
     paymentStatus: 'Paid',
     status: 'Confirmed',
@@ -190,7 +203,7 @@ export const initialOrders = [
     customerName: 'Kondwani Phiri',
     customerPhone: '0971234567',
     deliveryType: 'Hostel Delivery',
-    hostelDetails: 'Kwatsha Hall, Room 8',
+    hostelDetails: 'UNILUS Silverest Hostel, Block A',
     paymentMethod: 'MTN Mobile Money',
     paymentStatus: 'Paid',
     status: 'Ready for Pickup',

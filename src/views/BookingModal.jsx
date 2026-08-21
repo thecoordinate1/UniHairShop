@@ -4,12 +4,13 @@ import { useApp } from '../context/AppContext';
 import LencoCheckoutWizard from '../components/LencoCheckoutWizard';
 
 export default function BookingModal() {
-  const { bookingService, setBookingService, staffList, createBooking, setActiveTab, user } = useApp();
+  const { bookingService, setBookingService, staffList, createBooking, setActiveTab, user, currentCampus, lusakaUniversities } = useApp();
 
   const [selectedStaff, setSelectedStaff] = useState('Any Available Specialist');
   const [selectedDate, setSelectedDate] = useState('2026-08-22');
   const [selectedTime, setSelectedTime] = useState('14:00');
-  const [hostel, setHostel] = useState(user.hostel || 'October Hall, Room 14');
+  const [selectedCampus, setSelectedCampus] = useState(currentCampus);
+  const [hostel, setHostel] = useState(user.hostel || 'UNILUS Silverest Hostel, Block C');
   const [phone, setPhone] = useState(user.phone || '0971234567');
   const [showLencoWizard, setShowLencoWizard] = useState(false);
   const [confirmedBooking, setConfirmedBooking] = useState(null);
@@ -31,6 +32,7 @@ export default function BookingModal() {
       staffName: selectedStaff,
       date: selectedDate,
       time: selectedTime,
+      campus: selectedCampus,
       hostel,
       paymentMethod: lencoResult.paymentMethod,
       lencoRef: lencoResult.lencoReference
@@ -63,6 +65,22 @@ export default function BookingModal() {
                   <span>Duration: {bookingService.duration} mins</span>
                   <span className="price-tag" style={{ fontSize: '0.95rem' }}>K {bookingService.price}</span>
                 </div>
+              </div>
+
+              {/* Campus Selector */}
+              <div className="form-group">
+                <label className="form-label">Lusaka Campus Location:</label>
+                <select
+                  className="form-select"
+                  value={selectedCampus}
+                  onChange={(e) => setSelectedCampus(e.target.value)}
+                >
+                  {lusakaUniversities.map((uni) => (
+                    <option key={uni.id} value={uni.name}>
+                      {uni.name} ({uni.area})
+                    </option>
+                  ))}
+                </select>
               </div>
 
               {/* 1. Select Staff */}
@@ -110,11 +128,11 @@ export default function BookingModal() {
 
               {/* 3. Customer Info */}
               <div className="form-group">
-                <label className="form-label">Campus Hostel / Address (Optional for reminders):</label>
+                <label className="form-label">Hostel Name & Room Number:</label>
                 <input
                   type="text"
                   className="form-input"
-                  placeholder="e.g. October Hall Room 14 / CBU Block B"
+                  placeholder="e.g. UNILUS Silverest Hostel, Block C Room 14"
                   value={hostel}
                   onChange={(e) => setHostel(e.target.value)}
                 />
@@ -155,6 +173,10 @@ export default function BookingModal() {
 
               <div style={{ background: 'rgba(15, 23, 42, 0.8)', padding: '16px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', textAlign: 'left', fontSize: '0.85rem', marginBottom: '20px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                  <span style={{ color: 'var(--text-muted)' }}>Campus:</span>
+                  <span style={{ color: 'var(--primary)', fontWeight: 700 }}>{confirmedBooking.campus}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
                   <span style={{ color: 'var(--text-muted)' }}>Service:</span>
                   <span style={{ color: '#fff', fontWeight: 600 }}>{confirmedBooking.serviceName}</span>
                 </div>
@@ -174,7 +196,7 @@ export default function BookingModal() {
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 <a
-                  href={`https://wa.me/260971234567?text=Hi%20UniHairShop,%20I%20just%20booked%20${confirmedBooking.serviceName}%20ref:${confirmedBooking.id}`}
+                  href={`https://wa.me/260971234567?text=Hi%20UniHairShop,%20I%20just%20booked%20${confirmedBooking.serviceName}%20at%20${confirmedBooking.campus}%20ref:${confirmedBooking.id}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="btn-success"
@@ -200,11 +222,10 @@ export default function BookingModal() {
         </div>
       </div>
 
-      {/* Lenco Payment Checkout Wizard Popup */}
       {showLencoWizard && (
         <LencoCheckoutWizard
           amount={bookingService.price}
-          title={`Booking: ${bookingService.name}`}
+          title={`Booking (${selectedCampus}): ${bookingService.name}`}
           onSuccess={handleLencoSuccess}
           onClose={() => setShowLencoWizard(false)}
           allowPayOnArrival={true}

@@ -1,11 +1,16 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { initialServices, initialProducts, initialStaff, initialBookings, initialOrders } from '../data/mockData';
+import { initialServices, initialProducts, initialStaff, initialBookings, initialOrders, lusakaUniversities } from '../data/mockData';
 
 const AppContext = createContext();
 
 export const AppProvider = ({ children }) => {
   // Navigation tab state
   const [activeTab, setActiveTab] = useState('home');
+
+  // Active Campus Selection (Default: UNILUS Silverest Campus)
+  const [currentCampus, setCurrentCampus] = useState(() => {
+    return localStorage.getItem('unihair_campus') || 'UNILUS Silverest Campus';
+  });
 
   // Role state (Student vs Admin)
   const [isAdmin, setIsAdmin] = useState(false);
@@ -17,9 +22,9 @@ export const AppProvider = ({ children }) => {
       isLoggedIn: true,
       name: 'Kondwani Phiri',
       phone: '0971234567',
-      hostel: 'October Hall, Room 14',
+      hostel: 'UNILUS Silverest Hostel, Block C',
       loyaltyPoints: 120, // K10 = 1 pt -> 120 pts = K12 value
-      referralCode: 'UNZA-KONDWANI-88',
+      referralCode: 'UNILUS-KONDWANI-88',
       favorites: ['srv-1', 'prd-1']
     };
   });
@@ -55,9 +60,9 @@ export const AppProvider = ({ children }) => {
   });
 
   // Modals state
-  const [bookingService, setBookingService] = useState(null); // Service selected for booking
-  const [selectedProduct, setSelectedProduct] = useState(null); // Product detail modal
-  const [lencoCheckoutState, setLencoCheckoutState] = useState(null); // Lenco checkout wizard state
+  const [bookingService, setBookingService] = useState(null);
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [lencoCheckoutState, setLencoCheckoutState] = useState(null);
 
   // Toast System
   const [toasts, setToasts] = useState([]);
@@ -70,7 +75,10 @@ export const AppProvider = ({ children }) => {
     }, 4000);
   };
 
-  // Sync state to localStorage
+  useEffect(() => {
+    localStorage.setItem('unihair_campus', currentCampus);
+  }, [currentCampus]);
+
   useEffect(() => {
     localStorage.setItem('unihair_user', JSON.stringify(user));
   }, [user]);
@@ -130,7 +138,6 @@ export const AppProvider = ({ children }) => {
 
   const clearCart = () => setCart([]);
 
-  // Wishlist / Favorites Toggle
   const toggleFavorite = (id) => {
     setUser((prev) => {
       const exists = prev.favorites.includes(id);
@@ -142,12 +149,12 @@ export const AppProvider = ({ children }) => {
     });
   };
 
-  // Booking logic
   const createBooking = (newBookingData) => {
     const bookingId = `UHS-B${Math.floor(1000 + Math.random() * 9000)}`;
     const newBooking = {
       id: bookingId,
       ...newBookingData,
+      campus: currentCampus,
       customerName: user.name,
       customerPhone: user.phone,
       paymentStatus: newBookingData.paymentMethod === 'Pay on Arrival' ? 'Pending' : 'Paid',
@@ -157,11 +164,10 @@ export const AppProvider = ({ children }) => {
 
     setBookings((prev) => [newBooking, ...prev]);
 
-    // Award loyalty points (1 point per K10)
     const pointsEarned = Math.floor(newBookingData.price / 10);
     setUser((prev) => ({ ...prev, loyaltyPoints: prev.loyaltyPoints + pointsEarned }));
 
-    addToast(`Booking ${bookingId} confirmed! +${pointsEarned} loyalty points earned.`, 'success');
+    addToast(`Booking ${bookingId} confirmed at ${currentCampus}! +${pointsEarned} points`, 'success');
     return newBooking;
   };
 
@@ -179,12 +185,12 @@ export const AppProvider = ({ children }) => {
     addToast(`Booking ${bookingId} rescheduled to ${newDate} at ${newTime}`, 'success');
   };
 
-  // E-Commerce Order Logic
   const createOrder = (orderData) => {
     const orderId = `UHS-ORD-${Math.floor(1000 + Math.random() * 9000)}`;
     const newOrder = {
       id: orderId,
       items: cart,
+      campus: currentCampus,
       totalAmount: orderData.totalAmount,
       customerName: user.name,
       customerPhone: user.phone,
@@ -198,7 +204,6 @@ export const AppProvider = ({ children }) => {
 
     setOrders((prev) => [newOrder, ...prev]);
 
-    // Reduce stock counts in products state
     setProducts((prevProducts) =>
       prevProducts.map((p) => {
         const cartItem = cart.find((item) => item.id === p.id);
@@ -210,16 +215,14 @@ export const AppProvider = ({ children }) => {
       })
     );
 
-    // Award points
     const pointsEarned = Math.floor(orderData.totalAmount / 10);
     setUser((prev) => ({ ...prev, loyaltyPoints: prev.loyaltyPoints + pointsEarned }));
 
     clearCart();
-    addToast(`Order ${orderId} placed successfully! Track status in Account.`, 'success');
+    addToast(`Order ${orderId} placed for ${currentCampus}!`, 'success');
     return newOrder;
   };
 
-  // Admin Actions
   const addService = (serviceData) => {
     const newId = `srv-${Date.now()}`;
     const newSrv = { id: newId, ...serviceData, image: serviceData.image || '/images/barber_service.jpg' };
@@ -265,6 +268,9 @@ export const AppProvider = ({ children }) => {
       value={{
         activeTab,
         setActiveTab,
+        currentCampus,
+        setCurrentCampus,
+        lusakaUniversities,
         isAdmin,
         setIsAdmin,
         user,
