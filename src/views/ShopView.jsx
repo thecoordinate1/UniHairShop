@@ -23,33 +23,31 @@ export default function ShopView() {
     });
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+    <div className="w-full flex flex-col gap-6 mx-auto">
       {/* Shop Header */}
       <div>
-        <h1 style={{ fontSize: '1.8rem', color: '#fff' }}>UniHairShop Retail Store</h1>
-        <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+        <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">UniHairShop Retail Store</h1>
+        <p className="text-slate-400 text-xs sm:text-sm mt-1">
           Quality hair oils, clippers, cosmetics, and self-care products with Zambian hostel delivery!
         </p>
       </div>
 
       {/* Controls Bar */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ position: 'relative', flex: 1, minWidth: '240px' }}>
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-wrap gap-3 justify-between items-center">
+          <div className="relative flex-1 min-w-[240px]">
             <input
               type="text"
-              className="form-input"
-              style={{ paddingLeft: '40px' }}
+              className="form-input pl-11"
               placeholder="Search shampoo, hair growth oil, lip gloss..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
-            <Search size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+            <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
           </div>
 
           <select
-            className="form-select"
-            style={{ width: 'auto', minWidth: '160px' }}
+            className="form-select w-auto min-w-[170px]"
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value)}
           >
@@ -59,21 +57,17 @@ export default function ShopView() {
           </select>
         </div>
 
-        {/* Category Pills */}
-        <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '6px' }}>
+        {/* Category Pills - iOS Segmented Control */}
+        <div className="flex gap-2 overflow-x-auto pb-1 bg-white/[0.04] p-1.5 rounded-full border border-white/10 backdrop-blur-md">
           {categories.map((cat) => (
             <button
               key={cat}
               onClick={() => setSelectedCat(cat)}
-              style={{
-                background: selectedCat === cat ? 'var(--primary)' : 'rgba(255, 255, 255, 0.08)',
-                color: selectedCat === cat ? 'var(--text-dark)' : 'var(--text-main)',
-                fontWeight: selectedCat === cat ? 700 : 500,
-                fontSize: '0.82rem',
-                padding: '6px 14px',
-                borderRadius: '20px',
-                whiteSpace: 'nowrap'
-              }}
+              className={`px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition-all duration-200 cursor-pointer border-0 ${
+                selectedCat === cat
+                  ? 'bg-[#007AFF] text-white font-bold shadow-apple-blue'
+                  : 'text-slate-400 hover:text-white bg-transparent'
+              }`}
             >
               {cat}
             </button>
@@ -84,59 +78,45 @@ export default function ShopView() {
       {/* Products Grid */}
       <div className="grid-3">
         {filteredProducts.map((prd) => (
-          <div key={prd.id} className="card" style={{ padding: '14px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+          <div key={prd.id} className="apple-card p-4 flex flex-col justify-between">
             <div>
-              <div style={{ position: 'relative', height: '180px', borderRadius: 'var(--radius-sm)', overflow: 'hidden', marginBottom: '12px' }}>
-                <img src={prd.image} alt={prd.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              <div className="relative h-48 w-full rounded-2xl overflow-hidden mb-3.5">
+                <img src={prd.image} alt={prd.name} className="w-full h-full object-cover" />
                 <span
-                  className={`badge ${prd.stock > 10 ? 'badge-in-stock' : prd.stock > 0 ? 'badge-low-stock' : 'badge-out-of-stock'}`}
-                  style={{ position: 'absolute', top: '8px', left: '8px' }}
+                  className={`badge ${prd.stock > 10 ? 'badge-in-stock' : prd.stock > 0 ? 'badge-low-stock' : 'badge-out-of-stock'} absolute top-2.5 left-2.5`}
                 >
                   {prd.stock > 10 ? 'In Stock' : prd.stock > 0 ? `Only ${prd.stock} left` : 'Out of Stock'}
                 </span>
                 <button
                   onClick={() => setSelectedProduct(prd)}
-                  style={{
-                    position: 'absolute',
-                    bottom: '8px',
-                    right: '8px',
-                    background: 'rgba(15, 23, 42, 0.85)',
-                    color: '#fff',
-                    padding: '6px 10px',
-                    borderRadius: '12px',
-                    fontSize: '0.75rem',
-                    fontWeight: 600,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px'
-                  }}
+                  className="absolute bottom-2.5 right-2.5 bg-black/70 backdrop-blur-md text-white px-3 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1.5 border border-white/10 active:scale-95 transition-all"
                 >
                   <Eye size={12} />
                   <span>Quick View</span>
                 </button>
               </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem', color: '#FFB800', marginBottom: '4px' }}>
-                <Star size={14} fill="#FFB800" />
-                <span style={{ fontWeight: 700 }}>{prd.rating}</span>
-                <span style={{ color: 'var(--text-muted)' }}>({prd.reviewsCount} reviews)</span>
+              <div className="flex items-center gap-1 text-xs text-amber-400 mb-1.5">
+                <Star size={14} fill="#F5A623" className="text-amber-400" />
+                <span className="font-bold">{prd.rating}</span>
+                <span className="text-slate-400">({prd.reviewsCount} reviews)</span>
               </div>
 
               <h3
-                style={{ fontSize: '1.05rem', color: '#fff', marginBottom: '6px', cursor: 'pointer' }}
+                className="text-base font-bold text-white mb-1.5 cursor-pointer hover:text-blue-400 transition-colors tracking-tight"
                 onClick={() => setSelectedProduct(prd)}
               >
                 {prd.name}
               </h3>
-              <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: '12px' }}>
-                {prd.description.length > 70 ? `${prd.description.substring(0, 70)}...` : prd.description}
+              <p className="text-xs text-slate-400 mb-4 line-clamp-2 leading-relaxed">
+                {prd.description.length > 75 ? `${prd.description.substring(0, 75)}...` : prd.description}
               </p>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '10px', borderTop: '1px solid var(--border-color)' }}>
-              <span className="price-tag">K {prd.price}</span>
+            <div className="flex items-center justify-between pt-3.5 border-t border-white/10">
+              <span className="price-tag text-base">K {prd.price}</span>
               <button
-                className="btn-secondary"
+                className="apple-btn-secondary text-xs px-4 py-2"
                 disabled={prd.stock <= 0}
                 onClick={() => addToCart(prd)}
               >

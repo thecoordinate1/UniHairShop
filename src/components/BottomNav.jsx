@@ -13,7 +13,7 @@ export default function BottomNav() {
         className={`nav-item ${activeTab === 'home' ? 'active' : ''}`}
         onClick={() => setActiveTab('home')}
       >
-        <Home size={20} />
+        <Home size={18} />
         <span>Home</span>
       </button>
 
@@ -21,7 +21,7 @@ export default function BottomNav() {
         className={`nav-item ${activeTab === 'services' ? 'active' : ''}`}
         onClick={() => setActiveTab('services')}
       >
-        <Calendar size={20} />
+        <Calendar size={18} />
         <span>Book</span>
       </button>
 
@@ -29,7 +29,7 @@ export default function BottomNav() {
         className={`nav-item ${activeTab === 'shop' ? 'active' : ''}`}
         onClick={() => setActiveTab('shop')}
       >
-        <ShoppingBag size={20} />
+        <ShoppingBag size={18} />
         <span>Shop</span>
       </button>
 
@@ -37,9 +37,9 @@ export default function BottomNav() {
         className={`nav-item ${activeTab === 'cart' ? 'active' : ''}`}
         onClick={() => setActiveTab('cart')}
       >
-        <div style={{ position: 'relative' }}>
-          <ShoppingCart size={20} />
-          {totalCartCount > 0 && <span className="badge-count" style={{ top: -6, right: -8 }}>{totalCartCount}</span>}
+        <div className="relative">
+          <ShoppingCart size={18} />
+          {totalCartCount > 0 && <span className="badge-count" style={{ top: -6, right: -10 }}>{totalCartCount}</span>}
         </div>
         <span>Cart</span>
       </button>
@@ -49,7 +49,7 @@ export default function BottomNav() {
           className={`nav-item ${activeTab === 'admin' ? 'active' : ''}`}
           onClick={() => setActiveTab('admin')}
         >
-          <ShieldCheck size={20} style={{ color: 'var(--primary)' }} />
+          <ShieldCheck size={18} className="text-amber-400" />
           <span>Admin</span>
         </button>
       ) : (
@@ -57,7 +57,7 @@ export default function BottomNav() {
           className={`nav-item ${activeTab === 'account' ? 'active' : ''}`}
           onClick={() => setActiveTab('account')}
         >
-          <User size={20} />
+          <User size={18} />
           <span>Account</span>
         </button>
       )}

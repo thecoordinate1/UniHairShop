@@ -39,6 +39,9 @@ export default function ProductDetailModal() {
   return (
     <div className="modal-overlay" onClick={handleBackdropClick}>
       <div className="modal-card max-w-md" onClick={(e) => e.stopPropagation()}>
+        {/* iOS Sheet Drag Handle */}
+        <div className="w-12 h-1.5 bg-white/20 rounded-full mx-auto mb-4 sm:hidden"></div>
+
         {/* Prominent Close X Button */}
         <button
           className="modal-close"
@@ -46,7 +49,7 @@ export default function ProductDetailModal() {
           title="Close Quick View (Esc)"
           aria-label="Close modal"
         >
-          <X size={20} />
+          <X size={18} />
         </button>
 
         <div className="h-52 w-full rounded-2xl overflow-hidden mb-4">
