@@ -211,7 +211,7 @@
 
   /* WhatsApp Widget */
   .whatsapp-widget {
-    @apply fixed bottom-20 left-5 z-40 bg-[#34C759] text-white w-12 h-12 rounded-full flex items-center justify-center shadow-lg shadow-emerald-500/40 hover:scale-110 active:scale-95 transition-all md:bottom-6;
+    @apply fixed bottom-28 left-5 z-40 bg-[#34C759] text-white w-12 h-12 rounded-full flex items-center justify-center shadow-lg shadow-emerald-500/40 hover:scale-110 active:scale-95 transition-all md:bottom-6;
   }
 
   /* Mobile Money Options */

@@ -17,7 +17,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
 const splash = document.getElementById('app-splash');
 if (splash) {
   // Small delay so the user actually sees the splash (min 600ms total)
-  const minShowTime = 600;
+  const minShowTime = 6000;
   const start = performance.timing?.navigationStart || performance.timeOrigin;
   const elapsed = Date.now() - start;
   const remaining = Math.max(0, minShowTime - elapsed);
