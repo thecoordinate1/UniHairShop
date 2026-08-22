@@ -1,12 +1,10 @@
 import React, { useState } from 'react';
-import { Scissors, ShoppingBag, User, ShieldCheck, MapPin, ChevronDown } from 'lucide-react';
+import { Scissors, ShieldCheck, MapPin, ChevronDown } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 
 export default function Header() {
-  const { activeTab, setActiveTab, cart, isAdmin, setIsAdmin, currentCampus, setCurrentCampus, lusakaUniversities, addToast } = useApp();
+  const { activeTab, setActiveTab, isAdmin, setIsAdmin, currentCampus, setCurrentCampus, lusakaUniversities, addToast } = useApp();
   const [showCampusDropdown, setShowCampusDropdown] = useState(false);
-
-  const totalCartCount = cart.reduce((acc, item) => acc + item.quantity, 0);
 
   const handleSelectCampus = (uniName) => {
     setCurrentCampus(uniName);
@@ -19,9 +17,9 @@ export default function Header() {
       <div className="header-inner">
         {/* Brand Logo & Campus Badge Selector */}
         <div className="flex items-center gap-2 relative min-w-0">
-          <button className="brand-logo truncate shrink-0" onClick={() => setActiveTab('home')}>
-            <Scissors size={22} className="shrink-0" />
-            <span className="text-lg sm:text-xl font-extrabold">UniHairShop</span>
+          <button className="brand-logo truncate shrink-0 cursor-pointer" onClick={() => setActiveTab('home')}>
+            <Scissors size={22} className="shrink-0 text-amber-400" />
+            <span className="text-lg sm:text-xl font-extrabold text-white">UniHairShop</span>
           </button>
 
           {/* Compact Campus Badge for Mobile & Desktop */}
@@ -37,7 +35,7 @@ export default function Header() {
 
           {/* Dropdown Menu listing Lusaka Universities */}
           {showCampusDropdown && (
-            <div className="absolute top-12 left-0 z-50 w-72 max-w-[calc(100vw-32px)] bg-[#1A1A22]/90 backdrop-blur-2xl border border-white/15 rounded-3xl shadow-2xl p-3 animate-in fade-in zoom-in-95 duration-150">
+            <div className="absolute top-12 left-0 z-50 w-72 max-w-[calc(100vw-32px)] bg-[#1A1A22]/95 backdrop-blur-2xl border border-white/15 rounded-3xl shadow-2xl p-3 animate-in fade-in zoom-in-95 duration-150">
               <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider px-2 py-1 border-b border-white/10 mb-2">
                 Lusaka Universities:
               </div>
@@ -46,7 +44,7 @@ export default function Header() {
                   <button
                     key={uni.id}
                     onClick={() => handleSelectCampus(uni.name)}
-                    className={`w-full p-2.5 rounded-2xl text-left flex items-center justify-between text-xs transition-all duration-200 ${
+                    className={`w-full p-2.5 rounded-2xl text-left flex items-center justify-between text-xs transition-all duration-200 cursor-pointer ${
                       currentCampus === uni.name
                         ? 'bg-amber-400/20 text-amber-300 font-bold border border-amber-400/30'
                         : 'hover:bg-white/10 text-slate-200 font-medium'
@@ -104,19 +102,10 @@ export default function Header() {
           </button>
         </nav>
 
-        {/* Right Header Actions */}
+        {/* Role Switcher Action */}
         <div className="header-actions shrink-0">
-          <button className="icon-btn" title="Cart" onClick={() => setActiveTab('cart')}>
-            <ShoppingBag size={18} />
-            {totalCartCount > 0 && <span className="badge-count">{totalCartCount}</span>}
-          </button>
-
-          <button className="icon-btn" title="My Account" onClick={() => setActiveTab('account')}>
-            <User size={18} />
-          </button>
-
           <button
-            className="role-switcher-btn"
+            className="role-switcher-btn cursor-pointer"
             onClick={() => {
               const nextMode = !isAdmin;
               setIsAdmin(nextMode);
