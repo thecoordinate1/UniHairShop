@@ -21,7 +21,7 @@
   }
 
   html {
-    @apply w-full overflow-x-hidden scroll-smooth bg-[#0A0A0C];
+    @apply w-full scroll-smooth bg-[#0A0A0C];
   }
 
   body {
