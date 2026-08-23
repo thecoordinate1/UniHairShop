@@ -1,13 +1,17 @@
 {
-  "name": "UniHairShop — Campus Beauty & Grooming",
+  "name": "UniHairShop — Campus Beauty & Grooming Zambia",
   "short_name": "UniHairShop",
   "description": "On-campus hair grooming, barbing, nails, makeup & cosmetics in Zambia. Fast mobile booking with Airtel, MTN, and Zamtel Kwacha.",
   "start_url": "/",
   "scope": "/",
+  "id": "zm.co.unihairshop.pwa",
   "display": "standalone",
-  "orientation": "portrait",
+  "orientation": "portrait-primary",
   "background_color": "#0A0A0C",
   "theme_color": "#0A0A0C",
+  "lang": "en",
+  "categories": ["lifestyle", "shopping", "beauty"],
+  "prefer_related_applications": false,
   "icons": [
     {
       "src": "/icons/icon-192.png",
@@ -32,6 +36,29 @@
       "sizes": "180x180",
       "type": "image/png",
       "purpose": "any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Book Appointment",
+      "short_name": "Book",
+      "description": "Quickly book a campus haircut or beauty appointment",
+      "url": "/?tab=services",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Shop Products",
+      "short_name": "Shop",
+      "description": "Order hair oils and cosmetics with hostel delivery",
+      "url": "/?tab=shop",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "My Account",
+      "short_name": "Account",
+      "description": "View appointment schedule and order status",
+      "url": "/?tab=account",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
     }
   ]
 }

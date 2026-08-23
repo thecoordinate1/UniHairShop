@@ -1,32 +1,45 @@
-const CACHE_NAME = 'unihairshop-v1';
+const CACHE_VERSION = 'v2';
+const CACHE_NAME = `unihairshop-${CACHE_VERSION}`;
+const FONTS_CACHE_NAME = `unihairshop-fonts-${CACHE_VERSION}`;
+
 const STATIC_ASSETS = [
   '/',
   '/index.html',
   '/manifest.json',
   '/icons/icon-192.png',
   '/icons/icon-512.png',
+  '/icons/icon-maskable.png',
   '/icons/apple-touch-icon.png',
-  '/icons/icon.svg'
+  '/icons/icon.svg',
+  '/images/barber_service.jpg',
+  '/images/hair_braids.jpg',
+  '/images/nail_art.jpg',
+  '/images/makeup_glam.jpg',
+  '/images/hair_product.jpg',
+  '/images/grooming_kit.jpg',
+  '/images/cosmetics_set.jpg',
+  '/images/hero_banner.jpg'
 ];
 
-// Install Event - Cache Core Static Assets
+// Install Event - Precache core static assets & shell
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      console.log('[SW] Caching app shell & static assets');
+      console.log('[SW] Precaching app shell & static assets');
       return cache.addAll(STATIC_ASSETS);
     }).then(() => self.skipWaiting())
   );
 });
 
-// Activate Event - Cleanup Old Caches
+// Activate Event - Clean up obsolete caches
 self.addEventListener('activate', (event) => {
+  const allowedCaches = [CACHE_NAME, FONTS_CACHE_NAME];
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((cache) => {
-          if (cache !== CACHE_NAME) {
-            console.log('[SW] Clearing old cache:', cache);
+          if (!allowedCaches.includes(cache)) {
+            console.log('[SW] Clearing old cache bucket:', cache);
             return caches.delete(cache);
           }
         })
@@ -35,14 +48,32 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Fetch Event - Stale-While-Revalidate for Assets, Network-First for Navigation
+// Fetch Event - Dynamic caching strategies
 self.addEventListener('fetch', (event) => {
   // Only handle GET requests
   if (event.request.method !== 'GET') return;
 
   const url = new URL(event.request.url);
 
-  // Handle Navigation Requests (HTML)
+  // 1. Google Fonts Cache Strategy (Cache-First)
+  if (url.origin === 'https://fonts.googleapis.com' || url.origin === 'https://fonts.gstatic.com') {
+    event.respondWith(
+      caches.open(FONTS_CACHE_NAME).then((cache) => {
+        return cache.match(event.request).then((cachedResponse) => {
+          if (cachedResponse) return cachedResponse;
+          return fetch(event.request).then((networkResponse) => {
+            if (networkResponse && networkResponse.status === 200) {
+              cache.put(event.request, networkResponse.clone());
+            }
+            return networkResponse;
+          });
+        });
+      })
+    );
+    return;
+  }
+
+  // 2. Navigation Requests (HTML) -> Network-First with Offline App-Shell Fallback
   if (event.request.mode === 'navigate') {
     event.respondWith(
       fetch(event.request).catch(() => {
@@ -52,33 +83,24 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Handle Static Assets (CSS, JS, Fonts, Images)
+  // 3. Static Assets & Images (Stale-While-Revalidate)
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
-      if (cachedResponse) {
-        // Fetch background update for stale-while-revalidate
-        fetch(event.request).then((networkResponse) => {
+      const fetchPromise = fetch(event.request)
+        .then((networkResponse) => {
           if (networkResponse && networkResponse.status === 200) {
-            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, networkResponse));
+            const responseToCache = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(event.request, responseToCache);
+            });
           }
-        }).catch(() => {/* Ignore network errors on background refresh */});
-
-        return cachedResponse;
-      }
-
-      // Network Fallback with Cache Storing
-      return fetch(event.request).then((networkResponse) => {
-        if (!networkResponse || networkResponse.status !== 200 || networkResponse.type !== 'basic') {
           return networkResponse;
-        }
-
-        const responseToCache = networkResponse.clone();
-        caches.open(CACHE_NAME).then((cache) => {
-          cache.put(event.request, responseToCache);
+        })
+        .catch(() => {
+          // Silent catch for offline image/asset fetching
         });
 
-        return networkResponse;
-      });
+      return cachedResponse || fetchPromise;
     })
   );
 });

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, Star, ShoppingBag, Filter, Sparkles, Eye } from 'lucide-react';
+import { Search, Star, ShoppingBag, Eye, SearchX } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 
 export default function ShopView() {
@@ -42,14 +42,16 @@ export default function ShopView() {
               placeholder="Search shampoo, hair growth oil, lip gloss..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
+              aria-label="Search products"
             />
-            <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+            <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" aria-hidden="true" />
           </div>
 
           <select
             className="form-select w-auto min-w-[170px]"
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value)}
+            aria-label="Sort products"
           >
             <option value="popular">Sort: Popularity</option>
             <option value="price-low">Price: Low to High</option>
@@ -58,11 +60,13 @@ export default function ShopView() {
         </div>
 
         {/* Category Pills - iOS Segmented Control */}
-        <div className="flex gap-2 overflow-x-auto pb-1 bg-white/[0.04] p-1.5 rounded-full border border-white/10 backdrop-blur-md">
+        <div className="flex gap-2 overflow-x-auto pb-1 bg-white/[0.04] p-1.5 rounded-full border border-white/10 backdrop-blur-md" role="tablist" aria-label="Product categories">
           {categories.map((cat) => (
             <button
               key={cat}
               onClick={() => setSelectedCat(cat)}
+              role="tab"
+              aria-selected={selectedCat === cat}
               className={`px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition-all duration-200 cursor-pointer border-0 ${
                 selectedCat === cat
                   ? 'bg-[#007AFF] text-white font-bold shadow-apple-blue'
@@ -76,56 +80,69 @@ export default function ShopView() {
       </div>
 
       {/* Products Grid */}
-      <div className="grid-3">
-        {filteredProducts.map((prd) => (
-          <div key={prd.id} className="apple-card p-4 flex flex-col justify-between">
-            <div>
-              <div className="relative h-48 w-full rounded-2xl overflow-hidden mb-3.5">
-                <img src={prd.image} alt={prd.name} className="w-full h-full object-cover" />
-                <span
-                  className={`badge ${prd.stock > 10 ? 'badge-in-stock' : prd.stock > 0 ? 'badge-low-stock' : 'badge-out-of-stock'} absolute top-2.5 left-2.5`}
-                >
-                  {prd.stock > 10 ? 'In Stock' : prd.stock > 0 ? `Only ${prd.stock} left` : 'Out of Stock'}
-                </span>
-                <button
+      {filteredProducts.length === 0 ? (
+        <div className="empty-state">
+          <div className="empty-state-icon bg-white/[0.06]">
+            <SearchX size={28} className="text-slate-400" />
+          </div>
+          <h3 className="text-lg font-bold text-white mb-2">No Products Found</h3>
+          <p className="text-sm text-slate-400">
+            {search ? `No results for "${search}". Try a different search.` : `No products in "${selectedCat}" yet.`}
+          </p>
+        </div>
+      ) : (
+        <div className="grid-3">
+          {filteredProducts.map((prd) => (
+            <div key={prd.id} className="apple-card p-4 flex flex-col justify-between">
+              <div>
+                <div className="relative h-48 w-full rounded-2xl overflow-hidden mb-3.5">
+                  <img src={prd.image} alt={prd.name} className="w-full h-full object-cover" loading="lazy" />
+                  <span
+                    className={`badge ${prd.stock > 10 ? 'badge-in-stock' : prd.stock > 0 ? 'badge-low-stock' : 'badge-out-of-stock'} absolute top-2.5 left-2.5`}
+                  >
+                    {prd.stock > 10 ? 'In Stock' : prd.stock > 0 ? `Only ${prd.stock} left` : 'Out of Stock'}
+                  </span>
+                  <button
+                    onClick={() => setSelectedProduct(prd)}
+                    className="absolute bottom-2.5 right-2.5 bg-black/70 backdrop-blur-md text-white px-3 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1.5 border border-white/10 active:scale-95 transition-all"
+                    aria-label={`Quick view ${prd.name}`}
+                  >
+                    <Eye size={12} aria-hidden="true" />
+                    <span>Quick View</span>
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-1 text-xs text-amber-400 mb-1.5">
+                  <Star size={14} fill="#F5A623" className="text-amber-400" aria-hidden="true" />
+                  <span className="font-bold">{prd.rating}</span>
+                  <span className="text-slate-400">({prd.reviewsCount} reviews)</span>
+                </div>
+
+                <h3
+                  className="text-base font-bold text-white mb-1.5 cursor-pointer hover:text-blue-400 transition-colors tracking-tight"
                   onClick={() => setSelectedProduct(prd)}
-                  className="absolute bottom-2.5 right-2.5 bg-black/70 backdrop-blur-md text-white px-3 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1.5 border border-white/10 active:scale-95 transition-all"
                 >
-                  <Eye size={12} />
-                  <span>Quick View</span>
+                  {prd.name}
+                </h3>
+                <p className="text-xs text-slate-400 mb-4 line-clamp-2 leading-relaxed">
+                  {prd.description.length > 75 ? `${prd.description.substring(0, 75)}...` : prd.description}
+                </p>
+              </div>
+
+              <div className="flex items-center justify-between pt-3.5 border-t border-white/10">
+                <span className="price-tag text-base">K {prd.price}</span>
+                <button
+                  className="apple-btn-secondary text-xs px-4 py-2"
+                  disabled={prd.stock <= 0}
+                  onClick={() => addToCart(prd)}
+                >
+                  {prd.stock > 0 ? 'Add to Cart' : 'Out of Stock'}
                 </button>
               </div>
-
-              <div className="flex items-center gap-1 text-xs text-amber-400 mb-1.5">
-                <Star size={14} fill="#F5A623" className="text-amber-400" />
-                <span className="font-bold">{prd.rating}</span>
-                <span className="text-slate-400">({prd.reviewsCount} reviews)</span>
-              </div>
-
-              <h3
-                className="text-base font-bold text-white mb-1.5 cursor-pointer hover:text-blue-400 transition-colors tracking-tight"
-                onClick={() => setSelectedProduct(prd)}
-              >
-                {prd.name}
-              </h3>
-              <p className="text-xs text-slate-400 mb-4 line-clamp-2 leading-relaxed">
-                {prd.description.length > 75 ? `${prd.description.substring(0, 75)}...` : prd.description}
-              </p>
             </div>
-
-            <div className="flex items-center justify-between pt-3.5 border-t border-white/10">
-              <span className="price-tag text-base">K {prd.price}</span>
-              <button
-                className="apple-btn-secondary text-xs px-4 py-2"
-                disabled={prd.stock <= 0}
-                onClick={() => addToCart(prd)}
-              >
-                {prd.stock > 0 ? 'Add to Cart' : 'Out of Stock'}
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

@@ -39,9 +39,9 @@ export default function BottomNav() {
   };
 
   return (
-    <nav className="bottom-nav overflow-hidden">
+    <nav className="bottom-nav overflow-hidden" role="navigation" aria-label="Main navigation">
       {/* Top Edge Loading Bar (Red -> Green Transition) */}
-      <div className="absolute top-0 left-0 right-0 h-1 bg-white/5 pointer-events-none">
+      <div className="absolute top-0 left-0 right-0 h-1 bg-white/5 pointer-events-none" aria-hidden="true">
         <div
           className={`h-full transition-all duration-300 ease-out rounded-full ${loading ? 'opacity-100' : 'opacity-0'}`}
           style={{
@@ -55,34 +55,46 @@ export default function BottomNav() {
       <button
         className={`nav-item ${activeTab === 'home' ? 'active' : ''}`}
         onClick={() => handleTabClick('home')}
+        aria-label="Home"
+        aria-current={activeTab === 'home' ? 'page' : undefined}
       >
-        <Home size={18} />
+        <Home size={18} aria-hidden="true" />
         <span>Home</span>
       </button>
 
       <button
         className={`nav-item ${activeTab === 'services' ? 'active' : ''}`}
         onClick={() => handleTabClick('services')}
+        aria-label="Book a service"
+        aria-current={activeTab === 'services' ? 'page' : undefined}
       >
-        <Calendar size={18} />
+        <Calendar size={18} aria-hidden="true" />
         <span>Book</span>
       </button>
 
       <button
         className={`nav-item ${activeTab === 'shop' ? 'active' : ''}`}
         onClick={() => handleTabClick('shop')}
+        aria-label="Shop products"
+        aria-current={activeTab === 'shop' ? 'page' : undefined}
       >
-        <ShoppingBag size={18} />
+        <ShoppingBag size={18} aria-hidden="true" />
         <span>Shop</span>
       </button>
 
       <button
         className={`nav-item ${activeTab === 'cart' ? 'active' : ''}`}
         onClick={() => handleTabClick('cart')}
+        aria-label={`Shopping cart${totalCartCount > 0 ? `, ${totalCartCount} items` : ', empty'}`}
+        aria-current={activeTab === 'cart' ? 'page' : undefined}
       >
         <div className="relative">
-          <ShoppingCart size={18} />
-          {totalCartCount > 0 && <span className="badge-count" style={{ top: -6, right: -10 }}>{totalCartCount}</span>}
+          <ShoppingCart size={18} aria-hidden="true" />
+          {totalCartCount > 0 && (
+            <span className="badge-count" style={{ top: -6, right: -10 }} aria-hidden="true">
+              {totalCartCount}
+            </span>
+          )}
         </div>
         <span>Cart</span>
       </button>
@@ -91,16 +103,20 @@ export default function BottomNav() {
         <button
           className={`nav-item ${activeTab === 'admin' ? 'active' : ''}`}
           onClick={() => handleTabClick('admin')}
+          aria-label="Admin dashboard"
+          aria-current={activeTab === 'admin' ? 'page' : undefined}
         >
-          <ShieldCheck size={18} className="text-amber-400" />
+          <ShieldCheck size={18} className="text-amber-400" aria-hidden="true" />
           <span>Admin</span>
         </button>
       ) : (
         <button
           className={`nav-item ${activeTab === 'account' ? 'active' : ''}`}
           onClick={() => handleTabClick('account')}
+          aria-label="My account"
+          aria-current={activeTab === 'account' ? 'page' : undefined}
         >
-          <User size={18} />
+          <User size={18} aria-hidden="true" />
           <span>Account</span>
         </button>
       )}

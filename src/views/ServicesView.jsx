@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, Clock, Heart, Plus, Sparkles, UserCheck } from 'lucide-react';
+import { Search, Clock, Heart, Sparkles, SearchX } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 
 export default function ServicesView() {
@@ -35,16 +35,19 @@ export default function ServicesView() {
             placeholder="Search barbing, knotless braids, nails, makeup..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
+            aria-label="Search services"
           />
-          <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+          <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" aria-hidden="true" />
         </div>
 
         {/* Category Pills - Segmented Control */}
-        <div className="flex gap-2 overflow-x-auto pb-1 bg-white/[0.04] p-1.5 rounded-full border border-white/10 backdrop-blur-md">
+        <div className="flex gap-2 overflow-x-auto pb-1 bg-white/[0.04] p-1.5 rounded-full border border-white/10 backdrop-blur-md" role="tablist" aria-label="Service categories">
           {categories.map((cat) => (
             <button
               key={cat}
               onClick={() => setSelectedCategory(cat)}
+              role="tab"
+              aria-selected={selectedCategory === cat}
               className={`px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition-all duration-200 cursor-pointer border-0 ${
                 selectedCategory === cat
                   ? 'bg-[#007AFF] text-white font-bold shadow-apple-blue'
@@ -58,47 +61,60 @@ export default function ServicesView() {
       </div>
 
       {/* Services Grid */}
-      <div className="grid-2">
-        {filteredServices.map((srv) => (
-          <div key={srv.id} className="apple-card flex flex-col justify-between">
-            <div className="relative h-48 w-full">
-              <img src={srv.image} alt={srv.name} className="w-full h-full object-cover" />
-              <button
-                onClick={() => toggleFavorite(srv.id)}
-                className="absolute top-3 right-3 bg-black/60 backdrop-blur-md text-white p-2.5 rounded-full border border-white/10 active:scale-95 transition-all"
-              >
-                <Heart size={16} fill={user.favorites.includes(srv.id) ? 'var(--accent)' : 'none'} className={user.favorites.includes(srv.id) ? 'text-pink-500' : 'text-white'} />
-              </button>
-              <div className="absolute bottom-3 left-3 bg-black/70 backdrop-blur-md px-3 py-1 rounded-full text-xs font-semibold text-white flex items-center gap-1.5 border border-white/10">
-                <Clock size={12} className="text-amber-400" />
-                <span>{srv.duration} mins</span>
-              </div>
-            </div>
-
-            <div className="p-5 flex-1 flex flex-col justify-between">
-              <div>
-                <div className="text-[11px] text-amber-400 font-bold uppercase tracking-wider mb-1">
-                  {srv.category}
-                </div>
-                <h3 className="text-lg font-bold text-white mb-1.5 tracking-tight">{srv.name}</h3>
-                <p className="text-xs text-slate-400 mb-4 leading-relaxed">
-                  {srv.description}
-                </p>
-              </div>
-
-              <div className="flex items-center justify-between pt-4 border-t border-white/10">
-                <div>
-                  <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider block">Price</span>
-                  <span className="price-tag">K {srv.price}</span>
-                </div>
-                <button className="apple-btn-primary text-xs px-5 py-2.5" onClick={() => setBookingService(srv)}>
-                  Book Service
-                </button>
-              </div>
-            </div>
+      {filteredServices.length === 0 ? (
+        <div className="empty-state">
+          <div className="empty-state-icon bg-white/[0.06]">
+            <SearchX size={28} className="text-slate-400" />
           </div>
-        ))}
-      </div>
+          <h3 className="text-lg font-bold text-white mb-2">No Services Found</h3>
+          <p className="text-sm text-slate-400">
+            {searchQuery ? `No results for "${searchQuery}". Try a different search term.` : `No services in "${selectedCategory}" category yet.`}
+          </p>
+        </div>
+      ) : (
+        <div className="grid-2">
+          {filteredServices.map((srv) => (
+            <div key={srv.id} className="apple-card flex flex-col justify-between">
+              <div className="relative h-48 w-full">
+                <img src={srv.image} alt={srv.name} className="w-full h-full object-cover" loading="lazy" />
+                <button
+                  onClick={() => toggleFavorite(srv.id)}
+                  className="absolute top-3 right-3 bg-black/60 backdrop-blur-md text-white p-2.5 rounded-full border border-white/10 active:scale-95 transition-all"
+                  aria-label={user.favorites.includes(srv.id) ? `Remove ${srv.name} from favorites` : `Add ${srv.name} to favorites`}
+                >
+                  <Heart size={16} fill={user.favorites.includes(srv.id) ? 'var(--accent)' : 'none'} className={user.favorites.includes(srv.id) ? 'text-pink-500' : 'text-white'} aria-hidden="true" />
+                </button>
+                <div className="absolute bottom-3 left-3 bg-black/70 backdrop-blur-md px-3 py-1 rounded-full text-xs font-semibold text-white flex items-center gap-1.5 border border-white/10">
+                  <Clock size={12} className="text-amber-400" aria-hidden="true" />
+                  <span>{srv.duration} mins</span>
+                </div>
+              </div>
+
+              <div className="p-5 flex-1 flex flex-col justify-between">
+                <div>
+                  <div className="text-[11px] text-amber-400 font-bold uppercase tracking-wider mb-1">
+                    {srv.category}
+                  </div>
+                  <h3 className="text-lg font-bold text-white mb-1.5 tracking-tight">{srv.name}</h3>
+                  <p className="text-xs text-slate-400 mb-4 leading-relaxed">
+                    {srv.description}
+                  </p>
+                </div>
+
+                <div className="flex items-center justify-between pt-4 border-t border-white/10">
+                  <div>
+                    <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider block">Price</span>
+                    <span className="price-tag">K {srv.price}</span>
+                  </div>
+                  <button className="apple-btn-primary text-xs px-5 py-2.5" onClick={() => setBookingService(srv)}>
+                    Book Service
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

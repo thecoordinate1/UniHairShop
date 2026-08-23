@@ -12,8 +12,9 @@ export default function WhatsAppWidget() {
       rel="noopener noreferrer"
       className="whatsapp-widget"
       title="Chat with UniHairShop on WhatsApp (+260 772 822579)"
+      aria-label="Start WhatsApp live chat on +260 772 822579"
     >
-      <MessageCircle size={28} />
+      <MessageCircle size={26} aria-hidden="true" />
     </a>
   );
 }

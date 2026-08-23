@@ -5,32 +5,90 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <meta name="theme-color" content="#0A0A0C" />
     
+    <!-- Primary Meta Tags -->
+    <title>UniHairShop — Premium Campus Grooming & Beauty Zambia</title>
+    <meta name="title" content="UniHairShop — Premium Campus Grooming & Beauty Zambia" />
+    <meta name="description" content="On-campus hair grooming, barbing, knotless braids, nail tech, glam makeup & retail cosmetics tailored for Zambian university students. Instant mobile booking with Airtel, MTN, and Zamtel Kwacha." />
+    <meta name="keywords" content="UniHairShop, campus salon Zambia, UNILUS Silverest, UNZA hair, barbing Lusaka, braids Zambia, mobile money salon, campus beauty" />
+    <meta name="author" content="UniHairShop Zambia" />
+    <meta name="robots" content="index, follow" />
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://unihairshop.co.zm/" />
+    <meta property="og:title" content="UniHairShop — Premium Campus Grooming & Beauty Zambia" />
+    <meta property="og:description" content="Book on-campus barbers, hairstylists, nail techs, and order beauty products with fast hostel delivery across Lusaka universities." />
+    <meta property="og:image" content="/images/hero_banner.jpg" />
+    <meta property="og:locale" content="en_ZM" />
+    <meta property="og:site_name" content="UniHairShop" />
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image" />
+    <meta property="twitter:url" content="https://unihairshop.co.zm/" />
+    <meta property="twitter:title" content="UniHairShop — Premium Campus Grooming & Beauty Zambia" />
+    <meta property="twitter:description" content="Book on-campus barbers, hairstylists, nail techs, and order beauty products with fast hostel delivery across Lusaka universities." />
+    <meta property="twitter:image" content="/images/hero_banner.jpg" />
+
     <!-- PWA & Mobile Web App Meta Tags -->
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="UniHairShop" />
     <meta name="application-name" content="UniHairShop" />
+    <meta name="format-detection" content="telephone=no" />
     
-    <!-- Manifest & Icons -->
+    <!-- Manifest & Favicons -->
     <link rel="manifest" href="/manifest.json" />
     <link rel="icon" type="image/svg+xml" href="/icons/icon.svg" />
     <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png" />
+    <link rel="icon" type="image/png" sizes="512x512" href="/icons/icon-512.png" />
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
     
-    <title>UniHairShop — Premium Campus Grooming & Beauty</title>
-    <meta name="description" content="On-campus hair grooming, barbing, nails, makeup, and beauty products in Zambia. Fast mobile booking with Airtel, MTN, and Zamtel mobile money." />
-    
-    <!-- Google Fonts — preconnect + non-blocking load -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <!-- Performance & DNS Preconnects -->
+    <link rel="dns-prefetch" href="https://fonts.googleapis.com" />
+    <link rel="dns-prefetch" href="https://fonts.gstatic.com" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+
+    <!-- Google Fonts — preloaded with print fallback for non-blocking render -->
     <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
     <noscript>
       <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     </noscript>
+
+    <!-- Schema.org JSON-LD Structured Data -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BeautySalon",
+      "name": "UniHairShop Zambia",
+      "image": "https://unihairshop.co.zm/images/hero_banner.jpg",
+      "description": "On-campus grooming, hair styling, nail tech, and cosmetics shop for university students in Lusaka, Zambia.",
+      "url": "https://unihairshop.co.zm",
+      "telephone": "+260772822579",
+      "priceRange": "K20 - K450",
+      "paymentAccepted": "Airtel Money, MTN MoMo, Zamtel Kwacha, Visa, Mastercard, Cash",
+      "currenciesAccepted": "ZMW",
+      "address": {
+        "@type": "PostalAddress",
+        "streetAddress": "Silverest Campus Student Centre",
+        "addressLocality": "Lusaka",
+        "addressRegion": "Lusaka Province",
+        "addressCountry": "ZM"
+      },
+      "openingHoursSpecification": [
+        {
+          "@type": "OpeningHoursSpecification",
+          "dayOfWeek": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
+          "opens": "08:00",
+          "closes": "19:30"
+        }
+      ]
+    }
+    </script>
     
-    <!-- Inline Splash Screen Styles — renders instantly, no external deps -->
+    <!-- Inline Splash Screen Styles — renders instantly, zero external deps -->
     <style>
       #app-splash {
         position: fixed;
@@ -158,13 +216,20 @@
     </style>
   </head>
   <body class="bg-[#0A0A0C] text-slate-100 font-body antialiased selection:bg-blue-500/30 selection:text-white">
+    <noscript>
+      <div style="padding: 20px; text-align: center; color: #FFFFFF; background-color: #0A0A0C; font-family: sans-serif;">
+        <h2>JavaScript Required</h2>
+        <p>UniHairShop requires JavaScript to manage salon appointments and shop orders. Please enable JavaScript in your browser settings to continue.</p>
+      </div>
+    </noscript>
+
     <!-- Splash screen OUTSIDE #root so React doesn't destroy it on mount -->
-    <div id="app-splash">
+    <div id="app-splash" aria-hidden="true">
       <div class="splash-card">
         <div class="splash-logo-wrapper">
           <div class="splash-glow-ring"></div>
           <div class="splash-spin-ring"></div>
-          <svg class="splash-svg-logo" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <svg class="splash-svg-logo" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="UniHairShop Logo">
             <!-- Left Blade forming left arm of U -->
             <path d="M 175,120 L 175,270 C 175,345 240,360 256,290 L 335,120" stroke="#FFFFFF" stroke-width="28" stroke-linecap="round" stroke-linejoin="round"/>
             <!-- Right Blade forming right arm of U -->
@@ -180,7 +245,7 @@
         </div>
 
         <div class="splash-brand">
-          <h1 class="splash-title">UniHairShop</h1>
+          <div class="splash-title">UniHairShop</div>
           <span class="splash-tagline">Campus Grooming & Beauty</span>
         </div>
 

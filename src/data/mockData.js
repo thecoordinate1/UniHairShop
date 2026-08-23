@@ -1,6 +1,6 @@
-// Initial Seed Data for UniHairShop
+// Initial Seed Data for UniHairShop Zambia
 
-export const lusakaUniversities = [
+export const lusakaUniversities = Object.freeze([
   { id: 'uni-1', name: 'UNILUS Silverest Campus', shortName: 'UNILUS Silverest', area: 'Chongwe / Silverest, Lusaka' },
   { id: 'uni-2', name: 'UNILUS Pioneer Campus', shortName: 'UNILUS Pioneer', area: 'Mass Media, Lusaka' },
   { id: 'uni-3', name: 'UNZA Great East Road Campus', shortName: 'UNZA Great East', area: 'Great East Road, Lusaka' },
@@ -11,9 +11,9 @@ export const lusakaUniversities = [
   { id: 'uni-8', name: 'Zambia Open University (ZAOU)', shortName: 'ZAOU', area: 'Waterfalls, Lusaka' },
   { id: 'uni-9', name: 'Information & Communications University (ICU)', shortName: 'ICU Zambia', area: 'Mass Media, Lusaka' },
   { id: 'uni-10', name: 'National Institute of Public Administration (NIPA)', shortName: 'NIPA', area: 'Dapeza, Lusaka' }
-];
+]);
 
-export const initialServices = [
+export const initialServices = Object.freeze([
   {
     id: 'srv-1',
     name: 'Fresh Campus Fade & Beard Trim',
@@ -80,9 +80,9 @@ export const initialServices = [
     popular: false,
     staffIds: ['stf-3']
   }
-];
+]);
 
-export const initialProducts = [
+export const initialProducts = Object.freeze([
   {
     id: 'prd-1',
     name: 'Zambian Miracle Scalp & Growth Oil (100ml)',
@@ -143,16 +143,16 @@ export const initialProducts = [
     image: '/images/cosmetics_set.jpg',
     featured: false
   }
-];
+]);
 
-export const initialStaff = [
+export const initialStaff = Object.freeze([
   { id: 'stf-1', name: 'Junior "The Fade King"', role: 'Master Barber', rating: 4.9 },
   { id: 'stf-2', name: 'Barber Kasonde', role: 'Barber & Stylist', rating: 4.8 },
   { id: 'stf-3', name: 'Chileshe braids & Wigs', role: 'Senior Hair Stylist', rating: 5.0 },
   { id: 'stf-4', name: 'Natasha Glam & Nails', role: 'Nail Artist & MUA', rating: 4.9 }
-];
+]);
 
-export const initialTransformations = [
+export const initialTransformations = Object.freeze([
   {
     id: 'tr-1',
     title: 'Burst Fade & Lineup',
@@ -171,9 +171,9 @@ export const initialTransformations = [
     afterImg: '/images/hair_braids.jpg',
     rating: 5
   }
-];
+]);
 
-export const initialBookings = [
+export const initialBookings = Object.freeze([
   {
     id: 'UHS-B8901',
     serviceId: 'srv-1',
@@ -181,25 +181,27 @@ export const initialBookings = [
     category: 'Barbing',
     price: 80,
     staffName: 'Junior "The Fade King"',
-    date: '2026-08-22',
+    date: '2026-08-23',
     time: '14:00',
+    campus: 'UNILUS Silverest Campus',
     customerName: 'Kondwani Phiri',
     customerPhone: '0971234567',
     hostel: 'UNILUS Silverest Hostel, Block C',
     paymentMethod: 'Airtel Money',
     paymentStatus: 'Paid',
     status: 'Confirmed',
-    createdAt: '2026-08-21'
+    createdAt: '2026-08-22'
   }
-];
+]);
 
-export const initialOrders = [
+export const initialOrders = Object.freeze([
   {
     id: 'UHS-ORD-4102',
     items: [
-      { id: 'prd-1', name: 'Zambian Miracle Scalp & Growth Oil', price: 95, quantity: 1 }
+      { id: 'prd-1', name: 'Zambian Miracle Scalp & Growth Oil (100ml)', price: 95, quantity: 1 }
     ],
     totalAmount: 95,
+    campus: 'UNILUS Silverest Campus',
     customerName: 'Kondwani Phiri',
     customerPhone: '0971234567',
     deliveryType: 'Hostel Delivery',
@@ -207,6 +209,6 @@ export const initialOrders = [
     paymentMethod: 'MTN Mobile Money',
     paymentStatus: 'Paid',
     status: 'Ready for Pickup',
-    createdAt: '2026-08-21'
+    createdAt: '2026-08-22'
   }
-];
+]);

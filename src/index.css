@@ -28,8 +28,25 @@
     @apply w-full min-h-screen bg-[#0A0A0C] text-slate-100 font-body antialiased pb-24 md:pb-8 overflow-x-hidden m-0 p-0 selection:bg-blue-500/30 selection:text-white;
   }
 
+  /* Prevent body scroll when modals are open */
+  body.modal-open {
+    overflow: hidden;
+    touch-action: none;
+  }
+
   h1, h2, h3, h4, h5, h6 {
     @apply font-heading font-bold tracking-tight text-white;
+  }
+
+  /* Focus-visible for keyboard accessibility — shows only on Tab navigation */
+  *:focus-visible {
+    @apply outline-2 outline-offset-2 outline-[#007AFF] rounded-lg;
+    outline-style: solid;
+  }
+
+  /* Remove default focus ring for mouse users */
+  *:focus:not(:focus-visible) {
+    outline: none;
   }
 }
 
@@ -53,10 +70,23 @@
   50% { opacity: 0.8; transform: scale(1.05); }
 }
 
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
 @layer components {
+  /* Skip Navigation Link — Accessibility */
+  .skip-nav {
+    @apply fixed -top-12 left-4 z-[9999] bg-[#007AFF] text-white font-bold text-sm px-5 py-3 rounded-b-2xl transition-all duration-200;
+  }
+  .skip-nav:focus {
+    @apply top-0;
+  }
+
   /* Layout Utilities */
   .app-container {
-    @apply w-full min-h-screen flex flex-col items-center relative bg-[#0A0A0C];
+    @apply w-full min-h-screen flex flex-col items-center bg-[#0A0A0C];
   }
 
   .main-content {
@@ -94,6 +124,8 @@
 
   .icon-btn {
     @apply bg-white/10 hover:bg-white/15 text-white w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center relative transition-all duration-200 border border-white/10 active:scale-95 shadow-sm;
+    min-height: 44px;
+    min-width: 44px;
   }
 
   .badge-count {
@@ -102,6 +134,7 @@
 
   .role-switcher-btn {
     @apply bg-white/10 hover:bg-white/15 text-white font-semibold text-xs px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-full flex items-center gap-1.5 backdrop-blur-lg border border-white/15 shadow-md hover:border-white/25 active:scale-95 transition-all;
+    min-height: 44px;
   }
 
   /* Bottom Navigation - Floating iOS Dock Bar with Safe Area Bottom */
@@ -112,6 +145,8 @@
 
   .nav-item {
     @apply flex flex-col items-center gap-0.5 text-slate-400 text-[10px] font-medium px-3.5 py-1.5 rounded-full bg-transparent transition-all duration-200 border-0 active:scale-95;
+    min-height: 44px;
+    min-width: 44px;
   }
 
   .nav-item.active {
@@ -120,19 +155,23 @@
 
   /* Buttons & Badges */
   .btn-primary, .apple-btn-primary {
-    @apply bg-[#007AFF] hover:bg-[#0062CC] text-white font-semibold text-sm px-5 py-2.5 rounded-full inline-flex items-center justify-center gap-2 shadow-apple-blue transition-all duration-200 active:scale-[0.97] border border-blue-400/30 cursor-pointer;
+    @apply bg-[#007AFF] hover:bg-[#0062CC] text-white font-semibold text-sm px-5 py-2.5 rounded-full inline-flex items-center justify-center gap-2 shadow-apple-blue transition-all duration-200 active:scale-[0.97] border border-blue-400/30 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100;
   }
 
   .btn-gold {
-    @apply bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-slate-950 font-bold text-sm px-5 py-2.5 rounded-full inline-flex items-center justify-center gap-2 shadow-apple-gold transition-all duration-200 active:scale-[0.97] border-0 cursor-pointer;
+    @apply bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-slate-950 font-bold text-sm px-5 py-2.5 rounded-full inline-flex items-center justify-center gap-2 shadow-apple-gold transition-all duration-200 active:scale-[0.97] border-0 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed;
   }
 
   .btn-secondary, .apple-btn-secondary {
-    @apply bg-white/10 hover:bg-white/15 text-white font-semibold text-sm px-5 py-2.5 rounded-full inline-flex items-center justify-center gap-2 backdrop-blur-md transition-all duration-200 active:scale-[0.97] border border-white/10 hover:border-white/20 cursor-pointer;
+    @apply bg-white/10 hover:bg-white/15 text-white font-semibold text-sm px-5 py-2.5 rounded-full inline-flex items-center justify-center gap-2 backdrop-blur-md transition-all duration-200 active:scale-[0.97] border border-white/10 hover:border-white/20 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100;
   }
 
   .btn-success {
-    @apply bg-[#34C759] hover:bg-[#2FB34F] text-white font-semibold text-sm px-5 py-2.5 rounded-full inline-flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/25 transition-all duration-200 active:scale-[0.97] border-0 cursor-pointer;
+    @apply bg-[#34C759] hover:bg-[#2FB34F] text-white font-semibold text-sm px-5 py-2.5 rounded-full inline-flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/25 transition-all duration-200 active:scale-[0.97] border-0 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-danger {
+    @apply bg-[#FF2D55] hover:bg-[#E6264D] text-white font-semibold text-sm px-5 py-2.5 rounded-full inline-flex items-center justify-center gap-2 shadow-lg shadow-pink-500/25 transition-all duration-200 active:scale-[0.97] border-0 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed;
   }
 
   .price-tag {
@@ -167,6 +206,8 @@
 
   .modal-close {
     @apply absolute top-4 right-4 bg-white/10 hover:bg-white/20 text-slate-400 hover:text-white w-9 h-9 rounded-full flex items-center justify-center transition-all border border-white/10 active:scale-95;
+    min-height: 44px;
+    min-width: 44px;
   }
 
   /* Cards & Grid */
@@ -193,6 +234,15 @@
 
   .form-input, .form-select, .form-textarea {
     @apply w-full bg-white/[0.06] border border-white/10 rounded-2xl text-white px-4 py-3 text-sm outline-none focus:border-[#007AFF] focus:ring-2 focus:ring-[#007AFF]/30 transition-all duration-200 box-border placeholder:text-slate-500;
+    min-height: 44px;
+  }
+
+  .form-input.error, .form-select.error, .form-textarea.error {
+    @apply border-[#FF2D55] focus:border-[#FF2D55] focus:ring-[#FF2D55]/30;
+  }
+
+  .form-error-text {
+    @apply text-[#FF2D55] text-xs mt-1 font-medium;
   }
 
   /* Toast - iOS Dynamic Island Pill */
@@ -201,7 +251,7 @@
   }
 
   .toast {
-    @apply bg-[#1C1C24]/90 backdrop-blur-2xl border border-white/15 text-white px-5 py-3.5 rounded-full shadow-2xl flex items-center gap-3 text-sm font-semibold justify-between;
+    @apply bg-[#1C1C24]/90 backdrop-blur-2xl border border-white/15 text-white px-5 py-3.5 rounded-full shadow-2xl flex items-center gap-3 text-sm font-semibold justify-between cursor-pointer active:scale-[0.98] transition-transform;
     animation: popIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   }
 
@@ -209,14 +259,21 @@
     @apply border-emerald-500/40 text-emerald-300;
   }
 
+  .toast-error {
+    @apply border-[#FF2D55]/40 text-[#FF2D55];
+  }
+
   /* WhatsApp Widget */
   .whatsapp-widget {
-    @apply fixed bottom-28 left-5 z-40 bg-[#34C759] text-white w-12 h-12 rounded-full flex items-center justify-center shadow-lg shadow-emerald-500/40 hover:scale-110 active:scale-95 transition-all md:bottom-6;
+    @apply fixed bottom-24 left-5 z-40 bg-[#34C759] text-white w-12 h-12 rounded-full flex items-center justify-center shadow-lg shadow-emerald-500/40 hover:scale-110 active:scale-95 transition-all md:bottom-6;
+    min-height: 44px;
+    min-width: 44px;
   }
 
   /* Mobile Money Options */
   .momo-option {
     @apply w-full flex items-center gap-3.5 p-3.5 border border-white/10 rounded-2xl bg-white/[0.04] cursor-pointer transition-all duration-200 hover:border-amber-400/50 hover:bg-white/[0.08] active:scale-[0.98];
+    min-height: 44px;
   }
 
   .momo-option.selected {
@@ -231,5 +288,42 @@
   .mtn { @apply bg-amber-400 text-black; }
   .zamtel { @apply bg-sky-600; }
   .lenco-pay { @apply bg-gradient-to-r from-cyan-600 to-emerald-600 text-white; }
+
+  /* Skeleton Loading */
+  .skeleton {
+    @apply bg-white/[0.06] rounded-2xl;
+    background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.04) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s ease-in-out infinite;
+  }
+
+  /* Empty State */
+  .empty-state {
+    @apply text-center py-12 px-6 max-w-md mx-auto;
+  }
+
+  .empty-state-icon {
+    @apply w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4;
+  }
 }
 
+/* Print Styles — for booking confirmations */
+@media print {
+  .top-header,
+  .bottom-nav,
+  .whatsapp-widget,
+  .toast-container,
+  .modal-overlay,
+  .skip-nav {
+    display: none !important;
+  }
+
+  body {
+    background: white !important;
+    color: black !important;
+  }
+
+  .main-content {
+    padding-top: 0 !important;
+  }
+}
