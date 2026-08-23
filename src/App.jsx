@@ -5,8 +5,12 @@ import BottomNav from './components/BottomNav';
 import Toast from './components/Toast';
 import WhatsAppWidget from './components/WhatsAppWidget';
 import ErrorBoundary from './components/ErrorBoundary';
+import CartDrawer from './components/CartDrawer';
+import StylistProfileModal from './components/StylistProfileModal';
+import SafetyModal from './components/SafetyModal';
+import InstallBanner from './components/InstallBanner';
 
-// Code-split all view components for faster initial load
+// Code-split all view components
 const HomeView = lazy(() => import('./views/HomeView'));
 const ServicesView = lazy(() => import('./views/ServicesView'));
 const BookingModal = lazy(() => import('./views/BookingModal'));
@@ -14,18 +18,18 @@ const ShopView = lazy(() => import('./views/ShopView'));
 const ProductDetailModal = lazy(() => import('./views/ProductDetailModal'));
 const CartView = lazy(() => import('./views/CartView'));
 const AccountView = lazy(() => import('./views/AccountView'));
+const MessagesView = lazy(() => import('./views/MessagesView'));
 const AboutView = lazy(() => import('./views/AboutView'));
 const AdminDashboardView = lazy(() => import('./views/AdminDashboardView'));
 
-// Skeleton loading fallback for code-split views
 function ViewSkeleton() {
   return (
     <div className="w-full flex flex-col gap-6 animate-pulse" aria-busy="true" aria-label="Loading content">
-      <div className="w-3/4 h-8 bg-white/[0.06] rounded-2xl" />
-      <div className="w-1/2 h-4 bg-white/[0.04] rounded-xl" />
+      <div className="w-3/4 h-8 bg-black/5 dark:bg-white/[0.06] rounded-2xl" />
+      <div className="w-1/2 h-4 bg-black/5 dark:bg-white/[0.04] rounded-xl" />
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {[1, 2, 3, 4].map((i) => (
-          <div key={i} className="h-64 bg-white/[0.04] rounded-3xl border border-white/5" />
+          <div key={i} className="h-64 bg-black/5 dark:bg-white/[0.04] rounded-3xl border border-black/5 dark:border-white/5" />
         ))}
       </div>
     </div>
@@ -50,6 +54,8 @@ export default function App() {
         return <ShopView />;
       case 'cart':
         return <CartView />;
+      case 'messages':
+        return <MessagesView />;
       case 'account':
         return <AccountView />;
       case 'about':
@@ -69,6 +75,7 @@ export default function App() {
 
       <div className="app-container">
         <Header />
+        <InstallBanner />
 
         <main id="main-content" className="main-content" role="main">
           <Suspense fallback={<ViewSkeleton />}>
@@ -79,6 +86,11 @@ export default function App() {
         <BottomNav />
         <Toast />
         <WhatsAppWidget />
+
+        {/* Global Modals & Drawers */}
+        <CartDrawer />
+        <StylistProfileModal />
+        <SafetyModal />
 
         <Suspense fallback={null}>
           <BookingModal />

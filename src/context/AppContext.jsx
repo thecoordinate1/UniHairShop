@@ -1,9 +1,18 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { initialServices, initialProducts, initialStaff, initialBookings, initialOrders, lusakaUniversities } from '../data/mockData';
+import {
+  initialServices,
+  initialProducts,
+  initialStaff,
+  initialBookings,
+  initialOrders,
+  initialBundles,
+  initialConversations,
+  lusakaUniversities
+} from '../data/mockData';
 
 const AppContext = createContext();
 
-// Safe localStorage helpers — handles quota exceeded, private browsing, SSR
+// Safe localStorage helpers
 function safeGetItem(key, fallback) {
   try {
     const saved = localStorage.getItem(key);
@@ -29,7 +38,33 @@ function generateId(prefix) {
 }
 
 export const AppProvider = ({ children }) => {
-  // Navigation tab state
+  // Theme Mode ('dark' | 'light')
+  const [theme, setTheme] = useState(() => {
+    try {
+      return localStorage.getItem('unihair_theme') || 'dark';
+    } catch {
+      return 'dark';
+    }
+  });
+
+  // Sync theme to document.documentElement
+  useEffect(() => {
+    try {
+      localStorage.setItem('unihair_theme', theme);
+    } catch { /* ignore */ }
+
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [theme]);
+
+  const toggleTheme = useCallback(() => {
+    setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
+  }, []);
+
+  // Navigation tab state ('home' | 'services' | 'bookings' | 'shop' | 'messages' | 'account' | 'admin' | 'about')
   const [activeTab, setActiveTab] = useState('home');
 
   // Active Campus Selection (Default: UNILUS Silverest Campus)
@@ -49,31 +84,39 @@ export const AppProvider = ({ children }) => {
     isLoggedIn: true,
     name: 'Kondwani Phiri',
     phone: '0971234567',
-    hostel: 'UNILUS Silverest Hostel, Block C',
-    loyaltyPoints: 120,
+    hostel: 'UNILUS Silverest Hostel, Block C, Room 14',
+    loyaltyPoints: 140,
     referralCode: 'UNILUS-KONDWANI-88',
-    favorites: ['srv-1', 'prd-1']
+    favorites: ['srv-1', 'prd-1', 'stf-1']
   }));
 
-  // Services State (Persisted)
+  // Services, Products, Staff, Bookings, Orders
   const [services, setServices] = useState(() => safeGetItem('unihair_services', initialServices));
-
-  // Products State (Persisted)
   const [products, setProducts] = useState(() => safeGetItem('unihair_products', initialProducts));
-
-  // Bookings State (Persisted)
+  const [bundles] = useState(initialBundles);
+  const [staffList, setStaffList] = useState(() => safeGetItem('unihair_staff', initialStaff));
   const [bookings, setBookings] = useState(() => safeGetItem('unihair_bookings', initialBookings));
-
-  // Orders State (Persisted)
   const [orders, setOrders] = useState(() => safeGetItem('unihair_orders', initialOrders));
-
-  // Cart State (Persisted)
   const [cart, setCart] = useState(() => safeGetItem('unihair_cart', []));
 
-  // Modals state
+  // In-App Chat Conversations
+  const [conversations, setConversations] = useState(() => safeGetItem('unihair_conversations', initialConversations));
+  const [activeChatStylistId, setActiveChatStylistId] = useState('stf-1');
+
+  // Modals & Drawers
+  const [isCartOpen, setIsCartOpen] = useState(false);
   const [bookingService, setBookingService] = useState(null);
   const [selectedProduct, setSelectedProduct] = useState(null);
+  const [selectedStylist, setSelectedStylist] = useState(null);
+  const [showSafetyModal, setShowSafetyModal] = useState(false);
   const [lencoCheckoutState, setLencoCheckoutState] = useState(null);
+
+  // Granular Filter Engine States
+  const [filterCategory, setFilterCategory] = useState('All');
+  const [serviceTypeFilter, setServiceTypeFilter] = useState('All'); // 'All' | 'travel' | 'studio'
+  const [priceFilter, setPriceFilter] = useState('All'); // 'All' | 'under100' | '100to200' | 'over200'
+  const [ratingFilter, setRatingFilter] = useState('All'); // 'All' | '4.8+'
+  const [availabilityFilter, setAvailabilityFilter] = useState('All'); // 'All' | 'today' | 'weekend'
 
   // Toast System
   const [toasts, setToasts] = useState([]);
@@ -90,7 +133,7 @@ export const AppProvider = ({ children }) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
-  // Debounced localStorage persistence
+  // Debounced persistence
   const persistTimers = useRef({});
   const debouncedPersist = useCallback((key, value) => {
     if (persistTimers.current[key]) clearTimeout(persistTimers.current[key]);
@@ -107,6 +150,7 @@ export const AppProvider = ({ children }) => {
   useEffect(() => { debouncedPersist('unihair_bookings', bookings); }, [bookings, debouncedPersist]);
   useEffect(() => { debouncedPersist('unihair_orders', orders); }, [orders, debouncedPersist]);
   useEffect(() => { debouncedPersist('unihair_cart', cart); }, [cart, debouncedPersist]);
+  useEffect(() => { debouncedPersist('unihair_conversations', conversations); }, [conversations, debouncedPersist]);
 
   // Cart Management
   const addToCart = useCallback((product, quantity = 1) => {
@@ -121,6 +165,21 @@ export const AppProvider = ({ children }) => {
     });
     addToast(`Added "${product.name}" to cart!`, 'success');
   }, [addToast]);
+
+  const addBundleToCart = useCallback((bundle) => {
+    const bundleProduct = {
+      id: bundle.id,
+      name: bundle.title,
+      category: 'Campus Essentials Bundle',
+      price: bundle.bundlePrice,
+      image: bundle.image,
+      stock: 10,
+      quantity: 1
+    };
+    addToCart(bundleProduct, 1);
+    setIsCartOpen(true);
+    addToast(`Bundle "${bundle.title}" added to cart! (${bundle.savings})`, 'success');
+  }, [addToCart, addToast]);
 
   const updateCartQuantity = useCallback((productId, delta) => {
     setCart((prevCart) =>
@@ -151,7 +210,6 @@ export const AppProvider = ({ children }) => {
         : [...prev.favorites, id];
       return { ...prev, favorites: updated };
     });
-    // Toast outside setter to avoid stale closure
     setUser((prev) => {
       const justToggled = prev.favorites.includes(id);
       addToast(justToggled ? 'Saved to favorites!' : 'Removed from favorites', 'success');
@@ -159,6 +217,63 @@ export const AppProvider = ({ children }) => {
     });
   }, [addToast]);
 
+  // Messaging Management
+  const sendMessage = useCallback((stylistId, text) => {
+    if (!text.trim()) return;
+    const newMsg = {
+      id: `m-${Date.now()}`,
+      sender: 'user',
+      text: text.trim(),
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    };
+
+    setConversations((prev) => {
+      return prev.map((conv) => {
+        if (conv.stylistId === stylistId) {
+          return {
+            ...conv,
+            lastMessage: text.trim(),
+            lastTimestamp: 'Just now',
+            messages: [...conv.messages, newMsg]
+          };
+        }
+        return conv;
+      });
+    });
+
+    // Simulate stylist automated reply after 2 seconds
+    setTimeout(() => {
+      const replies = [
+        "Got it! I have your slot booked and will be ready.",
+        "Perfect! Looking forward to your appointment.",
+        "Received! Let me know if you need to adjust anything.",
+        "Awesome, see you on campus!"
+      ];
+      const randomReply = replies[Math.floor(Math.random() * replies.length)];
+      const stylistReply = {
+        id: `m-reply-${Date.now()}`,
+        sender: 'stylist',
+        text: randomReply,
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      };
+
+      setConversations((prev) => {
+        return prev.map((conv) => {
+          if (conv.stylistId === stylistId) {
+            return {
+              ...conv,
+              lastMessage: randomReply,
+              lastTimestamp: 'Just now',
+              messages: [...conv.messages, stylistReply]
+            };
+          }
+          return conv;
+        });
+      });
+    }, 2000);
+  }, []);
+
+  // Smart Booking Creation
   const createBooking = useCallback((newBookingData) => {
     const bookingId = generateId('UHS-B');
     const newBooking = {
@@ -174,10 +289,10 @@ export const AppProvider = ({ children }) => {
 
     setBookings((prev) => [newBooking, ...prev]);
 
-    const pointsEarned = Math.floor(newBookingData.price / 10);
+    const pointsEarned = Math.floor((newBookingData.totalPrice || newBookingData.price) / 10);
     setUser((prev) => ({ ...prev, loyaltyPoints: prev.loyaltyPoints + pointsEarned }));
 
-    addToast(`Booking ${bookingId} confirmed at ${currentCampus}! +${pointsEarned} points`, 'success');
+    addToast(`Booking ${bookingId} confirmed at ${currentCampus}! +${pointsEarned} loyalty points`, 'success');
     return newBooking;
   }, [currentCampus, user.name, user.phone, addToast]);
 
@@ -185,7 +300,7 @@ export const AppProvider = ({ children }) => {
     setBookings((prev) =>
       prev.map((b) => (b.id === bookingId ? { ...b, status: 'Cancelled' } : b))
     );
-    addToast(`Booking ${bookingId} has been cancelled.`, 'info');
+    addToast(`Booking ${bookingId} has been cancelled per the 12hr policy.`, 'info');
   }, [addToast]);
 
   const rescheduleBooking = useCallback((bookingId, newDate, newTime) => {
@@ -195,9 +310,43 @@ export const AppProvider = ({ children }) => {
     addToast(`Booking ${bookingId} rescheduled to ${newDate} at ${newTime}`, 'success');
   }, [addToast]);
 
+  // Calendar .ics generator & download
+  const exportToCalendar = useCallback((booking) => {
+    if (!booking) return;
+    const dateFormatted = (booking.date || '2026-08-24').replace(/-/g, '');
+    const startTimeStr = (booking.time || '14:00').replace(/[^0-9]/g, '').padEnd(4, '0');
+    const icsContent = [
+      'BEGIN:VCALENDAR',
+      'VERSION:2.0',
+      'PRODID:-//UniHairShop//Campus Appointment//EN',
+      'CALSCALE:GREGORIAN',
+      'METHOD:PUBLISH',
+      'BEGIN:VEVENT',
+      `UID:${booking.id}@unihairshop.co.zm`,
+      `DTSTAMP:${dateFormatted}T100000Z`,
+      `DTSTART:${dateFormatted}T${startTimeStr}00Z`,
+      `SUMMARY:UniHairShop: ${booking.serviceName} with ${booking.staffName || 'Stylist'}`,
+      `DESCRIPTION:Campus Grooming Appointment for ${booking.customerName}. Ref: ${booking.id}. Location: ${booking.campus} (${booking.hostel || 'Hostel'})`,
+      `LOCATION:${booking.campus}, ${booking.hostel || 'Student Centre'}`,
+      'STATUS:CONFIRMED',
+      'END:VEVENT',
+      'END:VCALENDAR'
+    ].join('\r\n');
+
+    const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
+    const link = document.createElement('a');
+    link.href = window.URL.createObjectURL(blob);
+    link.setAttribute('download', `UniHairShop_${booking.id}.ics`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    addToast('Calendar (.ics) invite downloaded! Sync with Apple / Google Calendar.', 'success');
+  }, [addToast]);
+
+  // Order Management
   const createOrder = useCallback((orderData) => {
     const orderId = generateId('UHS-ORD');
-    const currentCart = cart; // capture current cart
+    const currentCart = cart;
     const newOrder = {
       id: orderId,
       items: currentCart,
@@ -230,6 +379,7 @@ export const AppProvider = ({ children }) => {
     setUser((prev) => ({ ...prev, loyaltyPoints: prev.loyaltyPoints + pointsEarned }));
 
     clearCart();
+    setIsCartOpen(false);
     addToast(`Order ${orderId} placed for ${currentCampus}!`, 'success');
     return newOrder;
   }, [cart, currentCampus, user.name, user.phone, clearCart, addToast]);
@@ -274,8 +424,10 @@ export const AppProvider = ({ children }) => {
     addToast(`Booking ${bookingId} marked as "${newStatus}"`, 'success');
   }, [addToast]);
 
-  // Memoize context value to prevent unnecessary re-renders
+  // Context value memoization
   const contextValue = useMemo(() => ({
+    theme,
+    toggleTheme,
     activeTab,
     setActiveTab,
     currentCampus,
@@ -287,23 +439,37 @@ export const AppProvider = ({ children }) => {
     setUser,
     services,
     products,
+    bundles,
+    staffList,
     bookings,
     orders,
     cart,
     addToCart,
+    addBundleToCart,
     updateCartQuantity,
     removeFromCart,
     clearCart,
     toggleFavorite,
+    isCartOpen,
+    setIsCartOpen,
     bookingService,
     setBookingService,
     selectedProduct,
     setSelectedProduct,
+    selectedStylist,
+    setSelectedStylist,
+    showSafetyModal,
+    setShowSafetyModal,
     lencoCheckoutState,
     setLencoCheckoutState,
+    conversations,
+    activeChatStylistId,
+    setActiveChatStylistId,
+    sendMessage,
     createBooking,
     cancelBooking,
     rescheduleBooking,
+    exportToCalendar,
     createOrder,
     addService,
     updateService,
@@ -311,17 +477,29 @@ export const AppProvider = ({ children }) => {
     updateProductStock,
     updateOrderStatus,
     updateBookingStatus,
+    filterCategory,
+    setFilterCategory,
+    serviceTypeFilter,
+    setServiceTypeFilter,
+    priceFilter,
+    setPriceFilter,
+    ratingFilter,
+    setRatingFilter,
+    availabilityFilter,
+    setAvailabilityFilter,
     toasts,
     addToast,
-    dismissToast,
-    staffList: initialStaff
+    dismissToast
   }), [
-    activeTab, currentCampus, isAdmin, user, services, products,
-    bookings, orders, cart, bookingService, selectedProduct,
-    lencoCheckoutState, toasts,
-    addToCart, updateCartQuantity, removeFromCart, clearCart,
-    toggleFavorite, createBooking, cancelBooking, rescheduleBooking,
-    createOrder, addService, updateService, addProduct,
+    theme, toggleTheme, activeTab, currentCampus, isAdmin, user,
+    services, products, bundles, staffList, bookings, orders, cart,
+    isCartOpen, bookingService, selectedProduct, selectedStylist,
+    showSafetyModal, lencoCheckoutState, conversations, activeChatStylistId,
+    filterCategory, serviceTypeFilter, priceFilter, ratingFilter, availabilityFilter,
+    toasts,
+    addToCart, addBundleToCart, updateCartQuantity, removeFromCart, clearCart,
+    toggleFavorite, sendMessage, createBooking, cancelBooking, rescheduleBooking,
+    exportToCalendar, createOrder, addService, updateService, addProduct,
     updateProductStock, updateOrderStatus, updateBookingStatus,
     addToast, dismissToast
   ]);

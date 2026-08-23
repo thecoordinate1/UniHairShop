@@ -10,41 +10,69 @@
     --apple-blue-hover: #0062CC;
     --secondary: #34C759;
     --accent: #FF2D55;
-    --dark-bg: #0A0A0C;
+    
+    /* Light Theme Palette */
+    --app-bg: #F8FAFC;
+    --app-surface: #FFFFFF;
+    --card-bg: rgba(255, 255, 255, 0.85);
+    --card-hover: rgba(255, 255, 255, 1);
+    --card-border: rgba(0, 0, 0, 0.08);
+    --card-border-hover: rgba(0, 0, 0, 0.16);
+    --text-main: #0F172A;
+    --text-muted: #64748B;
+    --header-bg: rgba(255, 255, 255, 0.88);
+    --dock-bg: rgba(255, 255, 255, 0.92);
+    --input-bg: rgba(0, 0, 0, 0.04);
+    --input-border: rgba(0, 0, 0, 0.1);
+    
+    --font-heading: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
+    --font-body: 'Inter', -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+  }
+
+  .dark {
+    /* Dark Theme Palette */
+    --app-bg: #0A0A0C;
+    --app-surface: #121217;
     --card-bg: rgba(255, 255, 255, 0.04);
-    --card-hover: rgba(255, 255, 255, 0.08);
+    --card-hover: rgba(255, 255, 255, 0.07);
+    --card-border: rgba(255, 255, 255, 0.1);
+    --card-border-hover: rgba(255, 255, 255, 0.22);
     --text-main: #F8FAFC;
     --text-muted: #94A3B8;
-    --text-dark: #0A0A0C;
-    --font-heading: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
-    --font-body: -apple-system, BlinkMacSystemFont, "SF Pro Text", 'Inter', sans-serif;
+    --header-bg: rgba(10, 10, 12, 0.9);
+    --dock-bg: rgba(18, 18, 23, 0.9);
+    --input-bg: rgba(255, 255, 255, 0.06);
+    --input-border: rgba(255, 255, 255, 0.12);
   }
 
   html {
-    @apply w-full scroll-smooth bg-[#0A0A0C];
+    @apply w-full scroll-smooth;
+    background-color: var(--app-bg);
+    color: var(--text-main);
   }
 
   body {
-    @apply w-full min-h-screen bg-[#0A0A0C] text-slate-100 font-body antialiased pb-24 md:pb-8 overflow-x-hidden m-0 p-0 selection:bg-blue-500/30 selection:text-white;
+    @apply w-full min-h-screen font-body antialiased pb-24 md:pb-8 overflow-x-hidden m-0 p-0 selection:bg-blue-500/30 selection:text-white transition-colors duration-200;
+    background-color: var(--app-bg);
+    color: var(--text-main);
   }
 
-  /* Prevent body scroll when modals are open */
+  /* Prevent body scroll when modals or drawers are open */
   body.modal-open {
     overflow: hidden;
     touch-action: none;
   }
 
   h1, h2, h3, h4, h5, h6 {
-    @apply font-heading font-bold tracking-tight text-white;
+    @apply font-heading font-bold tracking-tight;
   }
 
-  /* Focus-visible for keyboard accessibility — shows only on Tab navigation */
+  /* Focus-visible for keyboard accessibility */
   *:focus-visible {
     @apply outline-2 outline-offset-2 outline-[#007AFF] rounded-lg;
     outline-style: solid;
   }
 
-  /* Remove default focus ring for mouse users */
   *:focus:not(:focus-visible) {
     outline: none;
   }
@@ -53,6 +81,11 @@
 @keyframes popIn {
   0% { opacity: 0; transform: scale(0.96) translateY(8px); }
   100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+@keyframes slideLeftDrawer {
+  0% { transform: translateX(100%); }
+  100% { transform: translateX(0); }
 }
 
 @keyframes slideUpSheet {
@@ -76,7 +109,7 @@
 }
 
 @layer components {
-  /* Skip Navigation Link — Accessibility */
+  /* Skip Navigation Link */
   .skip-nav {
     @apply fixed -top-12 left-4 z-[9999] bg-[#007AFF] text-white font-bold text-sm px-5 py-3 rounded-b-2xl transition-all duration-200;
   }
@@ -86,22 +119,20 @@
 
   /* Layout Utilities */
   .app-container {
-    @apply w-full min-h-screen flex flex-col items-center bg-[#0A0A0C];
+    @apply w-full min-h-screen flex flex-col items-center;
+    background-color: var(--app-bg);
   }
 
   .main-content {
     @apply w-full max-w-[1200px] mx-auto px-4 pb-6 flex-1 flex flex-col box-border z-10;
-    padding-top: calc(4.2rem + max(0.85rem, env(safe-area-inset-top)));
+    padding-top: calc(4.3rem + max(0.85rem, env(safe-area-inset-top)));
   }
 
-  /* Glassmorphism Panels */
-  .glass-panel {
-    @apply bg-white/[0.04] backdrop-blur-2xl border border-white/10 rounded-3xl shadow-apple-glass box-border;
-  }
-
-  /* Header - Always Fixed to Viewport Top with Notch & Dynamic Island Safe Area */
+  /* Header - Fixed Viewport Top with Theme Backdrop Blur */
   .top-header {
-    @apply w-full fixed top-0 left-0 right-0 z-50 px-4 bg-[#0A0A0C]/90 backdrop-blur-2xl border-b border-white/10 shadow-lg shadow-black/50 transition-all;
+    @apply w-full fixed top-0 left-0 right-0 z-50 px-4 backdrop-blur-2xl border-b shadow-lg transition-all;
+    background-color: var(--header-bg);
+    border-color: var(--card-border);
     padding-top: max(0.85rem, env(safe-area-inset-top));
     padding-bottom: 0.75rem;
   }
@@ -111,49 +142,47 @@
   }
 
   .brand-logo {
-    @apply flex items-center gap-2.5 text-lg sm:text-xl font-extrabold text-white font-heading bg-transparent border-0 p-0 tracking-tight transition-transform active:scale-95;
+    @apply flex items-center gap-2 text-lg sm:text-xl font-extrabold font-heading bg-transparent border-0 p-0 tracking-tight transition-transform active:scale-95 cursor-pointer;
+    color: var(--text-main);
   }
 
   .campus-badge {
-    @apply bg-amber-500/15 text-amber-300 border border-amber-500/30 text-xs font-semibold px-3 py-1 rounded-full flex items-center gap-1.5 backdrop-blur-md shadow-sm;
+    @apply bg-amber-500/15 text-amber-500 dark:text-amber-300 border border-amber-500/30 text-xs font-semibold px-3 py-1 rounded-full flex items-center gap-1.5 backdrop-blur-md shadow-sm;
   }
 
   .header-actions {
-    @apply flex items-center gap-2 sm:gap-3;
+    @apply flex items-center gap-1.5 sm:gap-2.5;
   }
 
   .icon-btn {
-    @apply bg-white/10 hover:bg-white/15 text-white w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center relative transition-all duration-200 border border-white/10 active:scale-95 shadow-sm;
+    @apply bg-black/5 hover:bg-black/10 dark:bg-white/10 dark:hover:bg-white/15 text-slate-800 dark:text-white w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center relative transition-all duration-200 border border-black/10 dark:border-white/10 active:scale-95 shadow-sm cursor-pointer;
     min-height: 44px;
     min-width: 44px;
   }
 
   .badge-count {
-    @apply absolute -top-1 -right-1 bg-[#FF2D55] text-white text-[10px] font-extrabold w-5 h-5 rounded-full flex items-center justify-center shadow-md shadow-pink-500/30 ring-2 ring-[#0A0A0C];
+    @apply absolute -top-1 -right-1 bg-[#FF2D55] text-white text-[10px] font-extrabold w-5 h-5 rounded-full flex items-center justify-center shadow-md shadow-pink-500/30 ring-2 ring-white dark:ring-[#0A0A0C];
   }
 
-  .role-switcher-btn {
-    @apply bg-white/10 hover:bg-white/15 text-white font-semibold text-xs px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-full flex items-center gap-1.5 backdrop-blur-lg border border-white/15 shadow-md hover:border-white/25 active:scale-95 transition-all;
-    min-height: 44px;
-  }
-
-  /* Bottom Navigation - Floating iOS Dock Bar with Safe Area Bottom */
+  /* Bottom Navigation - Floating 5-Tab iOS Dock Bar */
   .bottom-nav {
-    @apply fixed left-1/2 -translate-x-1/2 z-50 bg-[#121217]/85 backdrop-blur-2xl border border-white/15 rounded-full px-3 py-1.5 flex justify-around items-center md:hidden w-[92%] max-w-md shadow-2xl shadow-black/80;
+    @apply fixed left-1/2 -translate-x-1/2 z-50 backdrop-blur-2xl border rounded-full px-2 py-1.5 flex justify-around items-center md:hidden w-[94%] max-w-lg shadow-2xl transition-all;
+    background-color: var(--dock-bg);
+    border-color: var(--card-border);
     bottom: max(1rem, env(safe-area-inset-bottom));
   }
 
   .nav-item {
-    @apply flex flex-col items-center gap-0.5 text-slate-400 text-[10px] font-medium px-3.5 py-1.5 rounded-full bg-transparent transition-all duration-200 border-0 active:scale-95;
+    @apply flex flex-col items-center gap-0.5 text-slate-500 dark:text-slate-400 text-[10px] font-medium px-2.5 py-1 rounded-full bg-transparent transition-all duration-200 border-0 active:scale-95 cursor-pointer relative;
     min-height: 44px;
     min-width: 44px;
   }
 
   .nav-item.active {
-    @apply text-white font-bold bg-white/15 shadow-inner border border-white/10 text-amber-400;
+    @apply text-amber-500 dark:text-amber-400 font-bold bg-black/5 dark:bg-white/15 shadow-inner border border-black/5 dark:border-white/10;
   }
 
-  /* Buttons & Badges */
+  /* Buttons */
   .btn-primary, .apple-btn-primary {
     @apply bg-[#007AFF] hover:bg-[#0062CC] text-white font-semibold text-sm px-5 py-2.5 rounded-full inline-flex items-center justify-center gap-2 shadow-apple-blue transition-all duration-200 active:scale-[0.97] border border-blue-400/30 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100;
   }
@@ -163,7 +192,7 @@
   }
 
   .btn-secondary, .apple-btn-secondary {
-    @apply bg-white/10 hover:bg-white/15 text-white font-semibold text-sm px-5 py-2.5 rounded-full inline-flex items-center justify-center gap-2 backdrop-blur-md transition-all duration-200 active:scale-[0.97] border border-white/10 hover:border-white/20 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100;
+    @apply bg-black/5 hover:bg-black/10 dark:bg-white/10 dark:hover:bg-white/15 text-slate-800 dark:text-white font-semibold text-sm px-5 py-2.5 rounded-full inline-flex items-center justify-center gap-2 backdrop-blur-md transition-all duration-200 active:scale-[0.97] border border-black/10 dark:border-white/10 hover:border-black/20 dark:hover:border-white/20 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100;
   }
 
   .btn-success {
@@ -175,7 +204,7 @@
   }
 
   .price-tag {
-    @apply text-amber-400 font-extrabold font-heading text-lg tracking-tight;
+    @apply text-amber-500 dark:text-amber-400 font-extrabold font-heading text-lg tracking-tight;
   }
 
   .badge {
@@ -183,44 +212,65 @@
   }
 
   .badge-in-stock {
-    @apply bg-emerald-500/15 text-emerald-400 border border-emerald-500/30;
+    @apply bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30;
   }
 
   .badge-low-stock {
-    @apply bg-amber-400/15 text-amber-400 border border-amber-400/30;
+    @apply bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30;
   }
 
   .badge-out-of-stock {
-    @apply bg-pink-500/15 text-pink-400 border border-pink-500/30;
+    @apply bg-pink-500/15 text-pink-600 dark:text-pink-400 border border-pink-500/30;
   }
 
-  /* Modals - iOS Sheet Modal */
+  .badge-verified {
+    @apply bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/30;
+  }
+
+  /* Modals & Overlays */
   .modal-overlay {
-    @apply fixed inset-0 z-50 bg-black/75 backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-4 w-full h-full;
+    @apply fixed inset-0 z-50 bg-black/60 dark:bg-black/75 backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-4 w-full h-full;
   }
 
   .modal-card {
-    @apply bg-[#121217] border border-white/15 rounded-t-[36px] sm:rounded-[36px] max-w-lg w-full max-h-[90vh] overflow-y-auto p-6 sm:p-7 shadow-2xl relative box-border mx-auto;
+    @apply bg-white dark:bg-[#121217] border border-black/10 dark:border-white/15 rounded-t-[36px] sm:rounded-[36px] max-w-lg w-full max-h-[90vh] overflow-y-auto p-6 sm:p-7 shadow-2xl relative box-border mx-auto;
     animation: popIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
   }
 
   .modal-close {
-    @apply absolute top-4 right-4 bg-white/10 hover:bg-white/20 text-slate-400 hover:text-white w-9 h-9 rounded-full flex items-center justify-center transition-all border border-white/10 active:scale-95;
+    @apply absolute top-4 right-4 bg-black/5 hover:bg-black/10 dark:bg-white/10 dark:hover:bg-white/20 text-slate-500 dark:text-slate-400 hover:text-black dark:hover:text-white w-9 h-9 rounded-full flex items-center justify-center transition-all border border-black/5 dark:border-white/10 active:scale-95 cursor-pointer;
     min-height: 44px;
     min-width: 44px;
   }
 
-  /* Cards & Grid */
+  /* Slide-Out Drawer */
+  .drawer-overlay {
+    @apply fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex justify-end;
+  }
+
+  .drawer-panel {
+    @apply w-full max-w-md h-full bg-white dark:bg-[#121217] border-l border-black/10 dark:border-white/15 shadow-2xl p-6 flex flex-col justify-between overflow-y-auto;
+    animation: slideLeftDrawer 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  /* Cards & Grids */
   .grid-2 {
     @apply w-full grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5;
   }
 
   .grid-3 {
-    @apply w-full grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5 sm:gap-6;
+    @apply w-full grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6;
   }
 
   .card, .apple-card {
-    @apply w-full bg-white/[0.04] hover:bg-white/[0.07] backdrop-blur-xl border border-white/10 hover:border-white/25 rounded-3xl overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl hover:shadow-black/70 box-border;
+    @apply w-full rounded-3xl overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-xl box-border border;
+    background-color: var(--card-bg);
+    border-color: var(--card-border);
+  }
+
+  .card:hover, .apple-card:hover {
+    background-color: var(--card-hover);
+    border-color: var(--card-border-hover);
   }
 
   /* Forms */
@@ -229,11 +279,13 @@
   }
 
   .form-label {
-    @apply block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2;
+    @apply block text-xs font-semibold uppercase tracking-wider mb-2 text-slate-700 dark:text-slate-300;
   }
 
   .form-input, .form-select, .form-textarea {
-    @apply w-full bg-white/[0.06] border border-white/10 rounded-2xl text-white px-4 py-3 text-sm outline-none focus:border-[#007AFF] focus:ring-2 focus:ring-[#007AFF]/30 transition-all duration-200 box-border placeholder:text-slate-500;
+    @apply w-full rounded-2xl px-4 py-3 text-sm outline-none focus:border-[#007AFF] focus:ring-2 focus:ring-[#007AFF]/30 transition-all duration-200 box-border text-slate-900 dark:text-white placeholder:text-slate-400 border;
+    background-color: var(--input-bg);
+    border-color: var(--input-border);
     min-height: 44px;
   }
 
@@ -251,12 +303,12 @@
   }
 
   .toast {
-    @apply bg-[#1C1C24]/90 backdrop-blur-2xl border border-white/15 text-white px-5 py-3.5 rounded-full shadow-2xl flex items-center gap-3 text-sm font-semibold justify-between cursor-pointer active:scale-[0.98] transition-transform;
+    @apply bg-white/95 dark:bg-[#1C1C24]/95 backdrop-blur-2xl border border-black/10 dark:border-white/15 text-slate-900 dark:text-white px-5 py-3.5 rounded-full shadow-2xl flex items-center gap-3 text-sm font-semibold justify-between cursor-pointer active:scale-[0.98] transition-transform;
     animation: popIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   }
 
   .toast-success {
-    @apply border-emerald-500/40 text-emerald-300;
+    @apply border-emerald-500/40 text-emerald-600 dark:text-emerald-300;
   }
 
   .toast-error {
@@ -265,19 +317,19 @@
 
   /* WhatsApp Widget */
   .whatsapp-widget {
-    @apply fixed bottom-24 left-5 z-40 bg-[#34C759] text-white w-12 h-12 rounded-full flex items-center justify-center shadow-lg shadow-emerald-500/40 hover:scale-110 active:scale-95 transition-all md:bottom-6;
+    @apply fixed bottom-24 left-5 z-40 bg-[#34C759] text-white w-12 h-12 rounded-full flex items-center justify-center shadow-lg shadow-emerald-500/40 hover:scale-110 active:scale-95 transition-all md:bottom-6 cursor-pointer;
     min-height: 44px;
     min-width: 44px;
   }
 
   /* Mobile Money Options */
   .momo-option {
-    @apply w-full flex items-center gap-3.5 p-3.5 border border-white/10 rounded-2xl bg-white/[0.04] cursor-pointer transition-all duration-200 hover:border-amber-400/50 hover:bg-white/[0.08] active:scale-[0.98];
+    @apply w-full flex items-center gap-3.5 p-3.5 border border-black/10 dark:border-white/10 rounded-2xl bg-black/[0.02] dark:bg-white/[0.04] cursor-pointer transition-all duration-200 hover:border-amber-400/50 hover:bg-black/[0.05] dark:hover:bg-white/[0.08] active:scale-[0.98];
     min-height: 44px;
   }
 
   .momo-option.selected {
-    @apply border-[#007AFF] bg-[#007AFF]/15 shadow-apple-blue;
+    @apply border-[#007AFF] bg-[#007AFF]/10 dark:bg-[#007AFF]/15 shadow-apple-blue;
   }
 
   .momo-logo {
@@ -289,14 +341,6 @@
   .zamtel { @apply bg-sky-600; }
   .lenco-pay { @apply bg-gradient-to-r from-cyan-600 to-emerald-600 text-white; }
 
-  /* Skeleton Loading */
-  .skeleton {
-    @apply bg-white/[0.06] rounded-2xl;
-    background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.04) 75%);
-    background-size: 200% 100%;
-    animation: shimmer 1.5s ease-in-out infinite;
-  }
-
   /* Empty State */
   .empty-state {
     @apply text-center py-12 px-6 max-w-md mx-auto;
@@ -307,13 +351,14 @@
   }
 }
 
-/* Print Styles — for booking confirmations */
+/* Print Styles */
 @media print {
   .top-header,
   .bottom-nav,
   .whatsapp-widget,
   .toast-container,
   .modal-overlay,
+  .drawer-overlay,
   .skip-nav {
     display: none !important;
   }

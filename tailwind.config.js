@@ -1,5 +1,6 @@
 /** @type {import('tailwindcss').Config} */
 export default {
+  darkMode: 'class',
   content: [
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
@@ -18,6 +19,12 @@ export default {
           card: '#1A1A22',
           elevated: '#242430'
         },
+        appleLight: {
+          DEFAULT: '#F8FAFC',
+          surface: '#FFFFFF',
+          card: '#F1F5F9',
+          elevated: '#E2E8F0'
+        },
         primary: {
           DEFAULT: '#F5A623',
           hover: '#E09418'
@@ -29,7 +36,7 @@ export default {
       },
       fontFamily: {
         heading: ['Plus Jakarta Sans', '-apple-system', 'BlinkMacSystemFont', 'SF Pro Display', 'sans-serif'],
-        body: ['-apple-system', 'BlinkMacSystemFont', 'SF Pro Text', 'Inter', 'sans-serif']
+        body: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'SF Pro Text', 'sans-serif']
       },
       borderRadius: {
         '2.5xl': '1.25rem',
@@ -42,6 +49,7 @@ export default {
       },
       boxShadow: {
         'apple-glass': '0 20px 50px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.12)',
+        'apple-glass-light': '0 10px 30px rgba(0, 0, 0, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.9)',
         'apple-blue': '0 10px 30px -5px rgba(0, 122, 255, 0.4)',
         'apple-gold': '0 10px 30px -5px rgba(245, 166, 35, 0.35)'
       },
