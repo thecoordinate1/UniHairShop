@@ -75,9 +75,11 @@ export default function App() {
 
       <div className="app-container">
         <Header />
-        <InstallBanner />
 
         <main id="main-content" className="main-content" role="main">
+          {/* Install banner positioned inside main flow with safe area top clearance */}
+          <InstallBanner />
+
           <Suspense fallback={<ViewSkeleton />}>
             {renderCurrentView()}
           </Suspense>
