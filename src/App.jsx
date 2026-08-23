@@ -19,6 +19,7 @@ const ProductDetailModal = lazy(() => import('./views/ProductDetailModal'));
 const CartView = lazy(() => import('./views/CartView'));
 const AccountView = lazy(() => import('./views/AccountView'));
 const MessagesView = lazy(() => import('./views/MessagesView'));
+const VendorStudioView = lazy(() => import('./views/VendorStudioView'));
 const AboutView = lazy(() => import('./views/AboutView'));
 const AdminDashboardView = lazy(() => import('./views/AdminDashboardView'));
 
@@ -37,14 +38,19 @@ function ViewSkeleton() {
 }
 
 export default function App() {
-  const { activeTab } = useApp();
+  const { activeTab, userMode } = useApp();
 
   // Scroll to top on tab change
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
-  }, [activeTab]);
+  }, [activeTab, userMode]);
 
   const renderCurrentView = () => {
+    // If in vendor mode and activeTab is home/vendor, show VendorStudioView
+    if (userMode === 'vendor' && (activeTab === 'home' || activeTab === 'vendor')) {
+      return <VendorStudioView />;
+    }
+
     switch (activeTab) {
       case 'home':
         return <HomeView />;
@@ -56,6 +62,8 @@ export default function App() {
         return <CartView />;
       case 'messages':
         return <MessagesView />;
+      case 'vendor':
+        return <VendorStudioView />;
       case 'account':
         return <AccountView />;
       case 'about':
@@ -63,7 +71,7 @@ export default function App() {
       case 'admin':
         return <AdminDashboardView />;
       default:
-        return <HomeView />;
+        return userMode === 'vendor' ? <VendorStudioView /> : <HomeView />;
     }
   };
 

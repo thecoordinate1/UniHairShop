@@ -47,6 +47,18 @@ export const AppProvider = ({ children }) => {
     }
   });
 
+  // Dual Architecture: User Mode ('customer' | 'vendor')
+  const [userMode, setUserMode] = useState(() => {
+    try {
+      return localStorage.getItem('unihair_user_mode') || 'customer';
+    } catch {
+      return 'customer';
+    }
+  });
+
+  // Vendor Studio active sub-tab ('overview' | 'schedule' | 'services' | 'portfolio' | 'wallet')
+  const [vendorTab, setVendorTab] = useState('overview');
+
   // Sync theme to document.documentElement
   useEffect(() => {
     try {
@@ -60,11 +72,25 @@ export const AppProvider = ({ children }) => {
     }
   }, [theme]);
 
+  // Sync userMode
+  useEffect(() => {
+    try {
+      localStorage.setItem('unihair_user_mode', userMode);
+    } catch { /* ignore */ }
+  }, [userMode]);
+
   const toggleTheme = useCallback(() => {
     setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
   }, []);
 
-  // Navigation tab state ('home' | 'services' | 'bookings' | 'shop' | 'messages' | 'account' | 'admin' | 'about')
+  const toggleUserMode = useCallback(() => {
+    setUserMode((prev) => {
+      const next = prev === 'customer' ? 'vendor' : 'customer';
+      return next;
+    });
+  }, []);
+
+  // Navigation tab state ('home' | 'services' | 'bookings' | 'shop' | 'messages' | 'account' | 'admin' | 'about' | 'vendor')
   const [activeTab, setActiveTab] = useState('home');
 
   // Active Campus Selection (Default: UNILUS Silverest Campus)
@@ -76,10 +102,10 @@ export const AppProvider = ({ children }) => {
     }
   });
 
-  // Role state (Student vs Admin)
+  // Role state (Student Admin vs Regular)
   const [isAdmin, setIsAdmin] = useState(false);
 
-  // User auth state
+  // Customer Student profile
   const [user, setUser] = useState(() => safeGetItem('unihair_user', {
     isLoggedIn: true,
     name: 'Kondwani Phiri',
@@ -88,6 +114,37 @@ export const AppProvider = ({ children }) => {
     loyaltyPoints: 140,
     referralCode: 'UNILUS-KONDWANI-88',
     favorites: ['srv-1', 'prd-1', 'stf-1']
+  }));
+
+  // Vendor Student profile (Stylist / Barber / Creator)
+  const [vendorProfile, setVendorProfile] = useState(() => safeGetItem('unihair_vendor_profile', {
+    id: 'stf-1',
+    name: 'Junior "The Fade King"',
+    role: 'Master Barber & Stylist',
+    campus: 'UNILUS Silverest Campus',
+    dormLocation: 'Silverest Hostel, Block C, Room 14',
+    avatar: '/images/barber_service.jpg',
+    isVerified: true,
+    badge: 'Verified Campus Stylist',
+    travelsToDorm: true,
+    travelFee: 20,
+    hasStudio: true,
+    phone: '0971234567',
+    payoutProvider: 'Airtel Money',
+    payoutNumber: '0971234567',
+    bio: 'Campus favorite barber at UNILUS Silverest. 4+ years precision fades and beard sculpting. I travel to student rooms or host in Block C!'
+  }));
+
+  // Vendor Wallet & Payout State
+  const [vendorWallet, setVendorWallet] = useState(() => safeGetItem('unihair_vendor_wallet', {
+    availableBalance: 640,
+    pendingBalance: 125,
+    totalEarned: 3450,
+    completedJobsCount: 42,
+    payouts: [
+      { id: 'PAY-891', date: '2026-08-20', amount: 450, provider: 'Airtel Money', number: '0971234567', status: 'Completed', ref: 'AM-TX-9841' },
+      { id: 'PAY-742', date: '2026-08-14', amount: 600, provider: 'MTN Mobile Money', number: '0961234567', status: 'Completed', ref: 'MTN-TX-1029' }
+    ]
   }));
 
   // Services, Products, Staff, Bookings, Orders
@@ -113,10 +170,10 @@ export const AppProvider = ({ children }) => {
 
   // Granular Filter Engine States
   const [filterCategory, setFilterCategory] = useState('All');
-  const [serviceTypeFilter, setServiceTypeFilter] = useState('All'); // 'All' | 'travel' | 'studio'
-  const [priceFilter, setPriceFilter] = useState('All'); // 'All' | 'under100' | '100to200' | 'over200'
-  const [ratingFilter, setRatingFilter] = useState('All'); // 'All' | '4.8+'
-  const [availabilityFilter, setAvailabilityFilter] = useState('All'); // 'All' | 'today' | 'weekend'
+  const [serviceTypeFilter, setServiceTypeFilter] = useState('All');
+  const [priceFilter, setPriceFilter] = useState('All');
+  const [ratingFilter, setRatingFilter] = useState('All');
+  const [availabilityFilter, setAvailabilityFilter] = useState('All');
 
   // Toast System
   const [toasts, setToasts] = useState([]);
@@ -145,6 +202,8 @@ export const AppProvider = ({ children }) => {
   }, [currentCampus]);
 
   useEffect(() => { debouncedPersist('unihair_user', user); }, [user, debouncedPersist]);
+  useEffect(() => { debouncedPersist('unihair_vendor_profile', vendorProfile); }, [vendorProfile, debouncedPersist]);
+  useEffect(() => { debouncedPersist('unihair_vendor_wallet', vendorWallet); }, [vendorWallet, debouncedPersist]);
   useEffect(() => { debouncedPersist('unihair_services', services); }, [services, debouncedPersist]);
   useEffect(() => { debouncedPersist('unihair_products', products); }, [products, debouncedPersist]);
   useEffect(() => { debouncedPersist('unihair_bookings', bookings); }, [bookings, debouncedPersist]);
@@ -241,7 +300,6 @@ export const AppProvider = ({ children }) => {
       });
     });
 
-    // Simulate stylist automated reply after 2 seconds
     setTimeout(() => {
       const replies = [
         "Got it! I have your slot booked and will be ready.",
@@ -289,10 +347,18 @@ export const AppProvider = ({ children }) => {
 
     setBookings((prev) => [newBooking, ...prev]);
 
-    const pointsEarned = Math.floor((newBookingData.totalPrice || newBookingData.price) / 10);
+    // Update vendor wallet pending/earned
+    const bookingAmount = newBookingData.totalPrice || newBookingData.price || 0;
+    setVendorWallet((prev) => ({
+      ...prev,
+      availableBalance: prev.availableBalance + bookingAmount,
+      totalEarned: prev.totalEarned + bookingAmount
+    }));
+
+    const pointsEarned = Math.floor(bookingAmount / 10);
     setUser((prev) => ({ ...prev, loyaltyPoints: prev.loyaltyPoints + pointsEarned }));
 
-    addToast(`Booking ${bookingId} confirmed at ${currentCampus}! +${pointsEarned} loyalty points`, 'success');
+    addToast(`Booking ${bookingId} confirmed at ${currentCampus}! +${pointsEarned} points`, 'success');
     return newBooking;
   }, [currentCampus, user.name, user.phone, addToast]);
 
@@ -300,7 +366,7 @@ export const AppProvider = ({ children }) => {
     setBookings((prev) =>
       prev.map((b) => (b.id === bookingId ? { ...b, status: 'Cancelled' } : b))
     );
-    addToast(`Booking ${bookingId} has been cancelled per the 12hr policy.`, 'info');
+    addToast(`Booking ${bookingId} has been cancelled.`, 'info');
   }, [addToast]);
 
   const rescheduleBooking = useCallback((bookingId, newDate, newTime) => {
@@ -384,12 +450,96 @@ export const AppProvider = ({ children }) => {
     return newOrder;
   }, [cart, currentCampus, user.name, user.phone, clearCart, addToast]);
 
+  // Vendor Specific Actions
+  const updateVendorProfile = useCallback((profileData) => {
+    setVendorProfile((prev) => ({ ...prev, ...profileData }));
+    addToast('Vendor Studio profile updated!', 'success');
+  }, [addToast]);
+
+  const toggleVendorDormTravel = useCallback(() => {
+    setVendorProfile((prev) => {
+      const nextTravel = !prev.travelsToDorm;
+      addToast(nextTravel ? 'Dorm travel enabled for bookings!' : 'Dorm travel turned off (Studio only)', 'info');
+      return { ...prev, travelsToDorm: nextTravel };
+    });
+  }, [addToast]);
+
+  const acceptBooking = useCallback((bookingId) => {
+    setBookings((prev) =>
+      prev.map((b) => (b.id === bookingId ? { ...b, status: 'Confirmed' } : b))
+    );
+    addToast(`Booking ${bookingId} accepted!`, 'success');
+  }, [addToast]);
+
+  const completeBooking = useCallback((bookingId) => {
+    setBookings((prev) =>
+      prev.map((b) => (b.id === bookingId ? { ...b, status: 'Completed' } : b))
+    );
+    setVendorWallet((prev) => ({
+      ...prev,
+      completedJobsCount: prev.completedJobsCount + 1
+    }));
+    addToast(`Booking ${bookingId} marked as completed! Funds ready for payout.`, 'success');
+  }, [addToast]);
+
+  const requestVendorPayout = useCallback((amount, provider, accountNumber) => {
+    if (amount <= 0 || amount > vendorWallet.availableBalance) {
+      addToast('Invalid payout amount or insufficient balance.', 'error');
+      return false;
+    }
+
+    const payoutId = generateId('PAY');
+    const newPayout = {
+      id: payoutId,
+      date: new Date().toISOString().split('T')[0],
+      amount: Number(amount),
+      provider: provider || 'Airtel Money',
+      number: accountNumber || vendorProfile.payoutNumber,
+      status: 'Completed',
+      ref: `${provider.slice(0, 3).toUpperCase()}-TX-${Math.floor(1000 + Math.random() * 9000)}`
+    };
+
+    setVendorWallet((prev) => ({
+      ...prev,
+      availableBalance: prev.availableBalance - Number(amount),
+      payouts: [newPayout, ...prev.payouts]
+    }));
+
+    addToast(`Payout of K${amount} sent to ${provider} (${accountNumber})! Ref: ${newPayout.ref}`, 'success');
+    return true;
+  }, [vendorWallet.availableBalance, vendorProfile.payoutNumber, addToast]);
+
+  const addVendorPortfolioItem = useCallback((item) => {
+    const newItem = {
+      id: generateId('port'),
+      image: item.image || '/images/barber_service.jpg',
+      tag: item.tag || 'Hair Transformation',
+      client: item.client || 'Campus Client'
+    };
+
+    setStaffList((prev) =>
+      prev.map((s) => {
+        if (s.id === vendorProfile.id) {
+          return { ...s, portfolio: [newItem, ...(s.portfolio || [])] };
+        }
+        return s;
+      })
+    );
+
+    addToast(`New hairstyle "${item.tag}" added to your portfolio!`, 'success');
+  }, [vendorProfile.id, addToast]);
+
   const addService = useCallback((serviceData) => {
     const newId = generateId('srv');
-    const newSrv = { id: newId, ...serviceData, image: serviceData.image || '/images/barber_service.jpg' };
+    const newSrv = {
+      id: newId,
+      ...serviceData,
+      image: serviceData.image || '/images/barber_service.jpg',
+      staffIds: [vendorProfile.id]
+    };
     setServices((prev) => [...prev, newSrv]);
-    addToast(`New service "${serviceData.name}" created!`, 'success');
-  }, [addToast]);
+    addToast(`New service "${serviceData.name}" added to your menu!`, 'success');
+  }, [vendorProfile.id, addToast]);
 
   const updateService = useCallback((id, updatedData) => {
     setServices((prev) => prev.map((s) => (s.id === id ? { ...s, ...updatedData } : s)));
@@ -428,6 +578,19 @@ export const AppProvider = ({ children }) => {
   const contextValue = useMemo(() => ({
     theme,
     toggleTheme,
+    userMode,
+    setUserMode,
+    toggleUserMode,
+    vendorTab,
+    setVendorTab,
+    vendorProfile,
+    updateVendorProfile,
+    toggleVendorDormTravel,
+    vendorWallet,
+    requestVendorPayout,
+    acceptBooking,
+    completeBooking,
+    addVendorPortfolioItem,
     activeTab,
     setActiveTab,
     currentCampus,
@@ -491,7 +654,10 @@ export const AppProvider = ({ children }) => {
     addToast,
     dismissToast
   }), [
-    theme, toggleTheme, activeTab, currentCampus, isAdmin, user,
+    theme, toggleTheme, userMode, toggleUserMode, vendorTab,
+    vendorProfile, updateVendorProfile, toggleVendorDormTravel, vendorWallet,
+    requestVendorPayout, acceptBooking, completeBooking, addVendorPortfolioItem,
+    activeTab, currentCampus, isAdmin, user,
     services, products, bundles, staffList, bookings, orders, cart,
     isCartOpen, bookingService, selectedProduct, selectedStylist,
     showSafetyModal, lencoCheckoutState, conversations, activeChatStylistId,

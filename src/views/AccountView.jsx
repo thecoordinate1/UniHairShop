@@ -18,7 +18,10 @@ import {
   Sun,
   Moon,
   MessageSquare,
-  Truck
+  Truck,
+  Store,
+  ArrowRight,
+  Scissors
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 
@@ -36,7 +39,9 @@ export default function AccountView() {
     setActiveTab,
     theme,
     toggleTheme,
-    setShowSafetyModal
+    setShowSafetyModal,
+    userMode,
+    toggleUserMode
   } = useApp();
 
   const [accountTab, setAccountTab] = useState('bookings');
@@ -129,6 +134,32 @@ export default function AccountView() {
             <span className="text-lg font-extrabold text-amber-400">{user.loyaltyPoints} Pts</span>
           </div>
         </div>
+      </div>
+
+      {/* Dual Architecture: Vendor Studio Banner */}
+      <div className="card p-5 bg-gradient-to-r from-amber-500/15 via-amber-400/10 to-transparent border border-amber-400/30 flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-center gap-3.5 min-w-0">
+          <div className="bg-amber-400 text-slate-950 w-11 h-11 rounded-2xl flex items-center justify-center font-extrabold shadow-md shrink-0">
+            <Store size={20} />
+          </div>
+          <div>
+            <h3 className="text-sm font-bold text-slate-900 dark:text-white m-0">Campus Stylist & Vendor Studio</h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 m-0 mt-0.5">
+              Cut hair, do braids, or sell hair products on campus? Manage appointments & instant mobile money payouts.
+            </p>
+          </div>
+        </div>
+
+        <button
+          onClick={() => {
+            if (userMode !== 'vendor') toggleUserMode();
+            setActiveTab('vendor');
+          }}
+          className="apple-btn-primary text-xs px-4 py-2 shrink-0"
+        >
+          <span>Open Vendor Studio</span>
+          <ArrowRight size={13} />
+        </button>
       </div>
 
       {/* Student Referral & Safety Quick Bar */}
@@ -229,7 +260,7 @@ export default function AccountView() {
                     <h3 className="text-base font-bold text-slate-900 dark:text-white tracking-tight">{b.serviceName}</h3>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Location: {b.campus} ({b.hostel || 'Campus'})</p>
                   </div>
-                  <span className={`badge ${b.status === 'Confirmed' ? 'badge-in-stock' : 'badge-out-of-stock'}`}>
+                  <span className={`badge ${b.status === 'Confirmed' ? 'badge-in-stock' : b.status === 'Completed' ? 'badge-verified' : 'badge-out-of-stock'}`}>
                     {b.status}
                   </span>
                 </div>

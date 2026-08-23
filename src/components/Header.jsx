@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Scissors, MapPin, ChevronDown, Sun, Moon, ShoppingBag, ShieldCheck } from 'lucide-react';
+import { Scissors, MapPin, ChevronDown, Sun, Moon, ShoppingBag, Store, User, Sparkles } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 
 export default function Header() {
   const {
     activeTab,
     setActiveTab,
-    isAdmin,
-    setIsAdmin,
+    userMode,
+    toggleUserMode,
     currentCampus,
     setCurrentCampus,
     lusakaUniversities,
@@ -65,8 +65,8 @@ export default function Header() {
         <div className="flex items-center gap-2 relative min-w-0" ref={dropdownRef}>
           <button
             className="brand-logo truncate shrink-0"
-            onClick={() => setActiveTab('home')}
-            aria-label="UniHairShop — Return to Explore"
+            onClick={() => setActiveTab(userMode === 'vendor' ? 'vendor' : 'home')}
+            aria-label="UniHairShop — Return to Home"
           >
             <Scissors size={20} className="shrink-0 text-amber-500" aria-hidden="true" />
             <span className="text-base sm:text-lg font-extrabold tracking-tight">UniHair</span>
@@ -74,7 +74,7 @@ export default function Header() {
 
           {/* Compact Campus Pill */}
           <button
-            className="campus-badge max-w-[135px] sm:max-w-[200px] truncate cursor-pointer hover:opacity-85 transition-opacity shrink"
+            className="campus-badge max-w-[130px] sm:max-w-[200px] truncate cursor-pointer hover:opacity-85 transition-opacity shrink"
             onClick={() => setShowCampusDropdown(!showCampusDropdown)}
             title="Click to change campus"
             aria-expanded={showCampusDropdown}
@@ -131,30 +131,75 @@ export default function Header() {
 
         {/* Center: Desktop Navigation Links (Hidden on Mobile) */}
         <nav className="hidden md:flex items-center gap-1 bg-black/5 dark:bg-white/[0.06] p-1 rounded-full border border-black/5 dark:border-white/10 backdrop-blur-md" role="navigation" aria-label="Desktop navigation">
-          {[
-            { id: 'home', label: 'Explore' },
-            { id: 'services', label: 'Services' },
-            { id: 'shop', label: 'Shop' },
-            { id: 'messages', label: 'Messages' },
-            { id: 'account', label: 'Bookings' }
-          ].map((item) => (
-            <button
-              key={item.id}
-              onClick={() => setActiveTab(item.id)}
-              aria-current={activeTab === item.id ? 'page' : undefined}
-              className={`text-xs font-semibold px-3.5 py-1.5 rounded-full transition-all duration-200 bg-transparent border-0 cursor-pointer ${
-                activeTab === item.id
-                  ? 'bg-white dark:bg-white/15 text-slate-900 dark:text-white shadow-sm font-bold border border-black/5 dark:border-white/10'
-                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-              }`}
-            >
-              {item.label}
-            </button>
-          ))}
+          {userMode === 'customer' ? (
+            [
+              { id: 'home', label: 'Explore' },
+              { id: 'services', label: 'Services' },
+              { id: 'shop', label: 'Shop' },
+              { id: 'messages', label: 'Messages' },
+              { id: 'account', label: 'Bookings' }
+            ].map((item) => (
+              <button
+                key={item.id}
+                onClick={() => setActiveTab(item.id)}
+                aria-current={activeTab === item.id ? 'page' : undefined}
+                className={`text-xs font-semibold px-3.5 py-1.5 rounded-full transition-all duration-200 bg-transparent border-0 cursor-pointer ${
+                  activeTab === item.id
+                    ? 'bg-white dark:bg-white/15 text-slate-900 dark:text-white shadow-sm font-bold border border-black/5 dark:border-white/10'
+                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                {item.label}
+              </button>
+            ))
+          ) : (
+            [
+              { id: 'vendor', label: 'Vendor Studio' },
+              { id: 'messages', label: 'Client Messages' },
+              { id: 'account', label: 'Profile Settings' }
+            ].map((item) => (
+              <button
+                key={item.id}
+                onClick={() => setActiveTab(item.id)}
+                aria-current={activeTab === item.id ? 'page' : undefined}
+                className={`text-xs font-semibold px-3.5 py-1.5 rounded-full transition-all duration-200 bg-transparent border-0 cursor-pointer ${
+                  activeTab === item.id
+                    ? 'bg-amber-400/20 text-amber-600 dark:text-amber-300 shadow-sm font-bold border border-amber-400/30'
+                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                {item.label}
+              </button>
+            ))
+          )}
         </nav>
 
-        {/* Right: Clean, Uncluttered Action Buttons */}
+        {/* Right: Clean Action Buttons & Dual Mode Switcher */}
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          {/* Dual Architecture 1-Tap Mode Switcher */}
+          <button
+            onClick={toggleUserMode}
+            className={`px-2.5 sm:px-3 py-1.5 rounded-2xl text-[11px] sm:text-xs font-bold transition-all duration-200 flex items-center gap-1.5 cursor-pointer border ${
+              userMode === 'vendor'
+                ? 'bg-gradient-to-r from-amber-500/20 to-amber-400/25 border-amber-400/40 text-amber-600 dark:text-amber-300 shadow-sm'
+                : 'bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:border-amber-400/30'
+            }`}
+            title={`Switch to ${userMode === 'vendor' ? 'Customer' : 'Vendor Studio'} Mode`}
+            aria-label={`Switch to ${userMode === 'vendor' ? 'Customer' : 'Vendor Studio'} Mode`}
+          >
+            {userMode === 'vendor' ? (
+              <>
+                <Store size={13} className="text-amber-500 shrink-0" />
+                <span className="hidden xs:inline">Vendor Studio</span>
+              </>
+            ) : (
+              <>
+                <Scissors size={13} className="text-amber-500 shrink-0" />
+                <span className="hidden xs:inline">Vendor Mode</span>
+              </>
+            )}
+          </button>
+
           {/* Theme Toggle Button */}
           <button
             onClick={toggleTheme}
@@ -163,42 +208,28 @@ export default function Header() {
             aria-label={`Switch to ${theme === 'dark' ? 'Light' : 'Dark'} mode`}
           >
             {theme === 'dark' ? (
-              <Sun size={17} className="text-amber-400" />
+              <Sun size={16} className="text-amber-400" />
             ) : (
-              <Moon size={17} className="text-slate-700" />
+              <Moon size={16} className="text-slate-700" />
             )}
           </button>
 
-          {/* Slide-Out Cart Trigger */}
-          <button
-            onClick={() => setIsCartOpen(true)}
-            className="icon-btn"
-            title="Open Shopping Cart"
-            aria-label={`Open Cart with ${cartTotalItems} items`}
-          >
-            <ShoppingBag size={17} />
-            {cartTotalItems > 0 && (
-              <span className="badge-count" aria-hidden="true">
-                {cartTotalItems}
-              </span>
-            )}
-          </button>
-
-          {/* Admin Switcher (Desktop Only to prevent mobile clutter) */}
-          <button
-            className="hidden md:flex role-switcher-btn cursor-pointer"
-            onClick={() => {
-              const nextMode = !isAdmin;
-              setIsAdmin(nextMode);
-              if (nextMode) setActiveTab('admin');
-              else setActiveTab('home');
-            }}
-            title="Toggle Admin / Student Mode"
-            aria-label={`Switch to ${isAdmin ? 'Student' : 'Admin'} mode`}
-          >
-            <ShieldCheck size={14} aria-hidden="true" />
-            <span>{isAdmin ? 'Admin' : 'Student'}</span>
-          </button>
+          {/* Slide-Out Cart Trigger (Customer Mode) */}
+          {userMode === 'customer' && (
+            <button
+              onClick={() => setIsCartOpen(true)}
+              className="icon-btn"
+              title="Open Shopping Cart"
+              aria-label={`Open Cart with ${cartTotalItems} items`}
+            >
+              <ShoppingBag size={16} />
+              {cartTotalItems > 0 && (
+                <span className="badge-count" aria-hidden="true">
+                  {cartTotalItems}
+                </span>
+              )}
+            </button>
+          )}
         </div>
       </div>
     </header>
