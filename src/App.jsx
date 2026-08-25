@@ -9,6 +9,7 @@ import CartDrawer from './components/CartDrawer';
 import StylistProfileModal from './components/StylistProfileModal';
 import SafetyModal from './components/SafetyModal';
 import InstallBanner from './components/InstallBanner';
+import AuthModal from './components/AuthModal';
 
 // Code-split all view components
 const HomeView = lazy(() => import('./views/HomeView'));
@@ -101,6 +102,7 @@ export default function App() {
         <CartDrawer />
         <StylistProfileModal />
         <SafetyModal />
+        <AuthModal />
 
         <Suspense fallback={null}>
           <BookingModal />

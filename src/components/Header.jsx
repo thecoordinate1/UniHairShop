@@ -214,6 +214,16 @@ export default function Header() {
             )}
           </button>
 
+          {/* User Account / Auth Button */}
+          <button
+            onClick={() => setShowAuthModal(true)}
+            className="icon-btn font-bold text-xs"
+            title={user?.isLoggedIn ? `Signed in as ${user.name}` : 'Sign In / Register'}
+            aria-label="Account and Authentication"
+          >
+            <User size={16} className="text-amber-500" />
+          </button>
+
           {/* Slide-Out Cart Trigger (Customer Mode) */}
           {userMode === 'customer' && (
             <button

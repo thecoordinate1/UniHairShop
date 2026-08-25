@@ -222,36 +222,60 @@ export default function BookingModal() {
                 </div>
               </div>
 
-              {/* 3. Date & Time Selection */}
-              <div className="grid grid-cols-2 gap-3 form-group">
-                <div>
-                  <label className="form-label" htmlFor="booking-date">Date:</label>
-                  <input
-                    id="booking-date"
-                    type="date"
-                    min={today}
-                    className={`form-input text-xs ${errors.date ? 'error' : ''}`}
-                    value={selectedDate}
-                    onChange={(e) => {
-                      setSelectedDate(e.target.value);
-                      if (errors.date) setErrors((p) => ({ ...p, date: undefined }));
-                    }}
-                  />
-                  {errors.date && <p className="form-error-text">{errors.date}</p>}
-                </div>
+              {/* 3. Date & Interactive Time Slot Selection with Real-time Conflict Detection */}
+              <div className="form-group">
+                <label className="form-label" htmlFor="booking-date">Select Appointment Date:</label>
+                <input
+                  id="booking-date"
+                  type="date"
+                  min={today}
+                  className={`form-input text-xs ${errors.date ? 'error' : ''}`}
+                  value={selectedDate}
+                  onChange={(e) => {
+                    setSelectedDate(e.target.value);
+                    if (errors.date) setErrors((p) => ({ ...p, date: undefined }));
+                  }}
+                />
+                {errors.date && <p className="form-error-text">{errors.date}</p>}
+              </div>
 
-                <div>
-                  <label className="form-label" htmlFor="booking-time">Time Slot:</label>
-                  <select
-                    id="booking-time"
-                    className="form-select text-xs"
-                    value={selectedTime}
-                    onChange={(e) => setSelectedTime(e.target.value)}
-                  >
-                    {availableTimeSlots.map((slot) => (
-                      <option key={slot} value={slot}>{slot}</option>
-                    ))}
-                  </select>
+              <div className="form-group mb-4">
+                <div className="flex justify-between items-center mb-1.5">
+                  <label className="form-label mb-0">Select Time Slot:</label>
+                  <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                    Live Availability
+                  </span>
+                </div>
+                <div className="grid grid-cols-3 sm:grid-cols-4 gap-1.5">
+                  {availableTimeSlots.map((slot) => {
+                    const isBooked = bookings.some((b) =>
+                      b.status === 'Confirmed' &&
+                      b.date === selectedDate &&
+                      b.time === slot &&
+                      (selectedStaff === 'Any Available Specialist' || b.staffName === selectedStaff)
+                    );
+                    const isSelected = selectedTime === slot && !isBooked;
+
+                    return (
+                      <button
+                        key={slot}
+                        type="button"
+                        disabled={isBooked}
+                        onClick={() => setSelectedTime(slot)}
+                        className={`p-2 rounded-xl text-xs font-semibold flex flex-col items-center justify-center transition-all border cursor-pointer ${
+                          isBooked
+                            ? 'opacity-45 bg-rose-500/10 border-rose-500/20 text-rose-500 line-through cursor-not-allowed'
+                            : isSelected
+                            ? 'bg-[#007AFF] border-[#007AFF] text-white shadow-apple-blue font-bold'
+                            : 'bg-black/[0.02] dark:bg-white/[0.04] border-black/10 dark:border-white/10 text-slate-700 dark:text-slate-200 hover:border-amber-400/40'
+                        }`}
+                      >
+                        <span>{slot}</span>
+                        {isBooked && <span className="text-[8px] no-underline font-bold mt-0.5">Booked</span>}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 

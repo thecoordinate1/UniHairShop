@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { supabase, isSupabaseConfigured } from '../lib/supabaseClient';
 import {
   initialServices,
   initialProducts,
@@ -56,7 +57,7 @@ export const AppProvider = ({ children }) => {
     }
   });
 
-  // Vendor Studio active sub-tab ('overview' | 'schedule' | 'services' | 'portfolio' | 'wallet')
+  // Vendor Studio active sub-tab
   const [vendorTab, setVendorTab] = useState('overview');
 
   // Sync theme to document.documentElement
@@ -84,10 +85,7 @@ export const AppProvider = ({ children }) => {
   }, []);
 
   const toggleUserMode = useCallback(() => {
-    setUserMode((prev) => {
-      const next = prev === 'customer' ? 'vendor' : 'customer';
-      return next;
-    });
+    setUserMode((prev) => (prev === 'customer' ? 'vendor' : 'customer'));
   }, []);
 
   // Navigation tab state ('home' | 'services' | 'bookings' | 'shop' | 'messages' | 'account' | 'admin' | 'about' | 'vendor')
@@ -161,6 +159,7 @@ export const AppProvider = ({ children }) => {
   const [activeChatStylistId, setActiveChatStylistId] = useState('stf-1');
 
   // Modals & Drawers
+  const [showAuthModal, setShowAuthModal] = useState(false);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [bookingService, setBookingService] = useState(null);
   const [selectedProduct, setSelectedProduct] = useState(null);
@@ -188,6 +187,85 @@ export const AppProvider = ({ children }) => {
 
   const dismissToast = useCallback((id) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
+  }, []);
+
+  // Supabase Backend Sync, Auth Listener & Realtime Subscription
+  useEffect(() => {
+    if (!isSupabaseConfigured || !supabase) return;
+
+    // Listen for auth state changes
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (session?.user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', session.user.id)
+          .single();
+
+        if (profile) {
+          setUser((prev) => ({
+            ...prev,
+            id: profile.id,
+            isLoggedIn: true,
+            name: profile.name || prev.name,
+            phone: profile.phone || prev.phone,
+            hostel: profile.hostel || prev.hostel,
+            loyaltyPoints: profile.loyalty_points || prev.loyaltyPoints,
+            referralCode: profile.referral_code || prev.referralCode
+          }));
+        }
+      }
+    });
+
+    // 1. Fetch initial services from Supabase
+    const fetchSupabaseData = async () => {
+      try {
+        const { data: srvData } = await supabase.from('services').select('*');
+        if (srvData && srvData.length > 0) {
+          setServices(srvData);
+        }
+
+        const { data: prdData } = await supabase.from('products').select('*');
+        if (prdData && prdData.length > 0) {
+          setProducts(prdData);
+        }
+
+        const { data: bData } = await supabase.from('bookings').select('*').order('created_at', { ascending: false });
+        if (bData && bData.length > 0) {
+          setBookings(bData);
+        }
+
+        const { data: vProfiles } = await supabase.from('vendor_profiles').select('*');
+        if (vProfiles && vProfiles.length > 0) {
+          setStaffList(vProfiles);
+        }
+      } catch (err) {
+        console.info('[UniHairShop] Supabase live fetch notice:', err.message);
+      }
+    };
+
+    fetchSupabaseData();
+
+    // 2. Realtime listener on Bookings
+    const bookingChannel = supabase
+      .channel('public:bookings')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' }, (payload) => {
+        if (payload.eventType === 'INSERT') {
+          setBookings((prev) => {
+            const exists = prev.some((b) => b.id === payload.new.id);
+            return exists ? prev : [payload.new, ...prev];
+          });
+        } else if (payload.eventType === 'UPDATE') {
+          setBookings((prev) => prev.map((b) => (b.id === payload.new.id ? payload.new : b)));
+        } else if (payload.eventType === 'DELETE') {
+          setBookings((prev) => prev.filter((b) => b.id === payload.old.id));
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(bookingChannel);
+    };
   }, []);
 
   // Debounced persistence
@@ -300,6 +378,17 @@ export const AppProvider = ({ children }) => {
       });
     });
 
+    // Sync message to Supabase
+    if (isSupabaseConfigured && supabase) {
+      supabase.from('messages').insert([{
+        id: newMsg.id,
+        conversation_id: `conv-${stylistId}`,
+        sender: 'user',
+        text: text.trim(),
+        time: newMsg.time
+      }]).catch(() => {});
+    }
+
     setTimeout(() => {
       const replies = [
         "Got it! I have your slot booked and will be ready.",
@@ -328,11 +417,21 @@ export const AppProvider = ({ children }) => {
           return conv;
         });
       });
+
+      if (isSupabaseConfigured && supabase) {
+        supabase.from('messages').insert([{
+          id: stylistReply.id,
+          conversation_id: `conv-${stylistId}`,
+          sender: 'stylist',
+          text: randomReply,
+          time: stylistReply.time
+        }]).catch(() => {});
+      }
     }, 2000);
   }, []);
 
   // Smart Booking Creation
-  const createBooking = useCallback((newBookingData) => {
+  const createBooking = useCallback(async (newBookingData) => {
     const bookingId = generateId('UHS-B');
     const newBooking = {
       id: bookingId,
@@ -346,6 +445,35 @@ export const AppProvider = ({ children }) => {
     };
 
     setBookings((prev) => [newBooking, ...prev]);
+
+    // Insert into Supabase if configured
+    if (isSupabaseConfigured && supabase) {
+      try {
+        await supabase.from('bookings').insert([{
+          id: bookingId,
+          service_id: newBookingData.serviceId || 'srv-1',
+          service_name: newBookingData.serviceName || 'Campus Service',
+          category: newBookingData.category || 'Barbering',
+          staff_id: newBookingData.staffId || 'stf-1',
+          staff_name: newBookingData.staffName || 'Campus Stylist',
+          date: newBookingData.date || new Date().toISOString().split('T')[0],
+          time: newBookingData.time || '14:00',
+          campus: currentCampus,
+          hostel: newBookingData.hostel || 'Hostel Room',
+          service_type: newBookingData.serviceType || 'Travel to Dorm',
+          customer_name: user.name,
+          customer_phone: user.phone,
+          selected_add_ons: newBookingData.selectedAddOns || [],
+          price: newBookingData.price || 90,
+          total_price: newBookingData.totalPrice || 110,
+          payment_method: newBookingData.paymentMethod || 'Cash / Mobile Money',
+          payment_status: newBooking.paymentStatus,
+          status: 'Confirmed'
+        }]);
+      } catch (err) {
+        console.warn('[UniHairShop] Supabase booking insert fallback:', err.message);
+      }
+    }
 
     // Update vendor wallet pending/earned
     const bookingAmount = newBookingData.totalPrice || newBookingData.price || 0;
@@ -362,17 +490,23 @@ export const AppProvider = ({ children }) => {
     return newBooking;
   }, [currentCampus, user.name, user.phone, addToast]);
 
-  const cancelBooking = useCallback((bookingId) => {
+  const cancelBooking = useCallback(async (bookingId) => {
     setBookings((prev) =>
       prev.map((b) => (b.id === bookingId ? { ...b, status: 'Cancelled' } : b))
     );
+    if (isSupabaseConfigured && supabase) {
+      supabase.from('bookings').update({ status: 'Cancelled' }).eq('id', bookingId).catch(() => {});
+    }
     addToast(`Booking ${bookingId} has been cancelled.`, 'info');
   }, [addToast]);
 
-  const rescheduleBooking = useCallback((bookingId, newDate, newTime) => {
+  const rescheduleBooking = useCallback(async (bookingId, newDate, newTime) => {
     setBookings((prev) =>
       prev.map((b) => (b.id === bookingId ? { ...b, date: newDate, time: newTime } : b))
     );
+    if (isSupabaseConfigured && supabase) {
+      supabase.from('bookings').update({ date: newDate, time: newTime }).eq('id', bookingId).catch(() => {});
+    }
     addToast(`Booking ${bookingId} rescheduled to ${newDate} at ${newTime}`, 'success');
   }, [addToast]);
 
@@ -410,7 +544,7 @@ export const AppProvider = ({ children }) => {
   }, [addToast]);
 
   // Order Management
-  const createOrder = useCallback((orderData) => {
+  const createOrder = useCallback(async (orderData) => {
     const orderId = generateId('UHS-ORD');
     const currentCart = cart;
     const newOrder = {
@@ -429,6 +563,26 @@ export const AppProvider = ({ children }) => {
     };
 
     setOrders((prev) => [newOrder, ...prev]);
+
+    if (isSupabaseConfigured && supabase) {
+      try {
+        await supabase.from('orders').insert([{
+          id: orderId,
+          items: currentCart,
+          campus: currentCampus,
+          total_amount: orderData.totalAmount,
+          customer_name: user.name,
+          customer_phone: user.phone,
+          delivery_type: orderData.deliveryType,
+          hostel_details: orderData.hostelDetails,
+          payment_method: orderData.paymentMethod,
+          payment_status: newOrder.paymentStatus,
+          status: 'Pending'
+        }]);
+      } catch (err) {
+        console.warn('[UniHairShop] Supabase order insert fallback:', err.message);
+      }
+    }
 
     setProducts((prevProducts) =>
       prevProducts.map((p) => {
@@ -451,10 +605,13 @@ export const AppProvider = ({ children }) => {
   }, [cart, currentCampus, user.name, user.phone, clearCart, addToast]);
 
   // Vendor Specific Actions
-  const updateVendorProfile = useCallback((profileData) => {
+  const updateVendorProfile = useCallback(async (profileData) => {
     setVendorProfile((prev) => ({ ...prev, ...profileData }));
+    if (isSupabaseConfigured && supabase) {
+      supabase.from('vendor_profiles').upsert([{ id: vendorProfile.id, ...profileData }]).catch(() => {});
+    }
     addToast('Vendor Studio profile updated!', 'success');
-  }, [addToast]);
+  }, [vendorProfile.id, addToast]);
 
   const toggleVendorDormTravel = useCallback(() => {
     setVendorProfile((prev) => {
@@ -464,14 +621,17 @@ export const AppProvider = ({ children }) => {
     });
   }, [addToast]);
 
-  const acceptBooking = useCallback((bookingId) => {
+  const acceptBooking = useCallback(async (bookingId) => {
     setBookings((prev) =>
       prev.map((b) => (b.id === bookingId ? { ...b, status: 'Confirmed' } : b))
     );
+    if (isSupabaseConfigured && supabase) {
+      supabase.from('bookings').update({ status: 'Confirmed' }).eq('id', bookingId).catch(() => {});
+    }
     addToast(`Booking ${bookingId} accepted!`, 'success');
   }, [addToast]);
 
-  const completeBooking = useCallback((bookingId) => {
+  const completeBooking = useCallback(async (bookingId) => {
     setBookings((prev) =>
       prev.map((b) => (b.id === bookingId ? { ...b, status: 'Completed' } : b))
     );
@@ -479,10 +639,13 @@ export const AppProvider = ({ children }) => {
       ...prev,
       completedJobsCount: prev.completedJobsCount + 1
     }));
+    if (isSupabaseConfigured && supabase) {
+      supabase.from('bookings').update({ status: 'Completed' }).eq('id', bookingId).catch(() => {});
+    }
     addToast(`Booking ${bookingId} marked as completed! Funds ready for payout.`, 'success');
   }, [addToast]);
 
-  const requestVendorPayout = useCallback((amount, provider, accountNumber) => {
+  const requestVendorPayout = useCallback(async (amount, provider, accountNumber) => {
     if (amount <= 0 || amount > vendorWallet.availableBalance) {
       addToast('Invalid payout amount or insufficient balance.', 'error');
       return false;
@@ -505,9 +668,22 @@ export const AppProvider = ({ children }) => {
       payouts: [newPayout, ...prev.payouts]
     }));
 
+    if (isSupabaseConfigured && supabase) {
+      supabase.from('vendor_payouts').insert([{
+        id: payoutId,
+        vendor_id: vendorProfile.id,
+        date: newPayout.date,
+        amount: Number(amount),
+        provider: newPayout.provider,
+        number: newPayout.number,
+        status: 'Completed',
+        reference: newPayout.ref
+      }]).catch(() => {});
+    }
+
     addToast(`Payout of K${amount} sent to ${provider} (${accountNumber})! Ref: ${newPayout.ref}`, 'success');
     return true;
-  }, [vendorWallet.availableBalance, vendorProfile.payoutNumber, addToast]);
+  }, [vendorWallet.availableBalance, vendorProfile.id, vendorProfile.payoutNumber, addToast]);
 
   const addVendorPortfolioItem = useCallback((item) => {
     const newItem = {
@@ -529,7 +705,7 @@ export const AppProvider = ({ children }) => {
     addToast(`New hairstyle "${item.tag}" added to your portfolio!`, 'success');
   }, [vendorProfile.id, addToast]);
 
-  const addService = useCallback((serviceData) => {
+  const addService = useCallback(async (serviceData) => {
     const newId = generateId('srv');
     const newSrv = {
       id: newId,
@@ -538,6 +714,22 @@ export const AppProvider = ({ children }) => {
       staffIds: [vendorProfile.id]
     };
     setServices((prev) => [...prev, newSrv]);
+
+    if (isSupabaseConfigured && supabase) {
+      supabase.from('services').insert([{
+        id: newId,
+        name: serviceData.name,
+        category: serviceData.category,
+        price: serviceData.price,
+        duration: serviceData.duration,
+        description: serviceData.description,
+        image: newSrv.image,
+        can_travel: serviceData.canTravel,
+        in_studio: serviceData.inStudio,
+        staff_ids: [vendorProfile.id]
+      }]).catch(() => {});
+    }
+
     addToast(`New service "${serviceData.name}" added to your menu!`, 'success');
   }, [vendorProfile.id, addToast]);
 
@@ -546,10 +738,23 @@ export const AppProvider = ({ children }) => {
     addToast('Service updated', 'success');
   }, [addToast]);
 
-  const addProduct = useCallback((productData) => {
+  const addProduct = useCallback(async (productData) => {
     const newId = generateId('prd');
     const newPrd = { id: newId, ...productData, image: productData.image || '/images/hair_product.jpg', rating: 5.0, reviewsCount: 1 };
     setProducts((prev) => [...prev, newPrd]);
+
+    if (isSupabaseConfigured && supabase) {
+      supabase.from('products').insert([{
+        id: newId,
+        name: productData.name,
+        category: productData.category,
+        price: productData.price,
+        stock: productData.stock,
+        description: productData.description,
+        image: newPrd.image
+      }]).catch(() => {});
+    }
+
     addToast(`New product "${productData.name}" added to shop!`, 'success');
   }, [addToast]);
 
@@ -557,6 +762,9 @@ export const AppProvider = ({ children }) => {
     setProducts((prev) =>
       prev.map((p) => (p.id === productId ? { ...p, stock: Number(newStock) } : p))
     );
+    if (isSupabaseConfigured && supabase) {
+      supabase.from('products').update({ stock: Number(newStock) }).eq('id', productId).catch(() => {});
+    }
     addToast('Stock level updated', 'info');
   }, [addToast]);
 
@@ -564,6 +772,9 @@ export const AppProvider = ({ children }) => {
     setOrders((prev) =>
       prev.map((o) => (o.id === orderId ? { ...o, status: newStatus } : o))
     );
+    if (isSupabaseConfigured && supabase) {
+      supabase.from('orders').update({ status: newStatus }).eq('id', orderId).catch(() => {});
+    }
     addToast(`Order ${orderId} updated to "${newStatus}"`, 'success');
   }, [addToast]);
 
@@ -571,6 +782,9 @@ export const AppProvider = ({ children }) => {
     setBookings((prev) =>
       prev.map((b) => (b.id === bookingId ? { ...b, status: newStatus } : b))
     );
+    if (isSupabaseConfigured && supabase) {
+      supabase.from('bookings').update({ status: newStatus }).eq('id', bookingId).catch(() => {});
+    }
     addToast(`Booking ${bookingId} marked as "${newStatus}"`, 'success');
   }, [addToast]);
 
@@ -613,6 +827,8 @@ export const AppProvider = ({ children }) => {
     removeFromCart,
     clearCart,
     toggleFavorite,
+    showAuthModal,
+    setShowAuthModal,
     isCartOpen,
     setIsCartOpen,
     bookingService,
@@ -659,7 +875,7 @@ export const AppProvider = ({ children }) => {
     requestVendorPayout, acceptBooking, completeBooking, addVendorPortfolioItem,
     activeTab, currentCampus, isAdmin, user,
     services, products, bundles, staffList, bookings, orders, cart,
-    isCartOpen, bookingService, selectedProduct, selectedStylist,
+    showAuthModal, isCartOpen, bookingService, selectedProduct, selectedStylist,
     showSafetyModal, lencoCheckoutState, conversations, activeChatStylistId,
     filterCategory, serviceTypeFilter, priceFilter, ratingFilter, availabilityFilter,
     toasts,
