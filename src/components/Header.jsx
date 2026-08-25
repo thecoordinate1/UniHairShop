@@ -15,6 +15,9 @@ export default function Header() {
     toggleTheme,
     cart,
     setIsCartOpen,
+    user,
+    showAuthModal,
+    setShowAuthModal,
     addToast
   } = useApp();
 
