@@ -31,7 +31,7 @@ export default function StylistProfileModal() {
 
   if (!selectedStylist) return null;
 
-  const stylistServices = services.filter((s) => s.staffIds?.includes(selectedStylist.id));
+  const stylistServices = services.filter((s) => (s.staffIds || s.staff_ids || []).includes(selectedStylist.id));
 
   const handleBookService = (srv) => {
     setSelectedStylist(null);

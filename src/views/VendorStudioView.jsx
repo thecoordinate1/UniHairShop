@@ -72,9 +72,13 @@ export default function VendorStudioView() {
   const [payoutProvider, setPayoutProvider] = useState(vendorProfile.payoutProvider || 'Airtel Money');
   const [payoutNumber, setPayoutNumber] = useState(vendorProfile.payoutNumber || '0971234567');
 
-  const myStylistObj = staffList.find((s) => s.id === vendorProfile.id) || staffList[0];
-  const myServices = services.filter((s) => s.staffIds?.includes(vendorProfile.id) || s.category === 'Barbering');
-  const myBookings = bookings.filter((b) => b.staffId === vendorProfile.id || b.staffName.includes(vendorProfile.name) || b.staffName === 'Junior "The Fade King"');
+  const myStylistObj = staffList.find((s) => s.id === vendorProfile.id) || staffList[0] || {};
+  const myServices = services.filter((s) => (s.staffIds || s.staff_ids || []).includes(vendorProfile.id) || s.category === 'Barbering');
+  const myBookings = bookings.filter((b) => {
+    const sName = b.staffName || b.staff_name || '';
+    const sId = b.staffId || b.staff_id || '';
+    return sId === vendorProfile.id || sName.includes(vendorProfile.name) || sName === 'Junior "The Fade King"';
+  });
 
   const activeConfirmedBookings = myBookings.filter((b) => b.status === 'Confirmed');
   const completedBookings = myBookings.filter((b) => b.status === 'Completed');

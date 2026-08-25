@@ -203,50 +203,58 @@ export default function HomeView() {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {staffList.map((stylist) => (
-            <div
-              key={stylist.id}
-              onClick={() => setSelectedStylist(stylist)}
-              className="apple-card p-4 flex flex-col justify-between cursor-pointer group"
-            >
-              <div>
-                <div className="relative h-44 w-full rounded-2xl overflow-hidden mb-3 bg-slate-800">
-                  <img src={stylist.avatar} alt={stylist.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" />
-                  <span className="badge badge-verified absolute top-2.5 left-2.5 text-[10px]">
-                    <ShieldCheck size={11} />
-                    <span>{stylist.badge}</span>
-                  </span>
-                  <div className="absolute bottom-2.5 left-2.5 bg-black/70 backdrop-blur-md px-2.5 py-1 rounded-full text-[10px] text-white flex items-center gap-1">
-                    <MapPin size={11} className="text-amber-400" />
-                    <span className="truncate max-w-[130px]">{stylist.dormLocation}</span>
-                  </div>
-                </div>
+          {staffList.map((stylist) => {
+            const dormLoc = stylist.dormLocation || stylist.dorm_location || 'Campus Hostel';
+            const respTime = stylist.responseTime || stylist.response_time || '15 mins';
+            const specialtiesList = Array.isArray(stylist.specialties) ? stylist.specialties : ['Campus Specialist', 'Verified Pro'];
+            const badgeText = stylist.badge || (stylist.is_verified || stylist.isVerified ? 'Verified Stylist' : 'Campus Stylist');
+            const ratingVal = stylist.rating || 5.0;
 
-                <div className="flex items-center justify-between mb-1">
-                  <h3 className="text-sm font-bold text-slate-900 dark:text-white group-hover:text-blue-500 transition-colors truncate">{stylist.name}</h3>
-                  <div className="flex items-center gap-1 text-xs text-amber-500 font-bold shrink-0">
-                    <Star size={13} fill="#F5A623" />
-                    <span>{stylist.rating}</span>
-                  </div>
-                </div>
-
-                <p className="text-xs text-slate-500 dark:text-slate-400 mb-2 truncate">{stylist.role}</p>
-
-                <div className="flex flex-wrap gap-1 mb-3">
-                  {stylist.specialties.slice(0, 2).map((spec, i) => (
-                    <span key={i} className="text-[10px] bg-black/5 dark:bg-white/5 text-slate-600 dark:text-slate-300 px-2 py-0.5 rounded-md">
-                      {spec}
+            return (
+              <div
+                key={stylist.id}
+                onClick={() => setSelectedStylist(stylist)}
+                className="apple-card p-4 flex flex-col justify-between cursor-pointer group"
+              >
+                <div>
+                  <div className="relative h-44 w-full rounded-2xl overflow-hidden mb-3 bg-slate-800">
+                    <img src={stylist.avatar || '/images/barber_service.jpg'} alt={stylist.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" />
+                    <span className="badge badge-verified absolute top-2.5 left-2.5 text-[10px]">
+                      <ShieldCheck size={11} />
+                      <span>{badgeText}</span>
                     </span>
-                  ))}
+                    <div className="absolute bottom-2.5 left-2.5 bg-black/70 backdrop-blur-md px-2.5 py-1 rounded-full text-[10px] text-white flex items-center gap-1">
+                      <MapPin size={11} className="text-amber-400" />
+                      <span className="truncate max-w-[130px]">{dormLoc}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between mb-1">
+                    <h3 className="text-sm font-bold text-slate-900 dark:text-white group-hover:text-blue-500 transition-colors truncate">{stylist.name}</h3>
+                    <div className="flex items-center gap-1 text-xs text-amber-500 font-bold shrink-0">
+                      <Star size={13} fill="#F5A623" />
+                      <span>{ratingVal}</span>
+                    </div>
+                  </div>
+
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mb-2 truncate">{stylist.role}</p>
+
+                  <div className="flex flex-wrap gap-1 mb-3">
+                    {specialtiesList.slice(0, 2).map((spec, i) => (
+                      <span key={i} className="text-[10px] bg-black/5 dark:bg-white/5 text-slate-600 dark:text-slate-300 px-2 py-0.5 rounded-md">
+                        {spec}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between pt-3 border-t border-black/5 dark:border-white/10 text-xs">
+                  <span className="text-slate-400">Replies in {respTime}</span>
+                  <span className="text-[#007AFF] font-bold">View Portfolio →</span>
                 </div>
               </div>
-
-              <div className="flex items-center justify-between pt-3 border-t border-black/5 dark:border-white/10 text-xs">
-                <span className="text-slate-400">Replies in {stylist.responseTime}</span>
-                <span className="text-[#007AFF] font-bold">View Portfolio →</span>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </section>
 
