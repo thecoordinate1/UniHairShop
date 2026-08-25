@@ -10,6 +10,7 @@ import StylistProfileModal from './components/StylistProfileModal';
 import SafetyModal from './components/SafetyModal';
 import InstallBanner from './components/InstallBanner';
 import AuthModal from './components/AuthModal';
+import AuthGuard from './components/AuthGuard';
 
 // Code-split all view components
 const HomeView = lazy(() => import('./views/HomeView'));
@@ -47,9 +48,13 @@ export default function App() {
   }, [activeTab, userMode]);
 
   const renderCurrentView = () => {
-    // If in vendor mode and activeTab is home/vendor, show VendorStudioView
+    // If in vendor mode and activeTab is home/vendor, show VendorStudioView guarded
     if (userMode === 'vendor' && (activeTab === 'home' || activeTab === 'vendor')) {
-      return <VendorStudioView />;
+      return (
+        <AuthGuard requiredRole="vendor">
+          <VendorStudioView />
+        </AuthGuard>
+      );
     }
 
     switch (activeTab) {
@@ -64,7 +69,11 @@ export default function App() {
       case 'messages':
         return <MessagesView />;
       case 'vendor':
-        return <VendorStudioView />;
+        return (
+          <AuthGuard requiredRole="vendor">
+            <VendorStudioView />
+          </AuthGuard>
+        );
       case 'account':
         return <AccountView />;
       case 'about':
@@ -72,7 +81,13 @@ export default function App() {
       case 'admin':
         return <AdminDashboardView />;
       default:
-        return userMode === 'vendor' ? <VendorStudioView /> : <HomeView />;
+        return userMode === 'vendor' ? (
+          <AuthGuard requiredRole="vendor">
+            <VendorStudioView />
+          </AuthGuard>
+        ) : (
+          <HomeView />
+        );
     }
   };
 

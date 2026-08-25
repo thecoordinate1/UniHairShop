@@ -21,13 +21,19 @@ import {
   Truck,
   Store,
   ArrowRight,
-  Scissors
+  Scissors,
+  LogOut,
+  Edit3,
+  Lock
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 
 export default function AccountView() {
   const {
     user,
+    signOut,
+    updateUserProfile,
+    setShowAuthModal,
     bookings,
     orders,
     cancelBooking,
@@ -50,16 +56,23 @@ export default function AccountView() {
   const [newTime, setNewTime] = useState('14:00');
   const [dateError, setDateError] = useState('');
 
+  // Edit Profile Modal
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editName, setEditName] = useState(user.name || '');
+  const [editPhone, setEditPhone] = useState(user.phone || '');
+  const [editHostel, setEditHostel] = useState(user.hostel || '');
+
   const today = new Date().toISOString().split('T')[0];
 
-  // Lock body scroll when reschedule modal is active & listen for Escape
+  // Lock body scroll when modals are active
   useEffect(() => {
-    if (!rescheduleModal) return;
+    if (!rescheduleModal && !showEditModal) return;
 
     document.body.classList.add('modal-open');
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') {
         setRescheduleModal(null);
+        setShowEditModal(false);
         setDateError('');
       }
     };
@@ -69,7 +82,7 @@ export default function AccountView() {
       document.body.classList.remove('modal-open');
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [rescheduleModal]);
+  }, [rescheduleModal, showEditModal]);
 
   const handleShareReferral = async () => {
     const text = `Use my student code ${user.referralCode} on UniHairShop to get K15 off your haircut, braids, or salon appointment!`;
@@ -107,7 +120,21 @@ export default function AccountView() {
     setDateError('');
   };
 
-  const favoriteServices = services.filter((s) => user.favorites.includes(s.id));
+  const handleSaveProfile = (e) => {
+    e.preventDefault();
+    if (!editName.trim()) {
+      addToast('Name cannot be empty', 'error');
+      return;
+    }
+    updateUserProfile({
+      name: editName.trim(),
+      phone: editPhone.trim(),
+      hostel: editHostel.trim()
+    });
+    setShowEditModal(false);
+  };
+
+  const favoriteServices = services.filter((s) => user.favorites?.includes(s.id));
 
   return (
     <div className="w-full max-w-3xl mx-auto flex flex-col gap-6">
@@ -120,21 +147,116 @@ export default function AccountView() {
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight m-0">{user.name}</h1>
-              <span className="badge badge-verified text-[10px] py-0.2 px-2">Verified Student</span>
+              <span className={`badge text-[10px] py-0.2 px-2 ${user.role === 'vendor' ? 'badge-in-stock' : 'badge-verified'}`}>
+                {user.role === 'vendor' ? 'Verified Stylist' : 'Student Account'}
+              </span>
             </div>
-            <p className="text-xs text-slate-300 mt-1 mb-0">Phone: {user.phone} • {user.hostel}</p>
+            <p className="text-xs text-slate-300 mt-1 mb-0">
+              {user.isLoggedIn ? `Phone: ${user.phone || 'Not set'} • ${user.hostel || 'Campus'}` : 'Guest Visitor'}
+            </p>
           </div>
         </div>
 
-        {/* Loyalty Points Badge */}
-        <div className="bg-amber-400/15 border border-amber-400/30 p-3 rounded-2xl flex items-center gap-3 backdrop-blur-md shadow-sm">
-          <Award size={24} className="text-amber-400 shrink-0" aria-hidden="true" />
-          <div>
-            <span className="text-[10px] text-slate-300 font-semibold uppercase tracking-wider block">Student Points</span>
-            <span className="text-lg font-extrabold text-amber-400">{user.loyaltyPoints} Pts</span>
+        {/* Action Controls: Edit Profile & Sign Out / In */}
+        <div className="flex items-center gap-2">
+          {user.isLoggedIn ? (
+            <>
+              <button
+                onClick={() => {
+                  setEditName(user.name);
+                  setEditPhone(user.phone);
+                  setEditHostel(user.hostel);
+                  setShowEditModal(true);
+                }}
+                className="apple-btn-secondary text-xs px-3 py-1.5 flex items-center gap-1 text-slate-200"
+                title="Edit student profile"
+              >
+                <Edit3 size={13} />
+                <span>Edit</span>
+              </button>
+
+              <button
+                onClick={signOut}
+                className="apple-btn-secondary text-xs px-3 py-1.5 flex items-center gap-1 text-rose-400 hover:text-rose-300 hover:border-rose-500/30"
+                title="Sign out of account"
+              >
+                <LogOut size={13} />
+                <span>Sign Out</span>
+              </button>
+            </>
+          ) : (
+            <button
+              onClick={() => setShowAuthModal(true)}
+              className="apple-btn-primary text-xs px-4 py-2 flex items-center gap-1.5"
+            >
+              <Lock size={13} />
+              <span>Sign In / Register</span>
+            </button>
+          )}
+
+          {/* Loyalty Points Badge */}
+          <div className="bg-amber-400/15 border border-amber-400/30 p-2.5 rounded-2xl flex items-center gap-2.5 backdrop-blur-md shadow-sm">
+            <Award size={20} className="text-amber-400 shrink-0" aria-hidden="true" />
+            <div>
+              <span className="text-[9px] text-slate-300 font-semibold uppercase tracking-wider block">Points</span>
+              <span className="text-sm font-extrabold text-amber-400">{user.loyaltyPoints} Pts</span>
+            </div>
           </div>
         </div>
       </div>
+
+      {/* EDIT PROFILE MODAL */}
+      {showEditModal && (
+        <div className="modal-overlay" onClick={() => setShowEditModal(false)}>
+          <div className="modal-card max-w-sm" onClick={(e) => e.stopPropagation()}>
+            <button className="modal-close" onClick={() => setShowEditModal(false)}>
+              <X size={18} />
+            </button>
+            <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-3">Edit Profile</h3>
+            <form onSubmit={handleSaveProfile} className="space-y-3">
+              <div className="form-group">
+                <label className="form-label" htmlFor="edit-name">Full Name:</label>
+                <input
+                  id="edit-name"
+                  type="text"
+                  required
+                  className="form-input text-xs"
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label" htmlFor="edit-phone">WhatsApp Phone:</label>
+                <input
+                  id="edit-phone"
+                  type="tel"
+                  required
+                  className="form-input text-xs"
+                  value={editPhone}
+                  onChange={(e) => setEditPhone(e.target.value)}
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label" htmlFor="edit-hostel">Hostel & Room No:</label>
+                <input
+                  id="edit-hostel"
+                  type="text"
+                  className="form-input text-xs"
+                  value={editHostel}
+                  onChange={(e) => setEditHostel(e.target.value)}
+                />
+              </div>
+
+              <button type="submit" className="apple-btn-primary w-full text-xs py-2.5 mt-2">
+                <span>Save Profile Changes</span>
+                <CheckCircle2 size={14} />
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Dual Architecture: Vendor Studio Banner */}
       <div className="card p-5 bg-gradient-to-r from-amber-500/15 via-amber-400/10 to-transparent border border-amber-400/30 flex flex-wrap items-center justify-between gap-4">

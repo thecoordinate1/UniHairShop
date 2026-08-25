@@ -103,12 +103,21 @@ export const AppProvider = ({ children }) => {
   // Role state (Student Admin vs Regular)
   const [isAdmin, setIsAdmin] = useState(false);
 
+  // Supabase Authentication & Role State
+  const [session, setSession] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [pendingAuthCallback, setPendingAuthCallback] = useState(null);
+
   // Customer Student profile
   const [user, setUser] = useState(() => safeGetItem('unihair_user', {
     isLoggedIn: true,
+    id: 'usr-kondwani',
     name: 'Kondwani Phiri',
+    email: 'kondwani@unilus.ac.zm',
     phone: '0971234567',
+    campus: 'UNILUS Silverest Campus',
     hostel: 'UNILUS Silverest Hostel, Block C, Room 14',
+    role: 'customer',
     loyaltyPoints: 140,
     referralCode: 'UNILUS-KONDWANI-88',
     favorites: ['srv-1', 'prd-1', 'stf-1']
@@ -191,15 +200,52 @@ export const AppProvider = ({ children }) => {
 
   // Supabase Backend Sync, Auth Listener & Realtime Subscription
   useEffect(() => {
-    if (!isSupabaseConfigured || !supabase) return;
+    if (!isSupabaseConfigured || !supabase) {
+      setAuthLoading(false);
+      return;
+    }
+
+    // Check initial session
+    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
+      setSession(currentSession);
+      if (currentSession?.user) {
+        supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', currentSession.user.id)
+          .single()
+          .then(({ data: profile }) => {
+            if (profile) {
+              setUser({
+                id: profile.id,
+                isLoggedIn: true,
+                name: profile.name || currentSession.user.email?.split('@')[0],
+                email: currentSession.user.email,
+                phone: profile.phone || '',
+                campus: profile.campus || currentCampus,
+                hostel: profile.hostel || '',
+                role: profile.role || 'customer',
+                loyaltyPoints: profile.loyalty_points || 50,
+                referralCode: profile.referral_code || '',
+                favorites: []
+              });
+              if (profile.role === 'vendor') {
+                setUserMode('vendor');
+              }
+            }
+          });
+      }
+      setAuthLoading(false);
+    });
 
     // Listen for auth state changes
-    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (session?.user) {
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
+      setSession(currentSession);
+      if (currentSession?.user) {
         const { data: profile } = await supabase
           .from('profiles')
           .select('*')
-          .eq('id', session.user.id)
+          .eq('id', currentSession.user.id)
           .single();
 
         if (profile) {
@@ -208,12 +254,20 @@ export const AppProvider = ({ children }) => {
             id: profile.id,
             isLoggedIn: true,
             name: profile.name || prev.name,
+            email: currentSession.user.email,
             phone: profile.phone || prev.phone,
+            campus: profile.campus || prev.campus,
             hostel: profile.hostel || prev.hostel,
+            role: profile.role || prev.role,
             loyaltyPoints: profile.loyalty_points || prev.loyaltyPoints,
             referralCode: profile.referral_code || prev.referralCode
           }));
+          if (profile.role === 'vendor') {
+            setUserMode('vendor');
+          }
         }
+      } else if (event === 'SIGNED_OUT') {
+        setSession(null);
       }
     });
 
@@ -788,6 +842,135 @@ export const AppProvider = ({ children }) => {
     addToast(`Booking ${bookingId} marked as "${newStatus}"`, 'success');
   }, [addToast]);
 
+  // Authentication & RBAC Functions
+  const signIn = useCallback(async (email, password) => {
+    if (!isSupabaseConfigured || !supabase) {
+      setUser((prev) => ({ ...prev, isLoggedIn: true, email }));
+      addToast('Signed in successfully!', 'success');
+      return { success: true };
+    }
+    const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+    if (error) throw error;
+    if (data?.session) {
+      setSession(data.session);
+    }
+    return { success: true, data };
+  }, [addToast]);
+
+  const signUp = useCallback(async (userData) => {
+    if (!isSupabaseConfigured || !supabase) {
+      setUser((prev) => ({ ...prev, isLoggedIn: true, ...userData }));
+      addToast('Account registered successfully!', 'success');
+      return { success: true };
+    }
+    const { data, error } = await supabase.auth.signUp({
+      email: userData.email.trim(),
+      password: userData.password,
+      options: {
+        data: {
+          name: userData.name,
+          phone: userData.phone,
+          campus: userData.campus,
+          hostel: userData.hostel,
+          role: userData.role || 'customer'
+        }
+      }
+    });
+    if (error) throw error;
+    return { success: true, data };
+  }, [addToast]);
+
+  const signOut = useCallback(async () => {
+    if (isSupabaseConfigured && supabase) {
+      await supabase.auth.signOut().catch(() => {});
+    }
+    setSession(null);
+    setUser({
+      isLoggedIn: false,
+      id: null,
+      name: 'Student Guest',
+      email: '',
+      phone: '',
+      campus: currentCampus,
+      hostel: '',
+      role: 'customer',
+      loyaltyPoints: 0,
+      referralCode: '',
+      favorites: []
+    });
+    setUserMode('customer');
+    addToast('Signed out of UniHairShop', 'info');
+  }, [currentCampus, addToast]);
+
+  const requireAuth = useCallback((actionCallback) => {
+    if (user?.isLoggedIn && (session || !isSupabaseConfigured)) {
+      actionCallback();
+    } else {
+      setPendingAuthCallback(() => actionCallback);
+      setShowAuthModal(true);
+    }
+  }, [user?.isLoggedIn, session]);
+
+  const updateUserProfile = useCallback(async (profileUpdates) => {
+    setUser((prev) => ({ ...prev, ...profileUpdates }));
+    if (isSupabaseConfigured && supabase && user.id) {
+      await supabase.from('profiles').update({
+        name: profileUpdates.name,
+        phone: profileUpdates.phone,
+        hostel: profileUpdates.hostel,
+        campus: profileUpdates.campus
+      }).eq('id', user.id).catch(() => {});
+    }
+    addToast('Student profile updated successfully!', 'success');
+  }, [user.id, addToast]);
+
+  const onboardAsStylist = useCallback(async (stylistData) => {
+    setUser((prev) => ({ ...prev, role: 'vendor' }));
+    const newVendor = {
+      id: user.id || `stf-${Date.now().toString(36)}`,
+      name: stylistData.name || user.name,
+      role: stylistData.specialty || 'Barbering',
+      campus: stylistData.campus || currentCampus,
+      dormLocation: stylistData.hostel || user.hostel || 'Hostel Studio',
+      avatar: '/images/barber_service.jpg',
+      isVerified: true,
+      badge: 'Verified Campus Stylist',
+      travelsToDorm: true,
+      travelFee: 20,
+      hasStudio: true,
+      phone: stylistData.phone || user.phone,
+      bio: stylistData.bio || `Verified campus stylist at ${currentCampus}.`,
+      payoutProvider: 'Airtel Money',
+      payoutNumber: stylistData.phone || user.phone
+    };
+
+    setVendorProfile(newVendor);
+    setUserMode('vendor');
+
+    if (isSupabaseConfigured && supabase) {
+      await supabase.from('profiles').update({ role: 'vendor' }).eq('id', user.id).catch(() => {});
+      await supabase.from('vendor_profiles').upsert([{
+        id: newVendor.id,
+        name: newVendor.name,
+        role: newVendor.role,
+        campus: newVendor.campus,
+        dorm_location: newVendor.dormLocation,
+        avatar: newVendor.avatar,
+        is_verified: true,
+        badge: newVendor.badge,
+        travels_to_dorm: true,
+        travel_fee: 20,
+        has_studio: true,
+        phone: newVendor.phone,
+        bio: newVendor.bio,
+        payout_provider: newVendor.payoutProvider,
+        payout_number: newVendor.payoutNumber
+      }]).catch(() => {});
+    }
+
+    addToast('Welcome to Vendor Studio! Your stylist workspace is ready.', 'success');
+  }, [user, currentCampus, addToast]);
+
   // Context value memoization
   const contextValue = useMemo(() => ({
     theme,
@@ -812,8 +995,18 @@ export const AppProvider = ({ children }) => {
     lusakaUniversities,
     isAdmin,
     setIsAdmin,
+    session,
+    authLoading,
     user,
     setUser,
+    signIn,
+    signUp,
+    signOut,
+    requireAuth,
+    pendingAuthCallback,
+    setPendingAuthCallback,
+    updateUserProfile,
+    onboardAsStylist,
     services,
     products,
     bundles,
@@ -873,7 +1066,8 @@ export const AppProvider = ({ children }) => {
     theme, toggleTheme, userMode, toggleUserMode, vendorTab,
     vendorProfile, updateVendorProfile, toggleVendorDormTravel, vendorWallet,
     requestVendorPayout, acceptBooking, completeBooking, addVendorPortfolioItem,
-    activeTab, currentCampus, isAdmin, user,
+    activeTab, currentCampus, isAdmin, session, authLoading, user,
+    signIn, signUp, signOut, requireAuth, pendingAuthCallback, updateUserProfile, onboardAsStylist,
     services, products, bundles, staffList, bookings, orders, cart,
     showAuthModal, isCartOpen, bookingService, selectedProduct, selectedStylist,
     showSafetyModal, lencoCheckoutState, conversations, activeChatStylistId,
