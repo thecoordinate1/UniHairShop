@@ -62,7 +62,7 @@ function ViewSkeleton() {
 }
 
 export default function App() {
-  const { activeTab, userMode, user, authLoading } = useApp();
+  const { activeTab, userMode, user, authLoading, isGuestMode, setShowAuthModal } = useApp();
 
   // Scroll to top on tab change
   useEffect(() => {
@@ -82,8 +82,8 @@ export default function App() {
     );
   }
 
-  // App Gate: Inaccessible without login / active session
-  if (!user?.isLoggedIn) {
+  // App Gate: Inaccessible without login OR guest mode
+  if (!user?.isLoggedIn && !isGuestMode) {
     return (
       <ErrorBoundary>
         <AuthWall />
@@ -144,6 +144,20 @@ export default function App() {
 
       <div className="app-container">
         <Header />
+
+        {/* Guest Mode Indicator Banner */}
+        {isGuestMode && !user?.isLoggedIn && (
+          <div className="bg-gradient-to-r from-amber-500/15 via-amber-400/10 to-amber-500/15 border-b border-amber-400/20 px-3 sm:px-4 py-2 text-center text-xs text-amber-600 dark:text-amber-300 flex flex-wrap items-center justify-center gap-1.5 sm:gap-2 shadow-sm backdrop-blur-md">
+            <span>🎓 <strong>Guest Mode:</strong> You're previewing campus salon services & shop items.</span>
+            <button
+              type="button"
+              onClick={() => setShowAuthModal(true)}
+              className="font-bold underline text-amber-600 dark:text-amber-300 hover:text-amber-500 dark:hover:text-amber-100 bg-transparent border-0 cursor-pointer p-0"
+            >
+              Sign In to Book & Earn Points
+            </button>
+          </div>
+        )}
 
         <main id="main-content" className="main-content" role="main">
           {/* Install banner positioned inside main flow with safe area top clearance */}

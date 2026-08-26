@@ -272,6 +272,29 @@ export default function AccountView() {
         </div>
       )}
 
+      {/* Guest Mode Onboarding Callout Banner */}
+      {!user?.isLoggedIn && (
+        <div className="card p-5 bg-gradient-to-r from-amber-500/15 via-amber-400/10 to-transparent border border-amber-400/30 flex flex-wrap items-center justify-between gap-4 shadow-sm">
+          <div className="flex items-center gap-3.5 min-w-0">
+            <div className="bg-amber-400/20 text-amber-500 w-11 h-11 rounded-2xl flex items-center justify-center font-extrabold shadow-sm shrink-0 border border-amber-400/30">
+              <Sparkles size={22} />
+            </div>
+            <div>
+              <h2 className="text-sm font-bold text-slate-900 dark:text-white m-0">Browsing in Guest Mode 🎓</h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400 m-0 mt-0.5">
+                Sign in or register to save your hostel appointments, earn loyalty discounts, and activate your student perks!
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => setShowAuthModal(true)}
+            className="apple-btn-primary text-xs py-2 px-4 shrink-0 font-bold shadow-apple-gold cursor-pointer"
+          >
+            Sign In / Register
+          </button>
+        </div>
+      )}
+
       {/* Master Admin Command Hub Banner */}
       {(isAdmin || user?.role === 'admin') && (
         <div className="card p-5 bg-gradient-to-r from-amber-500/20 via-amber-400/15 to-transparent border border-amber-400/40 flex flex-wrap items-center justify-between gap-4 shadow-sm">

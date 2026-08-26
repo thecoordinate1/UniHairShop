@@ -86,6 +86,15 @@ export const AppProvider = ({ children }) => {
   const [authLoading, setAuthLoading] = useState(true);
   const [pendingAuthCallback, setPendingAuthCallback] = useState(null);
 
+  // Guest Mode State
+  const [isGuestMode, setIsGuestMode] = useState(() => {
+    try {
+      return localStorage.getItem('unihair_guest_mode') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
   // 2. User & Vendor Profiles
   const [user, setUser] = useState(() => safeGetItem('unihair_user', defaultGuestUser));
 
@@ -1211,8 +1220,24 @@ export const AppProvider = ({ children }) => {
     setIsAdmin(false);
     setUser(defaultGuestUser);
     setUserMode('customer');
+    setIsGuestMode(false);
     addToast('All active sessions terminated. Please sign in or create a new account.', 'info');
   }, [addToast]);
+
+  const continueAsGuest = useCallback(() => {
+    setIsGuestMode(true);
+    try {
+      localStorage.setItem('unihair_guest_mode', 'true');
+    } catch {}
+    addToast('Exploring UniHairShop in Guest Mode. 🎓 Sign in anytime to book or message!', 'info');
+  }, [addToast]);
+
+  const exitGuestMode = useCallback(() => {
+    setIsGuestMode(false);
+    try {
+      localStorage.removeItem('unihair_guest_mode');
+    } catch {}
+  }, []);
 
   const requireAuth = useCallback((actionCallback) => {
     if (user?.isLoggedIn && (session || !isSupabaseConfigured)) {
@@ -1368,6 +1393,10 @@ export const AppProvider = ({ children }) => {
     setIsAdmin,
     session,
     authLoading,
+    isGuestMode,
+    setIsGuestMode,
+    continueAsGuest,
+    exitGuestMode,
     user,
     setUser,
     signIn,
@@ -1440,7 +1469,7 @@ export const AppProvider = ({ children }) => {
     theme, toggleTheme, userMode, toggleUserMode, vendorTab,
     vendorProfile, updateVendorProfile, toggleVendorDormTravel, vendorWallet,
     requestVendorPayout, acceptBooking, completeBooking, addVendorPortfolioItem,
-    activeTab, currentCampus, isAdmin, session, authLoading, user,
+    activeTab, currentCampus, isAdmin, session, authLoading, isGuestMode, continueAsGuest, exitGuestMode, user,
     signIn, signUp, signOut, terminateAllSessions, requireAuth, pendingAuthCallback, updateUserProfile, onboardAsStylist,
     verifyStylist, settleVendorPayout, toggleAdminMode,
     services, products, bundles, staffList, bookings, orders, cart,

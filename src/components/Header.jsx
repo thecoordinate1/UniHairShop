@@ -252,6 +252,18 @@ export default function Header() {
               )}
             </button>
           )}
+
+          {/* Sign In Button for Unauthenticated Guest Mode */}
+          {!user?.isLoggedIn && (
+            <button
+              onClick={() => setShowAuthModal(true)}
+              className="apple-btn-primary text-[11px] sm:text-xs px-2.5 sm:px-3 py-1.5 rounded-2xl flex items-center gap-1 font-bold shadow-apple-gold cursor-pointer shrink-0"
+              title="Sign In or Register"
+            >
+              <User size={13} />
+              <span className="hidden xs:inline">Sign In</span>
+            </button>
+          )}
         </div>
       </div>
     </header>

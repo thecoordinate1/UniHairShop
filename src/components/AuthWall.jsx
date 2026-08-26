@@ -29,6 +29,7 @@ export default function AuthWall() {
   const {
     signIn,
     signUp,
+    continueAsGuest,
     terminateAllSessions,
     lusakaUniversities,
     currentCampus,
@@ -600,6 +601,22 @@ export default function AuthWall() {
               </div>
             </div>
           )}
+
+          {/* Guest Mode Exploration Gateway */}
+          <div className="pt-4 mt-5 border-t border-white/10 text-center">
+            <p className="text-[11px] text-slate-400 mb-2">Want to explore services & stylists before registering?</p>
+            <button
+              type="button"
+              onClick={continueAsGuest}
+              className="w-full py-2.5 px-4 rounded-2xl bg-white/[0.06] hover:bg-white/[0.12] border border-white/15 text-white text-xs font-bold transition-all flex items-center justify-between cursor-pointer shadow-sm hover:border-amber-400/40 active:scale-[0.99]"
+            >
+              <div className="flex items-center gap-2">
+                <GraduationCap size={15} className="text-amber-400 shrink-0" />
+                <span>Continue Browsing as Guest</span>
+              </div>
+              <ArrowRight size={14} className="text-slate-400 shrink-0" />
+            </button>
+          </div>
         </div>
 
         {/* Global Session Termination Button */}
