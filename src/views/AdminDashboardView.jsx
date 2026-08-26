@@ -55,6 +55,7 @@ export default function AdminDashboardView() {
   const [adminTab, setAdminTab] = useState('overview'); // 'overview' | 'vendors' | 'traffic' | 'payouts' | 'catalog'
   const [vendorSearch, setVendorSearch] = useState('');
   const [vendorCampusFilter, setVendorCampusFilter] = useState('All');
+  const [vendorVerifyFilter, setVendorVerifyFilter] = useState('All'); // 'All' | 'Verified' | 'Pending'
   const [trafficCampusFilter, setTrafficCampusFilter] = useState('All');
   const [trafficStatusFilter, setTrafficStatusFilter] = useState('All');
 
@@ -62,6 +63,7 @@ export default function AdminDashboardView() {
   const [showAddServiceModal, setShowAddServiceModal] = useState(false);
   const [showAddProductModal, setShowAddProductModal] = useState(false);
   const [showAddVendorModal, setShowAddVendorModal] = useState(false);
+  const [selectedStylistToVerify, setSelectedStylistToVerify] = useState(null);
 
   // New service form state
   const [newSrvName, setNewSrvName] = useState('');
@@ -87,7 +89,7 @@ export default function AdminDashboardView() {
 
   // Lock body scroll on modal opens & handle Escape
   useEffect(() => {
-    const isAnyModalOpen = showAddServiceModal || showAddProductModal || showAddVendorModal;
+    const isAnyModalOpen = showAddServiceModal || showAddProductModal || showAddVendorModal || !!selectedStylistToVerify;
     if (isAnyModalOpen) {
       document.body.classList.add('modal-open');
     } else {
@@ -99,6 +101,7 @@ export default function AdminDashboardView() {
         setShowAddServiceModal(false);
         setShowAddProductModal(false);
         setShowAddVendorModal(false);
+        setSelectedStylistToVerify(null);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -107,7 +110,7 @@ export default function AdminDashboardView() {
       document.body.classList.remove('modal-open');
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [showAddServiceModal, showAddProductModal, showAddVendorModal]);
+  }, [showAddServiceModal, showAddProductModal, showAddVendorModal, selectedStylistToVerify]);
 
   // Executive Calculations
   const grossBookingGMV = bookings.reduce((sum, b) => (b.status !== 'Cancelled' ? sum + (Number(b.price) || Number(b.totalPrice) || 0) : sum), 0);
@@ -135,11 +138,15 @@ export default function AdminDashboardView() {
 
   // Filtered Vendors
   const filteredVendors = staffList.filter((vendor) => {
+    const isVerified = vendor.isVerified || vendor.is_verified;
     const matchesSearch = vendor.name.toLowerCase().includes(vendorSearch.toLowerCase()) ||
                           vendor.role.toLowerCase().includes(vendorSearch.toLowerCase()) ||
                           vendor.dormLocation?.toLowerCase().includes(vendorSearch.toLowerCase());
     const matchesCampus = vendorCampusFilter === 'All' || vendor.campus === vendorCampusFilter;
-    return matchesSearch && matchesCampus;
+    const matchesVerify = vendorVerifyFilter === 'All' ||
+                          (vendorVerifyFilter === 'Verified' && isVerified) ||
+                          (vendorVerifyFilter === 'Pending' && !isVerified);
+    return matchesSearch && matchesCampus && matchesVerify;
   });
 
   // Filtered Traffic Bookings
@@ -346,6 +353,32 @@ export default function AdminDashboardView() {
       {/* 2. ALL CAMPUS VENDORS & STYLISTS TAB */}
       {adminTab === 'vendors' && (
         <div className="space-y-4">
+          {/* Verification Status Sub-Tabs */}
+          <div className="flex gap-1.5 overflow-x-auto pb-1">
+            {[
+              { id: 'All', label: 'All Stylists', count: staffList.length },
+              { id: 'Pending', label: 'Needs Verification', count: staffList.filter((s) => !(s.isVerified || s.is_verified)).length },
+              { id: 'Verified', label: 'Verified Stylists', count: staffList.filter((s) => s.isVerified || s.is_verified).length }
+            ].map((f) => (
+              <button
+                key={f.id}
+                onClick={() => setVendorVerifyFilter(f.id)}
+                className={`py-1.5 px-3 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-all border cursor-pointer ${
+                  vendorVerifyFilter === f.id
+                    ? 'bg-amber-400 text-slate-950 border-amber-400 font-bold shadow-sm'
+                    : 'bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 text-slate-600 dark:text-slate-300'
+                }`}
+              >
+                <span>{f.label}</span>
+                <span className={`text-[10px] px-1.5 rounded-full font-bold ${
+                  vendorVerifyFilter === f.id ? 'bg-slate-950 text-amber-400' : 'bg-black/10 dark:bg-white/10'
+                }`}>
+                  {f.count}
+                </span>
+              </button>
+            ))}
+          </div>
+
           {/* Filter Bar */}
           <div className="flex flex-wrap justify-between items-center gap-3">
             <div className="relative flex-1 min-w-[240px]">
@@ -378,7 +411,7 @@ export default function AdminDashboardView() {
               const vendorBookings = bookings.filter((b) => b.staffName?.includes(vendor.name) || b.staffId === vendor.id);
 
               return (
-                <div key={vendor.id} className="card p-4 flex flex-col justify-between border border-black/10 dark:border-white/10">
+                <div key={vendor.id} className="card p-4 flex flex-col justify-between border border-black/10 dark:border-white/10 hover:border-amber-400/30 transition-all">
                   <div>
                     <div className="flex items-start justify-between gap-3 mb-3">
                       <div className="flex items-center gap-3">
@@ -396,17 +429,18 @@ export default function AdminDashboardView() {
                         </div>
                       </div>
 
-                      <button
-                        onClick={() => verifyStylist(vendor.id, !isVerified)}
-                        className={`text-[10px] px-2 py-1 rounded-xl font-bold transition-colors border cursor-pointer ${
-                          isVerified
-                            ? 'bg-blue-500/15 border-blue-500/30 text-blue-500 hover:bg-rose-500/15 hover:text-rose-500 hover:border-rose-500/30'
-                            : 'bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 text-slate-500 hover:bg-emerald-500/15 hover:text-emerald-500'
-                        }`}
-                        title={isVerified ? 'Click to revoke verification' : 'Click to approve verification badge'}
-                      >
-                        {isVerified ? 'Verified' : 'Verify'}
-                      </button>
+                      {/* Verification Badge */}
+                      {isVerified ? (
+                        <span className="badge badge-in-stock text-[9px] py-0.5 px-2 flex items-center gap-1 font-bold shrink-0">
+                          <BadgeCheck size={11} className="text-blue-500" />
+                          <span>Verified</span>
+                        </span>
+                      ) : (
+                        <span className="badge badge-out-of-stock text-[9px] py-0.5 px-2 flex items-center gap-1 font-bold shrink-0">
+                          <AlertCircle size={11} className="text-amber-500" />
+                          <span>Unverified</span>
+                        </span>
+                      )}
                     </div>
 
                     <div className="space-y-1 text-xs text-slate-500 dark:text-slate-400 mb-3 bg-black/[0.02] dark:bg-white/[0.02] p-2.5 rounded-xl border border-black/5 dark:border-white/5">
@@ -425,17 +459,42 @@ export default function AdminDashboardView() {
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between pt-2 border-t border-black/5 dark:border-white/10 text-xs">
-                    <span className="text-slate-400">{vendorBookings.length} total client bookings</span>
-                    <a
-                      href={`https://wa.me/260${(vendor.phone || '0971234567').replace(/^0/, '')}?text=Hi%20${encodeURIComponent(vendor.name)},%20this%20is%20UniHairShop%20Admin.`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1 hover:underline"
-                    >
-                      <MessageSquare size={12} />
-                      <span>WhatsApp</span>
-                    </a>
+                  {/* Vendor Card Actions */}
+                  <div className="space-y-2 pt-2 border-t border-black/5 dark:border-white/10">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-slate-400">{vendorBookings.length} client appointments</span>
+                      <a
+                        href={`https://wa.me/260${(vendor.phone || '0971234567').replace(/^0/, '')}?text=Hi%20${encodeURIComponent(vendor.name)},%20this%20is%20UniHairShop%20Admin.`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1 hover:underline"
+                      >
+                        <MessageSquare size={12} />
+                        <span>WhatsApp</span>
+                      </a>
+                    </div>
+
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setSelectedStylistToVerify(vendor)}
+                        className="apple-btn-primary flex-1 text-[11px] py-1.5 flex items-center justify-center gap-1 font-bold"
+                      >
+                        <ShieldCheck size={13} />
+                        <span>Review & Verify</span>
+                      </button>
+
+                      <button
+                        onClick={() => verifyStylist(vendor.id, !isVerified)}
+                        className={`text-[11px] px-2.5 py-1.5 rounded-xl font-bold transition-colors border cursor-pointer shrink-0 ${
+                          isVerified
+                            ? 'bg-rose-500/10 border-rose-500/30 text-rose-500 hover:bg-rose-500/20'
+                            : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20'
+                        }`}
+                        title={isVerified ? 'Revoke verification badge' : 'Grant verification badge'}
+                      >
+                        {isVerified ? 'Revoke' : 'Quick Approve'}
+                      </button>
+                    </div>
                   </div>
                 </div>
               );
@@ -822,6 +881,114 @@ export default function AdminDashboardView() {
                 <CheckCircle2 size={14} />
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: STYLIST VERIFICATION & COMPLIANCE REVIEW */}
+      {selectedStylistToVerify && (
+        <div className="modal-overlay" onClick={() => setSelectedStylistToVerify(null)}>
+          <div className="modal-card max-w-md" onClick={(e) => e.stopPropagation()}>
+            <button className="modal-close" onClick={() => setSelectedStylistToVerify(null)}>
+              <X size={18} />
+            </button>
+
+            <div className="flex items-center gap-3 mb-4">
+              <img
+                src={selectedStylistToVerify.avatar || '/images/barber_service.jpg'}
+                alt={selectedStylistToVerify.name}
+                className="w-14 h-14 rounded-2xl object-cover border border-black/10 dark:border-white/10"
+              />
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5">
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white m-0 truncate">
+                    {selectedStylistToVerify.name}
+                  </h3>
+                  {(selectedStylistToVerify.isVerified || selectedStylistToVerify.is_verified) && (
+                    <BadgeCheck size={16} className="text-blue-500 shrink-0" />
+                  )}
+                </div>
+                <p className="text-xs text-amber-500 font-semibold m-0">{selectedStylistToVerify.role}</p>
+                <p className="text-[11px] text-slate-400 m-0 truncate">{selectedStylistToVerify.campus}</p>
+              </div>
+            </div>
+
+            {/* Profile Overview Card */}
+            <div className="card p-3.5 bg-black/[0.02] dark:bg-white/[0.03] border border-black/5 dark:border-white/10 space-y-2 mb-4 text-xs">
+              <div className="flex justify-between">
+                <span className="text-slate-400">Hostel Residence:</span>
+                <span className="font-semibold text-slate-900 dark:text-white">{selectedStylistToVerify.dormLocation || selectedStylistToVerify.dorm_location || 'Hostel Studio'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">WhatsApp Phone:</span>
+                <span className="font-semibold text-slate-900 dark:text-white">{selectedStylistToVerify.phone || '0971234567'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Mobile Money Payout:</span>
+                <span className="font-semibold text-emerald-500">{selectedStylistToVerify.payoutProvider || 'Airtel Money'} ({selectedStylistToVerify.phone || '0971234567'})</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Dorm Travel Capability:</span>
+                <span className="font-semibold text-slate-900 dark:text-white">{selectedStylistToVerify.travelsToDorm ? 'Travels to Hostels (+K20)' : 'Hostel Studio Only'}</span>
+              </div>
+            </div>
+
+            {/* Verification Checklist */}
+            <div className="space-y-2 text-xs text-slate-600 dark:text-slate-300 mb-5">
+              <div className="flex items-center gap-2 p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-semibold">
+                <CheckCircle2 size={15} className="shrink-0" />
+                <span>Enrolled Student Identity Verified at {selectedStylistToVerify.campus}</span>
+              </div>
+              <div className="flex items-center gap-2 p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-semibold">
+                <CheckCircle2 size={15} className="shrink-0" />
+                <span>Hostel Room Studio Location Confirmed</span>
+              </div>
+              <div className="flex items-center gap-2 p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-semibold">
+                <CheckCircle2 size={15} className="shrink-0" />
+                <span>Airtel / MTN Mobile Money Settlement Account Validated</span>
+              </div>
+              <div className="flex items-center gap-2 p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-semibold">
+                <CheckCircle2 size={15} className="shrink-0" />
+                <span>Campus Safety, Hygiene & Anti-Impersonation Charter Signed</span>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="space-y-2">
+              {!(selectedStylistToVerify.isVerified || selectedStylistToVerify.is_verified) ? (
+                <button
+                  onClick={() => {
+                    verifyStylist(selectedStylistToVerify.id, true);
+                    setSelectedStylistToVerify(null);
+                  }}
+                  className="apple-btn-primary w-full text-xs py-3 font-bold flex items-center justify-center gap-2"
+                >
+                  <ShieldCheck size={16} />
+                  <span>Approve & Grant Verified Campus Badge 🛡️</span>
+                </button>
+              ) : (
+                <button
+                  onClick={() => {
+                    verifyStylist(selectedStylistToVerify.id, false);
+                    setSelectedStylistToVerify(null);
+                  }}
+                  className="apple-btn-secondary w-full text-xs py-2.5 font-bold flex items-center justify-center gap-2 text-rose-500 hover:border-rose-500/40"
+                >
+                  <Ban size={15} />
+                  <span>Revoke Verification / Set Unverified</span>
+                </button>
+              )}
+
+              <a
+                href={`https://wa.me/260${(selectedStylistToVerify.phone || '0971234567').replace(/^0/, '')}?text=Hi%20${encodeURIComponent(selectedStylistToVerify.name)},%20this%20is%20UniHairShop%20Admin%20following%20up%20on%20your%20campus%20stylist%20verification.`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="apple-btn-secondary w-full text-xs py-2 flex items-center justify-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-semibold"
+              >
+                <MessageSquare size={14} />
+                <span>Contact Stylist on WhatsApp</span>
+              </a>
+            </div>
           </div>
         </div>
       )}
