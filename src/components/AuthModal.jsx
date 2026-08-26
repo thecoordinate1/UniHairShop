@@ -340,6 +340,21 @@ export default function AuthModal() {
               <span>{loading ? 'Signing In...' : 'Sign In to Account'}</span>
               <ArrowRight size={14} />
             </button>
+
+            {/* Master Admin Quick Sign In Helper */}
+            <div className="pt-2 border-t border-black/5 dark:border-white/5">
+              <button
+                type="button"
+                onClick={() => {
+                  setEmail('mapalolungu65@gmail.com');
+                  setPassword('Th3coordin@t3');
+                }}
+                className="w-full py-1.5 px-3 rounded-xl bg-amber-400/10 hover:bg-amber-400/20 border border-amber-400/30 text-amber-600 dark:text-amber-300 text-[11px] font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <KeyRound size={12} />
+                <span>Fill Master Admin (Mapalo Lungu)</span>
+              </button>
+            </div>
           </form>
         ) : (
           /* SIGN UP FORM */

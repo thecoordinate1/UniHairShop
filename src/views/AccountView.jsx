@@ -31,6 +31,7 @@ import { useApp } from '../context/AppContext';
 export default function AccountView() {
   const {
     user,
+    isAdmin,
     signOut,
     updateUserProfile,
     setShowAuthModal,
@@ -255,6 +256,34 @@ export default function AccountView() {
               </button>
             </form>
           </div>
+        </div>
+      )}
+
+      {/* Master Admin Command Hub Banner */}
+      {(isAdmin || user?.role === 'admin') && (
+        <div className="card p-5 bg-gradient-to-r from-amber-500/20 via-amber-400/15 to-transparent border border-amber-400/40 flex flex-wrap items-center justify-between gap-4 shadow-sm">
+          <div className="flex items-center gap-3.5 min-w-0">
+            <div className="bg-amber-400 text-slate-950 w-11 h-11 rounded-2xl flex items-center justify-center font-extrabold shadow-md shrink-0">
+              <ShieldCheck size={22} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white m-0">Master Admin Command Portal</h3>
+                <span className="badge badge-verified text-[9px] py-0.2 px-1.5 font-bold">Executive Access</span>
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400 m-0 mt-0.5">
+                Full platform visibility: View all campus stylists, live booking traffic, product orders, and mobile money revenue.
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={() => setActiveTab('admin')}
+            className="apple-btn-primary text-xs px-4 py-2 shrink-0 flex items-center gap-1.5"
+          >
+            <ShieldCheck size={14} />
+            <span>Launch Command Center</span>
+          </button>
         </div>
       )}
 

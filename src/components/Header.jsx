@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Scissors, MapPin, ChevronDown, Sun, Moon, ShoppingBag, Store, User, Sparkles } from 'lucide-react';
+import { Scissors, MapPin, ChevronDown, Sun, Moon, ShoppingBag, Store, User, Sparkles, ShieldCheck } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 
 export default function Header() {
@@ -16,6 +16,8 @@ export default function Header() {
     cart,
     setIsCartOpen,
     user,
+    isAdmin,
+    toggleAdminMode,
     showAuthModal,
     setShowAuthModal,
     addToast
@@ -179,6 +181,23 @@ export default function Header() {
 
         {/* Right: Clean Action Buttons & Dual Mode Switcher */}
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          {/* Master Admin Portal Trigger */}
+          {(isAdmin || user?.role === 'admin') && (
+            <button
+              onClick={() => setActiveTab('admin')}
+              className={`px-2.5 sm:px-3 py-1.5 rounded-2xl text-[11px] sm:text-xs font-bold transition-all duration-200 flex items-center gap-1.5 cursor-pointer border ${
+                activeTab === 'admin'
+                  ? 'bg-amber-400 text-slate-950 border-amber-400 shadow-apple-gold'
+                  : 'bg-amber-400/15 border-amber-400/30 text-amber-500 hover:bg-amber-400/25'
+              }`}
+              title="Open Master Admin Command Portal"
+              aria-label="Master Admin Portal"
+            >
+              <ShieldCheck size={13} className="shrink-0" />
+              <span className="hidden xs:inline">Master Admin</span>
+            </button>
+          )}
+
           {/* Dual Architecture 1-Tap Mode Switcher */}
           <button
             onClick={toggleUserMode}
