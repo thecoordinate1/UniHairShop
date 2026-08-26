@@ -56,28 +56,6 @@ export default function AuthWall() {
   const [errorMsg, setErrorMsg] = useState('');
   const [resetSent, setResetSent] = useState(false);
 
-  // Quick preset logins
-  const handleFillAdmin = () => {
-    setEmail('mapalolungu65@gmail.com');
-    setPassword('Th3coordin@t3');
-    setErrorMsg('');
-    setAuthMode('login');
-  };
-
-  const handleFillStylist = () => {
-    setEmail('junior.barber@unilus.ac.zm');
-    setPassword('StylistPass2026!');
-    setErrorMsg('');
-    setAuthMode('login');
-  };
-
-  const handleFillStudent = () => {
-    setEmail('kondwani@unilus.ac.zm');
-    setPassword('StudentPass2026!');
-    setErrorMsg('');
-    setAuthMode('login');
-  };
-
   // Submit Login
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -494,36 +472,6 @@ export default function AuthWall() {
                   </>
                 )}
               </button>
-
-              {/* Quick Fill Credentials Bar */}
-              <div className="pt-3 border-t border-white/10">
-                <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider block text-center mb-2">
-                  1-Tap Fast Logins
-                </span>
-                <div className="grid grid-cols-3 gap-1.5">
-                  <button
-                    type="button"
-                    onClick={handleFillAdmin}
-                    className="p-2 rounded-xl bg-amber-400/15 border border-amber-400/30 text-amber-300 hover:bg-amber-400/25 text-[10px] font-bold transition-colors cursor-pointer"
-                  >
-                    👑 Master Admin
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleFillStylist}
-                    className="p-2 rounded-xl bg-white/5 border border-white/10 text-slate-300 hover:bg-white/10 text-[10px] font-semibold transition-colors cursor-pointer"
-                  >
-                    ✂️ Campus Stylist
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleFillStudent}
-                    className="p-2 rounded-xl bg-white/5 border border-white/10 text-slate-300 hover:bg-white/10 text-[10px] font-semibold transition-colors cursor-pointer"
-                  >
-                    🎓 Student Client
-                  </button>
-                </div>
-              </div>
 
               <div className="text-center pt-2">
                 <span className="text-xs text-slate-400">New to UniHairShop? </span>
