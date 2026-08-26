@@ -73,20 +73,75 @@ export const AppProvider = ({ children }) => {
     }
   }, [theme]);
 
-  // Sync userMode
-  useEffect(() => {
-    try {
-      localStorage.setItem('unihair_user_mode', userMode);
-    } catch { /* ignore */ }
-  }, [userMode]);
+  const toggleUserMode = useCallback(async () => {
+    if (userMode === 'vendor') {
+      setUserMode('customer');
+      setActiveTab('home');
+      addToast('Switched to Student Customer Mode', 'info');
+      return;
+    }
 
-  const toggleTheme = useCallback(() => {
-    setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
-  }, []);
+    // Switching to Vendor Mode -> Enforce Database Verification Check
+    if (user?.role === 'admin') {
+      setUserMode('vendor');
+      setActiveTab('vendor');
+      addToast('Master Admin access granted to Vendor Studio', 'success');
+      return;
+    }
 
-  const toggleUserMode = useCallback(() => {
-    setUserMode((prev) => (prev === 'customer' ? 'vendor' : 'customer'));
-  }, []);
+    if (!user?.isLoggedIn) {
+      addToast('Please sign in to access Vendor Studio.', 'error');
+      return;
+    }
+
+    // Check database for vendor registration
+    if (isSupabaseConfigured && supabase && user?.id) {
+      try {
+        const { data: vendorData } = await supabase
+          .from('vendor_profiles')
+          .select('id, name, is_verified, role, dorm_location')
+          .eq('id', user.id)
+          .single();
+
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', user.id)
+          .single();
+
+        const isVendorInDb = (profileData && profileData.role === 'vendor') || (vendorData && vendorData.id);
+
+        if (!isVendorInDb && user.role !== 'vendor') {
+          addToast('Database check: No stylist account found. Onboard below to activate your Vendor Studio!', 'info');
+          setActiveTab('vendor');
+          return;
+        }
+
+        if (vendorData) {
+          setVendorProfile((prev) => ({
+            ...prev,
+            id: vendorData.id,
+            name: vendorData.name || prev.name,
+            role: vendorData.role || prev.role,
+            isVerified: vendorData.is_verified ?? true,
+            dormLocation: vendorData.dorm_location || prev.dormLocation
+          }));
+        }
+      } catch (err) {
+        console.warn('Database vendor verification check:', err);
+      }
+    } else {
+      if (user.role !== 'vendor') {
+        addToast('No stylist account registered. Onboard below to activate Vendor Studio!', 'info');
+        setActiveTab('vendor');
+        return;
+      }
+    }
+
+    setUserMode('vendor');
+    setActiveTab('vendor');
+    addToast('Verified Campus Stylist workspace activated!', 'success');
+  }, [userMode, user, setActiveTab, addToast]);
 
   // Navigation tab state ('home' | 'services' | 'bookings' | 'shop' | 'messages' | 'account' | 'admin' | 'about' | 'vendor')
   const [activeTab, setActiveTab] = useState('home');
@@ -305,6 +360,35 @@ export const AppProvider = ({ children }) => {
         if (vProfiles && vProfiles.length > 0) {
           setStaffList(vProfiles);
         }
+
+        // Fetch Conversations & Messages
+        const { data: convData } = await supabase.from('conversations').select('*').order('updated_at', { ascending: false });
+        const { data: msgData } = await supabase.from('messages').select('*').order('created_at', { ascending: true });
+
+        if (convData && convData.length > 0) {
+          const mapped = convData.map((c) => {
+            const matchingMsgs = (msgData || [])
+              .filter((m) => m.conversation_id === c.id || m.conversation_id === `conv-${c.stylist_id}`)
+              .map((m) => ({
+                id: m.id,
+                sender: m.sender,
+                text: m.text,
+                time: m.time
+              }));
+            return {
+              id: c.id,
+              stylistId: c.stylist_id,
+              stylistName: c.stylist_name,
+              avatar: c.avatar || '/images/barber_service.jpg',
+              stylistRole: c.stylist_role || 'Campus Stylist',
+              lastMessage: c.last_message || (matchingMsgs.length > 0 ? matchingMsgs[matchingMsgs.length - 1].text : 'Hello!'),
+              lastTimestamp: c.last_timestamp || 'Active',
+              unreadCount: c.unread_count || 0,
+              messages: matchingMsgs.length > 0 ? matchingMsgs : (initialConversations.find((ic) => ic.stylistId === c.stylist_id)?.messages || [])
+            };
+          });
+          setConversations(mapped);
+        }
       } catch (err) {
         console.info('[UniHairShop] Supabase live fetch notice:', err.message);
       }
@@ -312,7 +396,7 @@ export const AppProvider = ({ children }) => {
 
     fetchSupabaseData();
 
-    // 2. Realtime listener on Bookings
+    // 2. Realtime listener on Bookings & Messages
     const bookingChannel = supabase
       .channel('public:bookings')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' }, (payload) => {
@@ -329,8 +413,30 @@ export const AppProvider = ({ children }) => {
       })
       .subscribe();
 
+    const messagesChannel = supabase
+      .channel('public:messages')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
+        const newMsg = payload.new;
+        setConversations((prev) =>
+          prev.map((c) => {
+            if (c.id === newMsg.conversation_id || `conv-${c.stylistId}` === newMsg.conversation_id) {
+              if (c.messages.some((m) => m.id === newMsg.id)) return c;
+              return {
+                ...c,
+                lastMessage: newMsg.text,
+                lastTimestamp: newMsg.time || 'Just now',
+                messages: [...c.messages, { id: newMsg.id, sender: newMsg.sender, text: newMsg.text, time: newMsg.time }]
+              };
+            }
+            return c;
+          })
+        );
+      })
+      .subscribe();
+
     return () => {
       supabase.removeChannel(bookingChannel);
+      supabase.removeChannel(messagesChannel);
     };
   }, []);
 
@@ -420,81 +526,119 @@ export const AppProvider = ({ children }) => {
     });
   }, [addToast]);
 
-  // Messaging Management
-  const sendMessage = useCallback((stylistId, text) => {
-    if (!text.trim()) return;
+  // Messaging Management with Dual Role & Supabase Sync
+  const sendMessage = useCallback((stylistId, text, senderOverride) => {
+    if (!text || !text.trim()) return;
+    const sender = senderOverride || (userMode === 'vendor' ? 'stylist' : 'user');
+    const msgId = `m-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
     const newMsg = {
-      id: `m-${Date.now()}`,
-      sender: 'user',
+      id: msgId,
+      sender,
       text: text.trim(),
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      time: timeStr
     };
 
     setConversations((prev) => {
-      return prev.map((conv) => {
-        if (conv.stylistId === stylistId) {
-          return {
-            ...conv,
-            lastMessage: text.trim(),
-            lastTimestamp: 'Just now',
-            messages: [...conv.messages, newMsg]
-          };
-        }
-        return conv;
-      });
-    });
-
-    // Sync message to Supabase
-    if (isSupabaseConfigured && supabase) {
-      supabase.from('messages').insert([{
-        id: newMsg.id,
-        conversation_id: `conv-${stylistId}`,
-        sender: 'user',
-        text: text.trim(),
-        time: newMsg.time
-      }]).catch(() => {});
-    }
-
-    setTimeout(() => {
-      const replies = [
-        "Got it! I have your slot booked and will be ready.",
-        "Perfect! Looking forward to your appointment.",
-        "Received! Let me know if you need to adjust anything.",
-        "Awesome, see you on campus!"
-      ];
-      const randomReply = replies[Math.floor(Math.random() * replies.length)];
-      const stylistReply = {
-        id: `m-reply-${Date.now()}`,
-        sender: 'stylist',
-        text: randomReply,
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      };
-
-      setConversations((prev) => {
+      const existingConv = prev.find((c) => c.stylistId === stylistId);
+      if (existingConv) {
         return prev.map((conv) => {
           if (conv.stylistId === stylistId) {
             return {
               ...conv,
-              lastMessage: randomReply,
+              lastMessage: text.trim(),
               lastTimestamp: 'Just now',
-              messages: [...conv.messages, stylistReply]
+              messages: [...conv.messages, newMsg]
             };
           }
           return conv;
         });
-      });
+      } else {
+        const targetStaff = staffList.find((s) => s.id === stylistId) || {
+          name: 'Campus Stylist',
+          role: 'Hair Specialist',
+          avatar: '/images/barber_service.jpg'
+        };
+        const newConv = {
+          id: `conv-${stylistId}`,
+          stylistId,
+          stylistName: targetStaff.name,
+          avatar: targetStaff.avatar || '/images/barber_service.jpg',
+          stylistRole: targetStaff.role || 'Campus Stylist',
+          lastMessage: text.trim(),
+          lastTimestamp: 'Just now',
+          unreadCount: 0,
+          messages: [newMsg]
+        };
+        return [newConv, ...prev];
+      }
+    });
 
-      if (isSupabaseConfigured && supabase) {
+    // Sync message to Supabase
+    if (isSupabaseConfigured && supabase) {
+      const convId = `conv-${stylistId}`;
+      supabase.from('conversations').upsert([{
+        id: convId,
+        stylist_id: stylistId,
+        stylist_name: staffList.find((s) => s.id === stylistId)?.name || 'Campus Stylist',
+        last_message: text.trim(),
+        last_timestamp: timeStr,
+        unread_count: 0
+      }]).then(() => {
         supabase.from('messages').insert([{
-          id: stylistReply.id,
-          conversation_id: `conv-${stylistId}`,
+          id: newMsg.id,
+          conversation_id: convId,
+          sender,
+          text: text.trim(),
+          time: newMsg.time
+        }]).catch(() => {});
+      }).catch(() => {});
+    }
+
+    // Client assistant simulation if sending in customer mode
+    if (sender === 'user') {
+      setTimeout(() => {
+        const replies = [
+          "Got it! I have your slot booked and will be ready.",
+          "Perfect! Looking forward to your appointment. See you at your hostel!",
+          "Received! Let me know if you need to adjust anything.",
+          "Awesome, see you on campus!"
+        ];
+        const randomReply = replies[Math.floor(Math.random() * replies.length)];
+        const stylistReply = {
+          id: `m-reply-${Date.now()}`,
           sender: 'stylist',
           text: randomReply,
-          time: stylistReply.time
-        }]).catch(() => {});
-      }
-    }, 2000);
-  }, []);
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        };
+
+        setConversations((prev) => {
+          return prev.map((conv) => {
+            if (conv.stylistId === stylistId) {
+              return {
+                ...conv,
+                lastMessage: randomReply,
+                lastTimestamp: 'Just now',
+                messages: [...conv.messages, stylistReply]
+              };
+            }
+            return conv;
+          });
+        });
+
+        if (isSupabaseConfigured && supabase) {
+          supabase.from('messages').insert([{
+            id: stylistReply.id,
+            conversation_id: `conv-${stylistId}`,
+            sender: 'stylist',
+            text: randomReply,
+            time: stylistReply.time
+          }]).catch(() => {});
+        }
+      }, 1800);
+    }
+  }, [userMode, staffList]);
 
   // Smart Booking Creation
   const createBooking = useCallback(async (newBookingData) => {
