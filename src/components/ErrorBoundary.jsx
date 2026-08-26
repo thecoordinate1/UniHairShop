@@ -13,8 +13,22 @@ export default class ErrorBoundary extends React.Component {
 
   componentDidCatch(error, errorInfo) {
     this.setState({ errorInfo });
-    // Log to console — replace with production error service (Sentry, LogRocket, etc.)
     console.error('[UniHairShop] Uncaught render error:', error, errorInfo);
+
+    // Auto-recover from stale chunks after a fresh deployment
+    const isChunkError =
+      error?.name === 'ChunkLoadError' ||
+      error?.message?.includes('Failed to fetch dynamically imported module') ||
+      error?.message?.includes('Loading chunk') ||
+      error?.message?.includes('dynamically imported');
+
+    if (isChunkError) {
+      const hasReloaded = window.sessionStorage.getItem('unihair_error_chunk_reloaded');
+      if (!hasReloaded) {
+        window.sessionStorage.setItem('unihair_error_chunk_reloaded', 'true');
+        window.location.reload();
+      }
+    }
   }
 
   handleReload = () => {

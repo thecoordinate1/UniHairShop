@@ -14,18 +14,38 @@ import AuthModal from './components/AuthModal';
 import AuthGuard from './components/AuthGuard';
 import AuthWall from './components/AuthWall';
 
-// Code-split all view components
-const HomeView = lazy(() => import('./views/HomeView'));
-const ServicesView = lazy(() => import('./views/ServicesView'));
-const BookingModal = lazy(() => import('./views/BookingModal'));
-const ShopView = lazy(() => import('./views/ShopView'));
-const ProductDetailModal = lazy(() => import('./views/ProductDetailModal'));
-const CartView = lazy(() => import('./views/CartView'));
-const AccountView = lazy(() => import('./views/AccountView'));
-const MessagesView = lazy(() => import('./views/MessagesView'));
-const VendorStudioView = lazy(() => import('./views/VendorStudioView'));
-const AboutView = lazy(() => import('./views/AboutView'));
-const AdminDashboardView = lazy(() => import('./views/AdminDashboardView'));
+// Auto-retrying dynamic import wrapper to survive post-deployment chunk hash rotations
+function lazyWithRetry(componentImport) {
+  return lazy(async () => {
+    const pageHasBeenForceRefreshed = window.sessionStorage.getItem('unihair_chunk_refreshed');
+
+    try {
+      const module = await componentImport();
+      window.sessionStorage.removeItem('unihair_chunk_refreshed');
+      return module;
+    } catch (error) {
+      if (!pageHasBeenForceRefreshed) {
+        window.sessionStorage.setItem('unihair_chunk_refreshed', 'true');
+        window.location.reload();
+        return { default: () => <ViewSkeleton /> };
+      }
+      throw error;
+    }
+  });
+}
+
+// Code-split all view components with automatic retry
+const HomeView = lazyWithRetry(() => import('./views/HomeView'));
+const ServicesView = lazyWithRetry(() => import('./views/ServicesView'));
+const BookingModal = lazyWithRetry(() => import('./views/BookingModal'));
+const ShopView = lazyWithRetry(() => import('./views/ShopView'));
+const ProductDetailModal = lazyWithRetry(() => import('./views/ProductDetailModal'));
+const CartView = lazyWithRetry(() => import('./views/CartView'));
+const AccountView = lazyWithRetry(() => import('./views/AccountView'));
+const MessagesView = lazyWithRetry(() => import('./views/MessagesView'));
+const VendorStudioView = lazyWithRetry(() => import('./views/VendorStudioView'));
+const AboutView = lazyWithRetry(() => import('./views/AboutView'));
+const AdminDashboardView = lazyWithRetry(() => import('./views/AdminDashboardView'));
 
 function ViewSkeleton() {
   return (
