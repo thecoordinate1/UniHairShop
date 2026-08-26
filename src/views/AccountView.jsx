@@ -35,6 +35,7 @@ export default function AccountView() {
     user,
     isAdmin,
     signOut,
+    terminateAllSessions,
     updateUserProfile,
     setShowAuthModal,
     bookings,
@@ -182,10 +183,19 @@ export default function AccountView() {
               <button
                 onClick={signOut}
                 className="apple-btn-secondary text-xs px-3 py-1.5 flex items-center gap-1 text-rose-400 hover:text-rose-300 hover:border-rose-500/30"
-                title="Sign out of account"
+                title="Sign out of current account"
               >
                 <LogOut size={13} />
                 <span>Sign Out</span>
+              </button>
+
+              <button
+                onClick={terminateAllSessions}
+                className="apple-btn-secondary text-xs px-3 py-1.5 flex items-center gap-1 text-rose-500 hover:bg-rose-500/10 hover:border-rose-500/40"
+                title="Terminate all saved sessions across all devices"
+              >
+                <ShieldCheck size={13} />
+                <span>Reset All Sessions</span>
               </button>
             </>
           ) : (

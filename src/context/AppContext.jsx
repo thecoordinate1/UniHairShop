@@ -163,20 +163,33 @@ export const AppProvider = ({ children }) => {
   const [authLoading, setAuthLoading] = useState(true);
   const [pendingAuthCallback, setPendingAuthCallback] = useState(null);
 
+// Purge all legacy pre-filled sessions to enforce fresh sign-up and login flow
+try {
+  if (!localStorage.getItem('unihair_sessions_purged_v4')) {
+    localStorage.removeItem('unihair_user');
+    localStorage.removeItem('unihair_session');
+    const sbKeys = Object.keys(localStorage).filter((k) => k.startsWith('sb-'));
+    sbKeys.forEach((k) => localStorage.removeItem(k));
+    localStorage.setItem('unihair_sessions_purged_v4', 'true');
+  }
+} catch { /* ignore */ }
+
+const defaultGuestUser = {
+  isLoggedIn: false,
+  id: null,
+  name: 'Student Guest',
+  email: '',
+  phone: '',
+  campus: 'UNILUS Silverest Campus',
+  hostel: '',
+  role: 'customer',
+  loyaltyPoints: 0,
+  referralCode: '',
+  favorites: []
+};
+
   // Customer Student profile
-  const [user, setUser] = useState(() => safeGetItem('unihair_user', {
-    isLoggedIn: true,
-    id: 'usr-kondwani',
-    name: 'Kondwani Phiri',
-    email: 'kondwani@unilus.ac.zm',
-    phone: '0971234567',
-    campus: 'UNILUS Silverest Campus',
-    hostel: 'UNILUS Silverest Hostel, Block C, Room 14',
-    role: 'customer',
-    loyaltyPoints: 140,
-    referralCode: 'UNILUS-KONDWANI-88',
-    favorites: ['srv-1', 'prd-1', 'stf-1']
-  }));
+  const [user, setUser] = useState(() => safeGetItem('unihair_user', defaultGuestUser));
 
   // Vendor Student profile (Stylist / Barber / Creator)
   const [vendorProfile, setVendorProfile] = useState(() => safeGetItem('unihair_vendor_profile', {
@@ -1051,27 +1064,143 @@ export const AppProvider = ({ children }) => {
   }, [addToast]);
 
   const signUp = useCallback(async (userData) => {
+    const isStylist = userData.role === 'vendor';
+    const cleanEmail = userData.email.trim();
+    const cleanName = userData.name.trim();
+    const cleanPhone = userData.phone.trim();
+    const cleanCampus = userData.campus || currentCampus;
+    const cleanHostel = userData.hostel?.trim() || 'Campus Hostel';
+    const assignedRole = isStylist ? 'vendor' : 'customer';
+
     if (!isSupabaseConfigured || !supabase) {
-      setUser((prev) => ({ ...prev, isLoggedIn: true, ...userData }));
-      addToast('Account registered successfully!', 'success');
+      const newUserId = `usr-${Date.now().toString(36)}`;
+      const newUser = {
+        isLoggedIn: true,
+        id: newUserId,
+        name: cleanName,
+        email: cleanEmail,
+        phone: cleanPhone,
+        campus: cleanCampus,
+        hostel: cleanHostel,
+        role: assignedRole,
+        loyaltyPoints: 50,
+        referralCode: `${cleanCampus.slice(0, 4).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`,
+        favorites: []
+      };
+      setUser(newUser);
+      if (isStylist) {
+        setUserMode('vendor');
+        setVendorProfile((prev) => ({
+          ...prev,
+          id: newUserId,
+          name: cleanName,
+          campus: cleanCampus,
+          dormLocation: cleanHostel,
+          phone: cleanPhone,
+          isVerified: false,
+          badge: 'Campus Stylist (Pending Verification)'
+        }));
+        setStaffList((prev) => [
+          ...prev,
+          {
+            id: newUserId,
+            name: cleanName,
+            role: 'Hair Specialist',
+            campus: cleanCampus,
+            dormLocation: cleanHostel,
+            avatar: '/images/barber_service.jpg',
+            isVerified: false,
+            badge: 'Campus Stylist',
+            travelsToDorm: true,
+            travelFee: 20,
+            hasStudio: true,
+            phone: cleanPhone,
+            payoutProvider: 'Airtel Money',
+            payoutNumber: cleanPhone
+          }
+        ]);
+      }
+      addToast(`Welcome to UniHairShop, ${cleanName}! 🎓`, 'success');
       return { success: true };
     }
+
+    // Remote Supabase Auth SignUp
     const { data, error } = await supabase.auth.signUp({
-      email: userData.email.trim(),
+      email: cleanEmail,
       password: userData.password,
       options: {
         data: {
-          name: userData.name,
-          phone: userData.phone,
-          campus: userData.campus,
-          hostel: userData.hostel,
-          role: userData.role || 'customer'
+          name: cleanName,
+          phone: cleanPhone,
+          campus: cleanCampus,
+          hostel: cleanHostel,
+          role: assignedRole
         }
       }
     });
+
     if (error) throw error;
+
+    if (data?.user) {
+      const newUserId = data.user.id;
+      // Upsert profile in Supabase profiles table
+      await supabase.from('profiles').upsert([{
+        id: newUserId,
+        email: cleanEmail,
+        name: cleanName,
+        phone: cleanPhone,
+        campus: cleanCampus,
+        hostel: cleanHostel,
+        role: assignedRole,
+        loyalty_points: 50
+      }]).catch(() => {});
+
+      if (isStylist) {
+        await supabase.from('vendor_profiles').upsert([{
+          id: newUserId,
+          name: cleanName,
+          role: 'Hair Specialist',
+          campus: cleanCampus,
+          dorm_location: cleanHostel,
+          avatar: '/images/barber_service.jpg',
+          is_verified: false,
+          badge: 'Campus Stylist (Pending Verification)',
+          travels_to_dorm: true,
+          travel_fee: 20,
+          has_studio: true,
+          phone: cleanPhone,
+          bio: `Campus stylist at ${cleanCampus}`,
+          payout_provider: 'Airtel Money',
+          payout_number: cleanPhone
+        }]).catch(() => {});
+      }
+
+      setUser({
+        isLoggedIn: true,
+        id: newUserId,
+        name: cleanName,
+        email: cleanEmail,
+        phone: cleanPhone,
+        campus: cleanCampus,
+        hostel: cleanHostel,
+        role: assignedRole,
+        loyaltyPoints: 50,
+        referralCode: `${cleanCampus.slice(0, 4).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`,
+        favorites: []
+      });
+
+      if (isStylist) {
+        setUserMode('vendor');
+      }
+
+      if (data.session) {
+        setSession(data.session);
+      }
+    }
+
+    addToast(`Account created successfully! Welcome, ${cleanName}! 🎓`, 'success');
     return { success: true, data };
-  }, [addToast]);
+  }, [currentCampus, addToast]);
 
   const signOut = useCallback(async () => {
     if (isSupabaseConfigured && supabase) {
@@ -1079,22 +1208,33 @@ export const AppProvider = ({ children }) => {
     }
     setSession(null);
     setIsAdmin(false);
-    setUser({
-      isLoggedIn: false,
-      id: null,
-      name: 'Student Guest',
-      email: '',
-      phone: '',
-      campus: currentCampus,
-      hostel: '',
-      role: 'customer',
-      loyaltyPoints: 0,
-      referralCode: '',
-      favorites: []
-    });
+    setUser(defaultGuestUser);
     setUserMode('customer');
     addToast('Signed out of UniHairShop', 'info');
-  }, [currentCampus, addToast]);
+  }, [addToast]);
+
+  const terminateAllSessions = useCallback(async () => {
+    if (isSupabaseConfigured && supabase) {
+      try {
+        await supabase.auth.signOut({ scope: 'global' }).catch(() => {});
+      } catch { /* ignore */ }
+    }
+    try {
+      const keys = Object.keys(localStorage);
+      keys.forEach((key) => {
+        if (key.startsWith('sb-') || key.startsWith('unihair_user') || key.startsWith('unihair_session')) {
+          localStorage.removeItem(key);
+        }
+      });
+      sessionStorage.clear();
+    } catch { /* ignore */ }
+
+    setSession(null);
+    setIsAdmin(false);
+    setUser(defaultGuestUser);
+    setUserMode('customer');
+    addToast('All active sessions terminated. Please sign in or create a new account.', 'info');
+  }, [addToast]);
 
   const requireAuth = useCallback((actionCallback) => {
     if (user?.isLoggedIn && (session || !isSupabaseConfigured)) {
@@ -1255,6 +1395,7 @@ export const AppProvider = ({ children }) => {
     signIn,
     signUp,
     signOut,
+    terminateAllSessions,
     requireAuth,
     pendingAuthCallback,
     setPendingAuthCallback,
@@ -1322,7 +1463,7 @@ export const AppProvider = ({ children }) => {
     vendorProfile, updateVendorProfile, toggleVendorDormTravel, vendorWallet,
     requestVendorPayout, acceptBooking, completeBooking, addVendorPortfolioItem,
     activeTab, currentCampus, isAdmin, session, authLoading, user,
-    signIn, signUp, signOut, requireAuth, pendingAuthCallback, updateUserProfile, onboardAsStylist,
+    signIn, signUp, signOut, terminateAllSessions, requireAuth, pendingAuthCallback, updateUserProfile, onboardAsStylist,
     verifyStylist, settleVendorPayout, toggleAdminMode,
     services, products, bundles, staffList, bookings, orders, cart,
     showAuthModal, isCartOpen, bookingService, selectedProduct, selectedStylist,

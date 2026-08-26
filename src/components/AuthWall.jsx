@@ -13,7 +13,15 @@ import {
   Sparkles,
   KeyRound,
   Eye,
-  EyeOff
+  EyeOff,
+  GraduationCap,
+  Sparkle,
+  Check,
+  AlertCircle,
+  HelpCircle,
+  RefreshCw,
+  LogOut,
+  ChevronRight
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 
@@ -21,28 +29,59 @@ export default function AuthWall() {
   const {
     signIn,
     signUp,
+    terminateAllSessions,
     lusakaUniversities,
     currentCampus,
     addToast
   } = useApp();
 
-  const [authMode, setAuthMode] = useState('signin'); // 'signin' | 'signup' | 'forgot'
-  const [roleType, setRoleType] = useState('student'); // 'student' | 'stylist'
+  const [authMode, setAuthMode] = useState('signup'); // 'signup' | 'login' | 'forgot'
+  const [roleType, setRoleType] = useState('customer'); // 'customer' | 'vendor'
+
+  // Form Fields
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [campus, setCampus] = useState(currentCampus || 'UNILUS Silverest Campus');
   const [hostel, setHostel] = useState('');
+  const [referralCode, setReferralCode] = useState('');
+  const [agreedTerms, setAgreedTerms] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
+
+  // States
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [resetSent, setResetSent] = useState(false);
 
-  const handleSignIn = async (e) => {
+  // Quick preset logins
+  const handleFillAdmin = () => {
+    setEmail('mapalolungu65@gmail.com');
+    setPassword('Th3coordin@t3');
+    setErrorMsg('');
+    setAuthMode('login');
+  };
+
+  const handleFillStylist = () => {
+    setEmail('junior.barber@unilus.ac.zm');
+    setPassword('StylistPass2026!');
+    setErrorMsg('');
+    setAuthMode('login');
+  };
+
+  const handleFillStudent = () => {
+    setEmail('kondwani@unilus.ac.zm');
+    setPassword('StudentPass2026!');
+    setErrorMsg('');
+    setAuthMode('login');
+  };
+
+  // Submit Login
+  const handleLogin = async (e) => {
     e.preventDefault();
     if (!email.trim() || !password) {
-      setErrorMsg('Please provide both email and password.');
+      setErrorMsg('Please enter your email and password.');
       return;
     }
 
@@ -51,22 +90,33 @@ export default function AuthWall() {
     try {
       await signIn(email.trim(), password);
     } catch (err) {
-      console.error('Sign In Error:', err);
-      setErrorMsg(err.message || 'Invalid email or password. Please try again.');
+      console.error('Login Error:', err);
+      setErrorMsg(err.message || 'Invalid credentials. Please check your email and password.');
     } finally {
       setLoading(false);
     }
   };
 
+  // Submit Sign Up
   const handleSignUp = async (e) => {
     e.preventDefault();
-    if (!email.trim() || !password || !name.trim() || !phone.trim()) {
+    if (!name.trim() || !email.trim() || !phone.trim() || !password) {
       setErrorMsg('Please fill in all required fields.');
       return;
     }
 
     if (password.length < 6) {
-      setErrorMsg('Password must be at least 6 characters.');
+      setErrorMsg('Password must be at least 6 characters long.');
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setErrorMsg('Passwords do not match.');
+      return;
+    }
+
+    if (!agreedTerms) {
+      setErrorMsg('Please accept the campus safety guidelines to proceed.');
       return;
     }
 
@@ -74,283 +124,495 @@ export default function AuthWall() {
     setErrorMsg('');
     try {
       await signUp({
-        email: email.trim(),
-        password,
         name: name.trim(),
+        email: email.trim(),
         phone: phone.trim(),
         campus,
-        hostel: hostel.trim() || 'Campus Hostel',
-        role: roleType === 'stylist' ? 'vendor' : 'customer'
+        hostel: hostel.trim() || 'Campus Hostel Residence',
+        password,
+        role: roleType,
+        referralCode: referralCode.trim()
       });
     } catch (err) {
       console.error('Sign Up Error:', err);
-      setErrorMsg(err.message || 'Registration failed. Please try again.');
+      setErrorMsg(err.message || 'Registration failed. This email may already be in use.');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleFillAdmin = () => {
-    setEmail('mapalolungu65@gmail.com');
-    setPassword('Th3coordin@t3');
-    setErrorMsg('');
-  };
-
   return (
-    <div className="min-h-screen w-full flex items-center justify-center p-4 bg-gradient-to-br from-slate-950 via-slate-900 to-amber-950/30 text-white relative overflow-hidden">
-      {/* Background Glow Elements */}
-      <div className="absolute -top-40 -left-40 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
+    <div className="min-h-screen w-full flex items-center justify-center p-4 sm:p-6 bg-gradient-to-br from-slate-950 via-slate-900 to-amber-950/40 text-white relative overflow-hidden">
+      {/* Dynamic Background Glow Rings */}
+      <div className="absolute -top-40 -right-40 w-96 h-96 bg-amber-500/15 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-purple-500/15 rounded-full blur-3xl pointer-events-none" />
 
-      <div className="w-full max-w-md card p-6 sm:p-8 bg-slate-900/90 backdrop-blur-2xl border border-amber-400/20 shadow-2xl z-10">
+      <div className="w-full max-w-lg z-10 my-auto">
         {/* Brand Header */}
         <div className="text-center mb-6">
-          <div className="w-16 h-16 rounded-3xl bg-gradient-to-tr from-amber-400 to-amber-500 text-slate-950 flex items-center justify-center mx-auto mb-3 shadow-apple-gold">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-3xl bg-amber-400 text-slate-950 shadow-apple-gold mb-3">
             <Scissors size={32} />
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white m-0">
             Uni<span className="text-amber-400">Hair</span>Shop
           </h1>
-          <p className="text-xs text-slate-400 mt-1 max-w-xs mx-auto">
-            Lusaka's Premier Campus Beauty, Barber & Salon Hub. Sign in to access your appointments & orders.
+          <p className="text-xs sm:text-sm text-slate-400 mt-1 max-w-sm mx-auto">
+            Lusaka University Hair & Beauty Ecosystem • Dorm Visits & Hostel Studios
           </p>
-
-          {/* Campus Badges */}
-          <div className="flex flex-wrap justify-center gap-1.5 mt-3">
-            {['UNILUS', 'UNZA', 'Apex', 'Evelyn Hone', 'Eden'].map((badge) => (
-              <span key={badge} className="text-[10px] px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-slate-300 font-medium">
-                {badge}
-              </span>
-            ))}
-          </div>
         </div>
 
-        {/* Tab Switcher */}
-        <div className="flex bg-black/30 p-1 rounded-2xl border border-white/10 mb-5">
-          <button
-            type="button"
-            onClick={() => { setAuthMode('signin'); setErrorMsg(''); }}
-            className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all border-0 cursor-pointer ${
-              authMode === 'signin' ? 'bg-amber-400 text-slate-950 shadow-sm' : 'text-slate-400 hover:text-white bg-transparent'
-            }`}
-          >
-            Sign In
-          </button>
-          <button
-            type="button"
-            onClick={() => { setAuthMode('signup'); setErrorMsg(''); }}
-            className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all border-0 cursor-pointer ${
-              authMode === 'signup' ? 'bg-amber-400 text-slate-950 shadow-sm' : 'text-slate-400 hover:text-white bg-transparent'
-            }`}
-          >
-            Register
-          </button>
-        </div>
-
-        {/* Error Alert */}
-        {errorMsg && (
-          <div className="mb-4 p-3 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
-            <span className="w-1.5 h-1.5 rounded-full bg-rose-400 shrink-0"></span>
-            <span>{errorMsg}</span>
-          </div>
-        )}
-
-        {/* 1. SIGN IN FORM */}
-        {authMode === 'signin' && (
-          <form onSubmit={handleSignIn} className="space-y-3.5">
-            <div className="form-group">
-              <label className="form-label text-slate-300 text-xs">University Email or Username:</label>
-              <div className="relative">
-                <input
-                  type="email"
-                  required
-                  placeholder="student@unilus.ac.zm"
-                  className="form-input pl-10 text-xs bg-slate-950/60 border-white/15 text-white"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                />
-                <Mail size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-              </div>
-            </div>
-
-            <div className="form-group">
-              <label className="form-label text-slate-300 text-xs">Password:</label>
-              <div className="relative">
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  required
-                  placeholder="••••••••"
-                  className="form-input pl-10 pr-10 text-xs bg-slate-950/60 border-white/15 text-white"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                />
-                <Lock size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white bg-transparent border-0 cursor-pointer p-0"
-                >
-                  {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
-                </button>
-              </div>
-            </div>
-
+        {/* Main Glass Card */}
+        <div className="bg-slate-900/80 backdrop-blur-2xl border border-white/10 rounded-3xl p-5 sm:p-7 shadow-2xl shadow-black/80">
+          {/* Mode Switcher Tabs */}
+          <div className="flex bg-white/5 p-1 rounded-2xl border border-white/10 mb-6 gap-1">
             <button
-              type="submit"
-              disabled={loading}
-              className="apple-btn-primary w-full text-xs py-3 mt-1 font-bold"
+              type="button"
+              onClick={() => {
+                setAuthMode('signup');
+                setErrorMsg('');
+              }}
+              className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all border-0 cursor-pointer flex items-center justify-center gap-1.5 ${
+                authMode === 'signup'
+                  ? 'bg-amber-400 text-slate-950 shadow-sm'
+                  : 'text-slate-400 hover:text-white bg-transparent'
+              }`}
             >
-              <span>{loading ? 'Authenticating...' : 'Sign In to UniHairShop'}</span>
-              <ArrowRight size={15} />
+              <Sparkles size={14} />
+              <span>Create Account</span>
             </button>
 
-            {/* Master Admin Fill Pill */}
-            <div className="pt-3 border-t border-white/10">
-              <button
-                type="button"
-                onClick={handleFillAdmin}
-                className="w-full py-2 px-3 rounded-xl bg-amber-400/10 hover:bg-amber-400/20 border border-amber-400/30 text-amber-300 text-[11px] font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-              >
-                <KeyRound size={13} />
-                <span>Fill Master Admin (Mapalo Lungu)</span>
-              </button>
-            </div>
-          </form>
-        )}
+            <button
+              type="button"
+              onClick={() => {
+                setAuthMode('login');
+                setErrorMsg('');
+              }}
+              className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all border-0 cursor-pointer flex items-center justify-center gap-1.5 ${
+                authMode === 'login'
+                  ? 'bg-amber-400 text-slate-950 shadow-sm'
+                  : 'text-slate-400 hover:text-white bg-transparent'
+              }`}
+            >
+              <KeyRound size={14} />
+              <span>Log In</span>
+            </button>
+          </div>
 
-        {/* 2. SIGN UP FORM */}
-        {authMode === 'signup' && (
-          <form onSubmit={handleSignUp} className="space-y-3">
-            {/* Role Switcher */}
-            <div className="flex gap-2 mb-1">
-              <button
-                type="button"
-                onClick={() => setRoleType('student')}
-                className={`flex-1 p-2 rounded-2xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all border cursor-pointer ${
-                  roleType === 'student'
-                    ? 'bg-amber-400 text-slate-950 font-bold border-amber-400'
-                    : 'bg-white/5 border-white/10 text-slate-400'
-                }`}
-              >
-                <User size={13} />
-                <span>Student Client</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setRoleType('stylist')}
-                className={`flex-1 p-2 rounded-2xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all border cursor-pointer ${
-                  roleType === 'stylist'
-                    ? 'bg-amber-400 text-slate-950 font-bold border-amber-400'
-                    : 'bg-white/5 border-white/10 text-slate-400'
-                }`}
-              >
-                <Scissors size={13} />
-                <span>Campus Stylist</span>
-              </button>
+          {/* Error Alert Box */}
+          {errorMsg && (
+            <div className="p-3 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2 mb-4 animate-shake">
+              <AlertCircle size={16} className="shrink-0 text-rose-400" />
+              <span>{errorMsg}</span>
             </div>
+          )}
 
-            <div className="form-group">
-              <label className="form-label text-slate-300 text-xs">Full Name:</label>
-              <div className="relative">
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Mapalo Mwansa"
-                  className="form-input pl-10 text-xs bg-slate-950/60 border-white/15 text-white"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                />
-                <User size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-              </div>
-            </div>
+          {/* 1. SIGN UP FLOW */}
+          {authMode === 'signup' && (
+            <form onSubmit={handleSignUp} className="space-y-3.5">
+              {/* Role Selection */}
+              <div>
+                <label className="block text-[11px] font-bold text-slate-300 mb-1.5 uppercase tracking-wider">
+                  I want to join as:
+                </label>
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div
+                    onClick={() => setRoleType('customer')}
+                    className={`p-3 rounded-2xl cursor-pointer border text-center transition-all ${
+                      roleType === 'customer'
+                        ? 'bg-amber-400/20 border-amber-400 text-amber-300 font-bold shadow-sm'
+                        : 'bg-white/5 border-white/5 text-slate-400 hover:border-white/20'
+                    }`}
+                  >
+                    <GraduationCap size={18} className="mx-auto mb-1 text-amber-400" />
+                    <span className="text-xs block">Student Client</span>
+                    <span className="text-[10px] text-slate-400 block font-normal mt-0.5">Book styling & haircuts</span>
+                  </div>
 
-            <div className="grid grid-cols-2 gap-2">
-              <div className="form-group">
-                <label className="form-label text-slate-300 text-xs">WhatsApp Phone:</label>
-                <div className="relative">
-                  <input
-                    type="tel"
-                    required
-                    placeholder="0971234567"
-                    className="form-input pl-9 text-xs bg-slate-950/60 border-white/15 text-white"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                  />
-                  <Phone size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <div
+                    onClick={() => setRoleType('vendor')}
+                    className={`p-3 rounded-2xl cursor-pointer border text-center transition-all ${
+                      roleType === 'vendor'
+                        ? 'bg-amber-400/20 border-amber-400 text-amber-300 font-bold shadow-sm'
+                        : 'bg-white/5 border-white/5 text-slate-400 hover:border-white/20'
+                    }`}
+                  >
+                    <Scissors size={18} className="mx-auto mb-1 text-amber-400" />
+                    <span className="text-xs block">Campus Stylist</span>
+                    <span className="text-[10px] text-slate-400 block font-normal mt-0.5">Offer hair services & earn</span>
+                  </div>
                 </div>
               </div>
 
-              <div className="form-group">
-                <label className="form-label text-slate-300 text-xs">Campus:</label>
-                <select
-                  className="form-select text-xs bg-slate-950/60 border-white/15 text-white"
-                  value={campus}
-                  onChange={(e) => setCampus(e.target.value)}
-                >
-                  {lusakaUniversities.map((u) => (
-                    <option key={u.id} value={u.name} className="bg-slate-900 text-white">{u.name}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
+              {/* Full Name & WhatsApp Phone */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-300 mb-1">Full Legal Name *</label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Mapalo Lungu"
+                      className="form-input pl-8 text-xs py-2 bg-black/40 border-white/10 text-white rounded-xl"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                    />
+                    <User size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                  </div>
+                </div>
 
-            <div className="form-group">
-              <label className="form-label text-slate-300 text-xs">Hostel & Room No:</label>
-              <div className="relative">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-300 mb-1">WhatsApp Phone Number *</label>
+                  <div className="relative">
+                    <input
+                      type="tel"
+                      required
+                      placeholder="0971234567"
+                      className="form-input pl-8 text-xs py-2 bg-black/40 border-white/10 text-white rounded-xl"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                    />
+                    <Phone size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Campus Selection & Hostel Details */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-300 mb-1">Enrolled Campus *</label>
+                  <select
+                    className="form-select text-xs py-2 bg-black/40 border-white/10 text-white rounded-xl"
+                    value={campus}
+                    onChange={(e) => setCampus(e.target.value)}
+                  >
+                    {lusakaUniversities.map((u) => (
+                      <option key={u.id} value={u.name} className="bg-slate-900 text-white">
+                        {u.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-300 mb-1">Hostel Block & Room No. *</label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="e.g. Block C, Room 14"
+                      className="form-input pl-8 text-xs py-2 bg-black/40 border-white/10 text-white rounded-xl"
+                      value={hostel}
+                      onChange={(e) => setHostel(e.target.value)}
+                    />
+                    <Home size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Email Address */}
+              <div>
+                <label className="block text-[11px] font-bold text-slate-300 mb-1">Email Address *</label>
+                <div className="relative">
+                  <input
+                    type="email"
+                    required
+                    placeholder="student@unilus.ac.zm"
+                    className="form-input pl-8 text-xs py-2 bg-black/40 border-white/10 text-white rounded-xl"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                  />
+                  <Mail size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                </div>
+              </div>
+
+              {/* Password & Confirm Password */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-300 mb-1">Password (6+ chars) *</label>
+                  <div className="relative">
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      required
+                      placeholder="••••••••"
+                      className="form-input pl-8 pr-8 text-xs py-2 bg-black/40 border-white/10 text-white rounded-xl"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                    />
+                    <Lock size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white bg-transparent border-0 cursor-pointer p-0"
+                    >
+                      {showPassword ? <EyeOff size={13} /> : <Eye size={13} />}
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-300 mb-1">Confirm Password *</label>
+                  <div className="relative">
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      required
+                      placeholder="••••••••"
+                      className="form-input pl-8 text-xs py-2 bg-black/40 border-white/10 text-white rounded-xl"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                    />
+                    <Lock size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Referral Code (Optional) */}
+              <div>
+                <label className="block text-[11px] font-bold text-slate-300 mb-1">
+                  Referral / Promo Code <span className="text-slate-500 font-normal">(Optional)</span>
+                </label>
                 <input
                   type="text"
-                  placeholder="e.g. Silverest Block B, Room 12"
-                  className="form-input pl-10 text-xs bg-slate-950/60 border-white/15 text-white"
-                  value={hostel}
-                  onChange={(e) => setHostel(e.target.value)}
+                  placeholder="e.g. CAMPUS50"
+                  className="form-input text-xs py-2 bg-black/40 border-white/10 text-white rounded-xl uppercase"
+                  value={referralCode}
+                  onChange={(e) => setReferralCode(e.target.value)}
                 />
-                <Home size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
               </div>
-            </div>
 
-            <div className="form-group">
-              <label className="form-label text-slate-300 text-xs">Email Address:</label>
-              <div className="relative">
+              {/* Safety & Anti-Impersonation Agreement */}
+              <label className="flex items-start gap-2 text-[11px] text-slate-300 cursor-pointer pt-1">
                 <input
-                  type="email"
-                  required
-                  placeholder="student@unilus.ac.zm"
-                  className="form-input pl-10 text-xs bg-slate-950/60 border-white/15 text-white"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  type="checkbox"
+                  checked={agreedTerms}
+                  onChange={(e) => setAgreedTerms(e.target.checked)}
+                  className="mt-0.5 rounded border-white/20 text-amber-400 focus:ring-0"
                 />
-                <Mail size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <span>
+                  I agree to the <strong>Campus Safety & Anti-Impersonation Guidelines</strong> for dorm visits.
+                </span>
+              </label>
+
+              {/* Submit Button */}
+              <button
+                type="submit"
+                disabled={loading}
+                className="apple-btn-primary w-full text-xs py-3 rounded-2xl font-extrabold flex items-center justify-center gap-2 shadow-apple-gold mt-2 disabled:opacity-50"
+              >
+                {loading ? (
+                  <>
+                    <RefreshCw size={14} className="animate-spin" />
+                    <span>Creating Campus Profile...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Create Campus Account</span>
+                    <ArrowRight size={14} />
+                  </>
+                )}
+              </button>
+
+              <div className="text-center pt-2">
+                <span className="text-xs text-slate-400">Already registered? </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAuthMode('login');
+                    setErrorMsg('');
+                  }}
+                  className="text-xs text-amber-400 font-bold hover:underline bg-transparent border-0 cursor-pointer p-0"
+                >
+                  Log In Here
+                </button>
+              </div>
+            </form>
+          )}
+
+          {/* 2. LOG IN FLOW */}
+          {authMode === 'login' && (
+            <form onSubmit={handleLogin} className="space-y-4">
+              <div>
+                <label className="block text-[11px] font-bold text-slate-300 mb-1">Email or Campus ID</label>
+                <div className="relative">
+                  <input
+                    type="email"
+                    required
+                    placeholder="student@unilus.ac.zm"
+                    className="form-input pl-8 text-xs py-2.5 bg-black/40 border-white/10 text-white rounded-xl"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                  />
+                  <Mail size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                </div>
+              </div>
+
+              <div>
+                <div className="flex justify-between items-center mb-1">
+                  <label className="block text-[11px] font-bold text-slate-300">Password</label>
+                  <button
+                    type="button"
+                    onClick={() => setAuthMode('forgot')}
+                    className="text-[11px] text-amber-400 hover:underline bg-transparent border-0 cursor-pointer p-0"
+                  >
+                    Forgot Password?
+                  </button>
+                </div>
+                <div className="relative">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    required
+                    placeholder="••••••••"
+                    className="form-input pl-8 pr-8 text-xs py-2.5 bg-black/40 border-white/10 text-white rounded-xl"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                  />
+                  <Lock size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white bg-transparent border-0 cursor-pointer p-0"
+                  >
+                    {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                  </button>
+                </div>
+              </div>
+
+              {/* Submit Button */}
+              <button
+                type="submit"
+                disabled={loading}
+                className="apple-btn-primary w-full text-xs py-3 rounded-2xl font-extrabold flex items-center justify-center gap-2 shadow-apple-gold mt-2 disabled:opacity-50"
+              >
+                {loading ? (
+                  <>
+                    <RefreshCw size={14} className="animate-spin" />
+                    <span>Signing in...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Sign In to UniHairShop</span>
+                    <ArrowRight size={14} />
+                  </>
+                )}
+              </button>
+
+              {/* Quick Fill Credentials Bar */}
+              <div className="pt-3 border-t border-white/10">
+                <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider block text-center mb-2">
+                  1-Tap Fast Logins
+                </span>
+                <div className="grid grid-cols-3 gap-1.5">
+                  <button
+                    type="button"
+                    onClick={handleFillAdmin}
+                    className="p-2 rounded-xl bg-amber-400/15 border border-amber-400/30 text-amber-300 hover:bg-amber-400/25 text-[10px] font-bold transition-colors cursor-pointer"
+                  >
+                    👑 Master Admin
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleFillStylist}
+                    className="p-2 rounded-xl bg-white/5 border border-white/10 text-slate-300 hover:bg-white/10 text-[10px] font-semibold transition-colors cursor-pointer"
+                  >
+                    ✂️ Campus Stylist
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleFillStudent}
+                    className="p-2 rounded-xl bg-white/5 border border-white/10 text-slate-300 hover:bg-white/10 text-[10px] font-semibold transition-colors cursor-pointer"
+                  >
+                    🎓 Student Client
+                  </button>
+                </div>
+              </div>
+
+              <div className="text-center pt-2">
+                <span className="text-xs text-slate-400">New to UniHairShop? </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAuthMode('signup');
+                    setErrorMsg('');
+                  }}
+                  className="text-xs text-amber-400 font-bold hover:underline bg-transparent border-0 cursor-pointer p-0"
+                >
+                  Create Account
+                </button>
+              </div>
+            </form>
+          )}
+
+          {/* 3. FORGOT PASSWORD FLOW */}
+          {authMode === 'forgot' && (
+            <div className="space-y-4">
+              <div className="text-center">
+                <div className="w-12 h-12 rounded-2xl bg-amber-400/20 text-amber-400 flex items-center justify-center mx-auto mb-2">
+                  <KeyRound size={24} />
+                </div>
+                <h3 className="text-sm font-bold text-white m-0">Reset Password</h3>
+                <p className="text-xs text-slate-400 mt-1">
+                  Enter your campus email address to receive password reset instructions or connect directly with campus support.
+                </p>
+              </div>
+
+              {resetSent ? (
+                <div className="p-4 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-center space-y-2">
+                  <CheckCircle2 size={24} className="text-emerald-400 mx-auto" />
+                  <h4 className="text-xs font-bold text-emerald-300 m-0">Password Reset Email Dispatched</h4>
+                  <p className="text-[11px] text-slate-300 m-0">Check your inbox for the reset link.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-300 mb-1">Campus Email Address</label>
+                    <input
+                      type="email"
+                      placeholder="student@unilus.ac.zm"
+                      className="form-input text-xs py-2 bg-black/40 border-white/10 text-white rounded-xl"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                    />
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!email.trim()) {
+                        setErrorMsg('Please enter your email.');
+                        return;
+                      }
+                      setResetSent(true);
+                      addToast('Reset instructions sent to your email!', 'success');
+                    }}
+                    className="apple-btn-primary w-full text-xs py-2.5 rounded-xl font-bold"
+                  >
+                    Send Reset Instructions
+                  </button>
+                </div>
+              )}
+
+              <div className="pt-2 text-center">
+                <button
+                  type="button"
+                  onClick={() => setAuthMode('login')}
+                  className="text-xs text-slate-400 hover:text-white hover:underline bg-transparent border-0 cursor-pointer p-0"
+                >
+                  ← Back to Log In
+                </button>
               </div>
             </div>
+          )}
+        </div>
 
-            <div className="form-group">
-              <label className="form-label text-slate-300 text-xs">Password:</label>
-              <div className="relative">
-                <input
-                  type="password"
-                  required
-                  placeholder="At least 6 characters"
-                  className="form-input pl-10 text-xs bg-slate-950/60 border-white/15 text-white"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                />
-                <Lock size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="apple-btn-primary w-full text-xs py-3 mt-1 font-bold"
-            >
-              <span>{loading ? 'Creating Account...' : 'Complete Registration'}</span>
-              <CheckCircle2 size={15} />
-            </button>
-          </form>
-        )}
-
-        <div className="mt-6 text-center text-slate-500 text-[11px]">
-          <span>Protected with Supabase Auth & JWT Sessions 🛡️</span>
+        {/* Global Session Termination Button */}
+        <div className="mt-4 text-center">
+          <button
+            type="button"
+            onClick={terminateAllSessions}
+            className="text-[11px] text-slate-500 hover:text-rose-400 transition-colors flex items-center justify-center gap-1.5 mx-auto bg-transparent border-0 cursor-pointer"
+            title="Terminate all saved sessions across devices"
+          >
+            <LogOut size={12} />
+            <span>Terminate & Purge All Device Sessions</span>
+          </button>
         </div>
       </div>
     </div>
