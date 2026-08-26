@@ -236,27 +236,6 @@ export default function Header() {
             )}
           </button>
 
-          {/* User Account / Auth Button */}
-          {user?.isLoggedIn ? (
-            <button
-              onClick={() => setActiveTab('account')}
-              className="w-7 h-7 rounded-full bg-amber-400 text-slate-950 font-extrabold text-xs flex items-center justify-center shadow-sm cursor-pointer border-0 hover:scale-105 transition-transform"
-              title={`Signed in as ${user.name} (${user.role === 'vendor' ? 'Stylist' : 'Student'}) - Click to view profile`}
-              aria-label={`Profile: ${user.name}`}
-            >
-              {user.name ? user.name.charAt(0).toUpperCase() : 'U'}
-            </button>
-          ) : (
-            <button
-              onClick={() => setShowAuthModal(true)}
-              className="icon-btn font-bold text-xs"
-              title="Sign In / Register"
-              aria-label="Sign In or Register"
-            >
-              <User size={16} className="text-amber-500" />
-            </button>
-          )}
-
           {/* Slide-Out Cart Trigger (Customer Mode) */}
           {userMode === 'customer' && (
             <button

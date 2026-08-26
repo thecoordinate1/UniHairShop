@@ -24,9 +24,11 @@ import {
   Scissors,
   LogOut,
   Edit3,
-  Lock
+  Lock,
+  Info
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import BookingDetailModal from '../components/BookingDetailModal';
 
 export default function AccountView() {
   const {
@@ -53,6 +55,7 @@ export default function AccountView() {
 
   const [accountTab, setAccountTab] = useState('bookings');
   const [rescheduleModal, setRescheduleModal] = useState(null);
+  const [selectedBookingDetail, setSelectedBookingDetail] = useState(null);
   const [newDate, setNewDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [newTime, setNewTime] = useState('14:00');
   const [dateError, setDateError] = useState('');
@@ -435,41 +438,52 @@ export default function AccountView() {
                   </div>
                 </div>
 
-                {b.status === 'Confirmed' && (
-                  <div className="flex flex-wrap gap-2 justify-end pt-2 border-t border-black/5 dark:border-white/10">
-                    <button
-                      className="apple-btn-secondary text-xs px-3 py-1.5 flex items-center gap-1"
-                      onClick={() => exportToCalendar(b)}
-                      title="Download .ics Calendar Sync Invite"
-                    >
-                      <Download size={13} />
-                      <span>Sync (.ics)</span>
-                    </button>
+                <div className="flex flex-wrap gap-2 justify-end pt-2 border-t border-black/5 dark:border-white/10">
+                  <button
+                    className="apple-btn-primary text-xs px-3 py-1.5 flex items-center gap-1 font-bold"
+                    onClick={() => setSelectedBookingDetail(b)}
+                    title="View full booking details, breakdown & stylist contact"
+                  >
+                    <Info size={13} />
+                    <span>View Details</span>
+                  </button>
 
-                    <button
-                      className="apple-btn-secondary text-xs px-3 py-1.5 flex items-center gap-1"
-                      onClick={() => {
-                        setRescheduleModal(b);
-                        setNewDate(b.date || today);
-                        setNewTime(b.time || '14:00');
-                        setDateError('');
-                      }}
-                      aria-label={`Reschedule appointment for ${b.serviceName}`}
-                    >
-                      <RefreshCw size={13} aria-hidden="true" />
-                      <span>Reschedule</span>
-                    </button>
+                  {b.status === 'Confirmed' && (
+                    <>
+                      <button
+                        className="apple-btn-secondary text-xs px-3 py-1.5 flex items-center gap-1"
+                        onClick={() => exportToCalendar(b)}
+                        title="Download .ics Calendar Sync Invite"
+                      >
+                        <Download size={13} />
+                        <span>Sync (.ics)</span>
+                      </button>
 
-                    <button
-                      className="bg-pink-500/15 text-pink-500 border border-pink-500/30 px-3.5 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1 hover:bg-pink-500/25 active:scale-95 transition-all cursor-pointer"
-                      onClick={() => cancelBooking(b.id)}
-                      aria-label={`Cancel appointment for ${b.serviceName}`}
-                    >
-                      <XCircle size={13} aria-hidden="true" />
-                      <span>Cancel</span>
-                    </button>
-                  </div>
-                )}
+                      <button
+                        className="apple-btn-secondary text-xs px-3 py-1.5 flex items-center gap-1"
+                        onClick={() => {
+                          setRescheduleModal(b);
+                          setNewDate(b.date || today);
+                          setNewTime(b.time || '14:00');
+                          setDateError('');
+                        }}
+                        aria-label={`Reschedule appointment for ${b.serviceName}`}
+                      >
+                        <RefreshCw size={13} aria-hidden="true" />
+                        <span>Reschedule</span>
+                      </button>
+
+                      <button
+                        className="bg-pink-500/15 text-pink-500 border border-pink-500/30 px-3.5 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1 hover:bg-pink-500/25 active:scale-95 transition-all cursor-pointer"
+                        onClick={() => cancelBooking(b.id)}
+                        aria-label={`Cancel appointment for ${b.serviceName}`}
+                      >
+                        <XCircle size={13} aria-hidden="true" />
+                        <span>Cancel</span>
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
             ))
           )}
@@ -640,6 +654,25 @@ export default function AccountView() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* BOOKING DETAILS MODAL */}
+      {selectedBookingDetail && (
+        <BookingDetailModal
+          booking={selectedBookingDetail}
+          onClose={() => setSelectedBookingDetail(null)}
+          onReschedule={(b) => {
+            setSelectedBookingDetail(null);
+            setRescheduleModal(b);
+            setNewDate(b.date || today);
+            setNewTime(b.time || '14:00');
+            setDateError('');
+          }}
+          onCancel={(id) => {
+            setSelectedBookingDetail(null);
+            cancelBooking(id);
+          }}
+        />
       )}
     </div>
   );

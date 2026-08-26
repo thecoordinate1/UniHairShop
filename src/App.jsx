@@ -1,4 +1,5 @@
 import React, { Suspense, lazy, useEffect } from 'react';
+import { Scissors } from 'lucide-react';
 import { useApp } from './context/AppContext';
 import Header from './components/Header';
 import BottomNav from './components/BottomNav';
@@ -11,6 +12,7 @@ import SafetyModal from './components/SafetyModal';
 import InstallBanner from './components/InstallBanner';
 import AuthModal from './components/AuthModal';
 import AuthGuard from './components/AuthGuard';
+import AuthWall from './components/AuthWall';
 
 // Code-split all view components
 const HomeView = lazy(() => import('./views/HomeView'));
@@ -40,12 +42,35 @@ function ViewSkeleton() {
 }
 
 export default function App() {
-  const { activeTab, userMode } = useApp();
+  const { activeTab, userMode, user, authLoading } = useApp();
 
   // Scroll to top on tab change
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [activeTab, userMode]);
+
+  // Session Hydration Screen
+  if (authLoading) {
+    return (
+      <div className="min-h-screen w-full flex flex-col items-center justify-center bg-slate-950 text-white p-4">
+        <div className="w-16 h-16 rounded-3xl bg-amber-400 text-slate-950 flex items-center justify-center font-extrabold text-2xl shadow-apple-gold animate-bounce mb-4">
+          <Scissors size={32} />
+        </div>
+        <h2 className="text-base font-extrabold text-amber-400 tracking-wide m-0">UniHairShop Campus Hub</h2>
+        <p className="text-xs text-slate-400 mt-1">Verifying campus session...</p>
+      </div>
+    );
+  }
+
+  // App Gate: Inaccessible without login / active session
+  if (!user?.isLoggedIn) {
+    return (
+      <ErrorBoundary>
+        <AuthWall />
+        <Toast />
+      </ErrorBoundary>
+    );
+  }
 
   const renderCurrentView = () => {
     // If in vendor mode and activeTab is home/vendor, show VendorStudioView guarded
