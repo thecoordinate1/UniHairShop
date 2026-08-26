@@ -39,7 +39,7 @@ function generateId(prefix) {
 }
 
 export const AppProvider = ({ children }) => {
-  // Theme Mode ('dark' | 'light')
+  // 1. Theme & User Mode States
   const [theme, setTheme] = useState(() => {
     try {
       return localStorage.getItem('unihair_theme') || 'dark';
@@ -48,7 +48,6 @@ export const AppProvider = ({ children }) => {
     }
   });
 
-  // Dual Architecture: User Mode ('customer' | 'vendor')
   const [userMode, setUserMode] = useState(() => {
     try {
       return localStorage.getItem('unihair_user_mode') || 'customer';
@@ -57,10 +56,94 @@ export const AppProvider = ({ children }) => {
     }
   });
 
-  // Vendor Studio active sub-tab
   const [vendorTab, setVendorTab] = useState('overview');
+  const [activeTab, setActiveTab] = useState('home');
 
-  // Sync theme to document.documentElement
+  const [currentCampus, setCurrentCampus] = useState(() => {
+    try {
+      return localStorage.getItem('unihair_campus') || 'UNILUS Silverest Campus';
+    } catch {
+      return 'UNILUS Silverest Campus';
+    }
+  });
+
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [session, setSession] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [pendingAuthCallback, setPendingAuthCallback] = useState(null);
+
+  // 2. User & Vendor Profiles
+  const [user, setUser] = useState(() => safeGetItem('unihair_user', defaultGuestUser));
+
+  const [vendorProfile, setVendorProfile] = useState(() => safeGetItem('unihair_vendor_profile', {
+    id: 'stf-1',
+    name: 'Junior "The Fade King"',
+    role: 'Master Barber & Stylist',
+    campus: 'UNILUS Silverest Campus',
+    dormLocation: 'Silverest Hostel, Block C, Room 14',
+    avatar: '/images/barber_service.jpg',
+    isVerified: true,
+    badge: 'Verified Campus Stylist',
+    travelsToDorm: true,
+    travelFee: 20,
+    hasStudio: true,
+    phone: '0971234567',
+    payoutProvider: 'Airtel Money',
+    payoutNumber: '0971234567',
+    bio: 'Campus favorite barber at UNILUS Silverest. 4+ years precision fades and beard sculpting. I travel to student rooms or host in Block C!'
+  }));
+
+  const [vendorWallet, setVendorWallet] = useState(() => safeGetItem('unihair_vendor_wallet', {
+    availableBalance: 640,
+    pendingBalance: 125,
+    totalEarned: 3450,
+    completedJobsCount: 42,
+    payouts: [
+      { id: 'PAY-891', date: '2026-08-20', amount: 450, provider: 'Airtel Money', number: '0971234567', status: 'Completed', ref: 'AM-TX-9841' },
+      { id: 'PAY-742', date: '2026-08-14', amount: 600, provider: 'MTN Mobile Money', number: '0961234567', status: 'Completed', ref: 'MTN-TX-1029' }
+    ]
+  }));
+
+  // 3. Platform Data & Chat
+  const [services, setServices] = useState(() => safeGetItem('unihair_services', initialServices));
+  const [products, setProducts] = useState(() => safeGetItem('unihair_products', initialProducts));
+  const [bundles] = useState(initialBundles);
+  const [staffList, setStaffList] = useState(() => safeGetItem('unihair_staff', initialStaff));
+  const [bookings, setBookings] = useState(() => safeGetItem('unihair_bookings', initialBookings));
+  const [orders, setOrders] = useState(() => safeGetItem('unihair_orders', initialOrders));
+  const [cart, setCart] = useState(() => safeGetItem('unihair_cart', []));
+  const [conversations, setConversations] = useState(() => safeGetItem('unihair_conversations', initialConversations));
+  const [activeChatStylistId, setActiveChatStylistId] = useState('stf-1');
+
+  // 4. Modals & Filters
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [isCartOpen, setIsCartOpen] = useState(false);
+  const [bookingService, setBookingService] = useState(null);
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [selectedStylist, setSelectedStylist] = useState(null);
+  const [showSafetyModal, setShowSafetyModal] = useState(false);
+  const [lencoCheckoutState, setLencoCheckoutState] = useState(null);
+  const [filterCategory, setFilterCategory] = useState('All');
+  const [serviceTypeFilter, setServiceTypeFilter] = useState('All');
+  const [priceFilter, setPriceFilter] = useState('All');
+  const [ratingFilter, setRatingFilter] = useState('All');
+  const [availabilityFilter, setAvailabilityFilter] = useState('All');
+  const [toasts, setToasts] = useState([]);
+
+  // Toast Helpers
+  const addToast = useCallback((message, type = 'info') => {
+    const id = Date.now() + Math.random();
+    setToasts((prev) => [...prev, { id, message, type }]);
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+    }, 4000);
+  }, []);
+
+  const dismissToast = useCallback((id) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  }, []);
+
+  // Theme Synchronizer
   useEffect(() => {
     try {
       localStorage.setItem('unihair_theme', theme);
@@ -72,6 +155,10 @@ export const AppProvider = ({ children }) => {
       document.documentElement.classList.remove('dark');
     }
   }, [theme]);
+
+  const toggleTheme = useCallback(() => {
+    setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
+  }, []);
 
   const toggleUserMode = useCallback(async () => {
     if (userMode === 'vendor') {
@@ -142,129 +229,6 @@ export const AppProvider = ({ children }) => {
     setActiveTab('vendor');
     addToast('Verified Campus Stylist workspace activated!', 'success');
   }, [userMode, user, setActiveTab, addToast]);
-
-  // Navigation tab state ('home' | 'services' | 'bookings' | 'shop' | 'messages' | 'account' | 'admin' | 'about' | 'vendor')
-  const [activeTab, setActiveTab] = useState('home');
-
-  // Active Campus Selection (Default: UNILUS Silverest Campus)
-  const [currentCampus, setCurrentCampus] = useState(() => {
-    try {
-      return localStorage.getItem('unihair_campus') || 'UNILUS Silverest Campus';
-    } catch {
-      return 'UNILUS Silverest Campus';
-    }
-  });
-
-  // Role state (Student Admin vs Regular)
-  const [isAdmin, setIsAdmin] = useState(false);
-
-  // Supabase Authentication & Role State
-  const [session, setSession] = useState(null);
-  const [authLoading, setAuthLoading] = useState(true);
-  const [pendingAuthCallback, setPendingAuthCallback] = useState(null);
-
-// Purge all legacy pre-filled sessions to enforce fresh sign-up and login flow
-try {
-  if (!localStorage.getItem('unihair_sessions_purged_v4')) {
-    localStorage.removeItem('unihair_user');
-    localStorage.removeItem('unihair_session');
-    const sbKeys = Object.keys(localStorage).filter((k) => k.startsWith('sb-'));
-    sbKeys.forEach((k) => localStorage.removeItem(k));
-    localStorage.setItem('unihair_sessions_purged_v4', 'true');
-  }
-} catch { /* ignore */ }
-
-const defaultGuestUser = {
-  isLoggedIn: false,
-  id: null,
-  name: 'Student Guest',
-  email: '',
-  phone: '',
-  campus: 'UNILUS Silverest Campus',
-  hostel: '',
-  role: 'customer',
-  loyaltyPoints: 0,
-  referralCode: '',
-  favorites: []
-};
-
-  // Customer Student profile
-  const [user, setUser] = useState(() => safeGetItem('unihair_user', defaultGuestUser));
-
-  // Vendor Student profile (Stylist / Barber / Creator)
-  const [vendorProfile, setVendorProfile] = useState(() => safeGetItem('unihair_vendor_profile', {
-    id: 'stf-1',
-    name: 'Junior "The Fade King"',
-    role: 'Master Barber & Stylist',
-    campus: 'UNILUS Silverest Campus',
-    dormLocation: 'Silverest Hostel, Block C, Room 14',
-    avatar: '/images/barber_service.jpg',
-    isVerified: true,
-    badge: 'Verified Campus Stylist',
-    travelsToDorm: true,
-    travelFee: 20,
-    hasStudio: true,
-    phone: '0971234567',
-    payoutProvider: 'Airtel Money',
-    payoutNumber: '0971234567',
-    bio: 'Campus favorite barber at UNILUS Silverest. 4+ years precision fades and beard sculpting. I travel to student rooms or host in Block C!'
-  }));
-
-  // Vendor Wallet & Payout State
-  const [vendorWallet, setVendorWallet] = useState(() => safeGetItem('unihair_vendor_wallet', {
-    availableBalance: 640,
-    pendingBalance: 125,
-    totalEarned: 3450,
-    completedJobsCount: 42,
-    payouts: [
-      { id: 'PAY-891', date: '2026-08-20', amount: 450, provider: 'Airtel Money', number: '0971234567', status: 'Completed', ref: 'AM-TX-9841' },
-      { id: 'PAY-742', date: '2026-08-14', amount: 600, provider: 'MTN Mobile Money', number: '0961234567', status: 'Completed', ref: 'MTN-TX-1029' }
-    ]
-  }));
-
-  // Services, Products, Staff, Bookings, Orders
-  const [services, setServices] = useState(() => safeGetItem('unihair_services', initialServices));
-  const [products, setProducts] = useState(() => safeGetItem('unihair_products', initialProducts));
-  const [bundles] = useState(initialBundles);
-  const [staffList, setStaffList] = useState(() => safeGetItem('unihair_staff', initialStaff));
-  const [bookings, setBookings] = useState(() => safeGetItem('unihair_bookings', initialBookings));
-  const [orders, setOrders] = useState(() => safeGetItem('unihair_orders', initialOrders));
-  const [cart, setCart] = useState(() => safeGetItem('unihair_cart', []));
-
-  // In-App Chat Conversations
-  const [conversations, setConversations] = useState(() => safeGetItem('unihair_conversations', initialConversations));
-  const [activeChatStylistId, setActiveChatStylistId] = useState('stf-1');
-
-  // Modals & Drawers
-  const [showAuthModal, setShowAuthModal] = useState(false);
-  const [isCartOpen, setIsCartOpen] = useState(false);
-  const [bookingService, setBookingService] = useState(null);
-  const [selectedProduct, setSelectedProduct] = useState(null);
-  const [selectedStylist, setSelectedStylist] = useState(null);
-  const [showSafetyModal, setShowSafetyModal] = useState(false);
-  const [lencoCheckoutState, setLencoCheckoutState] = useState(null);
-
-  // Granular Filter Engine States
-  const [filterCategory, setFilterCategory] = useState('All');
-  const [serviceTypeFilter, setServiceTypeFilter] = useState('All');
-  const [priceFilter, setPriceFilter] = useState('All');
-  const [ratingFilter, setRatingFilter] = useState('All');
-  const [availabilityFilter, setAvailabilityFilter] = useState('All');
-
-  // Toast System
-  const [toasts, setToasts] = useState([]);
-
-  const addToast = useCallback((message, type = 'info') => {
-    const id = Date.now() + Math.random();
-    setToasts((prev) => [...prev, { id, message, type }]);
-    setTimeout(() => {
-      setToasts((prev) => prev.filter((t) => t.id !== id));
-    }, 4000);
-  }, []);
-
-  const dismissToast = useCallback((id) => {
-    setToasts((prev) => prev.filter((t) => t.id !== id));
-  }, []);
 
   // Supabase Backend Sync, Auth Listener & Realtime Subscription
   useEffect(() => {
