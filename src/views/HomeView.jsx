@@ -331,7 +331,7 @@ export default function HomeView() {
                     className="absolute top-3 right-3 bg-black/60 backdrop-blur-md text-white p-2.5 rounded-full border border-white/10 active:scale-95 transition-all"
                     aria-label="Save to favorites"
                   >
-                    <Heart size={16} fill={user.favorites.includes(srv.id) ? 'var(--accent)' : 'none'} className={user.favorites.includes(srv.id) ? 'text-pink-500' : 'text-white'} />
+                    <Heart size={16} fill={user?.favorites?.includes(srv.id) ? 'var(--accent)' : 'none'} className={user?.favorites?.includes(srv.id) ? 'text-pink-500' : 'text-white'} />
                   </button>
                   <div className="absolute bottom-3 left-3 bg-black/70 backdrop-blur-md px-3 py-1 rounded-full text-xs font-semibold text-white flex items-center gap-1.5 border border-white/10">
                     <Clock size={12} className="text-amber-400" />

@@ -38,6 +38,20 @@ function generateId(prefix) {
   return `${prefix}-${timestamp}-${random}`;
 }
 
+export const defaultGuestUser = {
+  isLoggedIn: false,
+  id: null,
+  name: 'Student Guest',
+  email: '',
+  phone: '',
+  campus: 'UNILUS Silverest Campus',
+  hostel: '',
+  role: 'customer',
+  loyaltyPoints: 0,
+  referralCode: '',
+  favorites: []
+};
+
 export const AppProvider = ({ children }) => {
   // 1. Theme & User Mode States
   const [theme, setTheme] = useState(() => {

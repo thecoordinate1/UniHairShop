@@ -139,7 +139,7 @@ export default function AccountView() {
     setShowEditModal(false);
   };
 
-  const favoriteServices = services.filter((s) => user.favorites?.includes(s.id));
+  const favoriteServices = services.filter((s) => user?.favorites?.includes(s.id));
 
   return (
     <div className="w-full max-w-3xl mx-auto flex flex-col gap-6">
@@ -394,7 +394,7 @@ export default function AccountView() {
               : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white bg-transparent'
           }`}
         >
-          Favorites ({user.favorites.length})
+          Favorites ({user?.favorites?.length || 0})
         </button>
       </div>
 
