@@ -403,18 +403,31 @@ export default function HomeView() {
                 </div>
               </div>
 
-              <div className="flex items-center justify-between pt-3 border-t border-black/5 dark:border-white/10">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 pt-3 border-t border-black/5 dark:border-white/10">
                 <div>
                   <span className="text-xs text-slate-400 line-through mr-2">K {bundle.originalPrice}</span>
                   <span className="price-tag text-lg">K {bundle.bundlePrice}</span>
                 </div>
-                <button
-                  className="apple-btn-primary text-xs px-4 py-2"
-                  onClick={() => addBundleToCart(bundle)}
-                >
-                  <Tag size={13} />
-                  <span>Add Bundle</span>
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    className="apple-btn-secondary text-xs px-3 py-2 flex items-center justify-center gap-1"
+                    onClick={() => addBundleToCart(bundle)}
+                    title="Add bundle to cart"
+                  >
+                    <Tag size={13} />
+                    <span>Add to Cart</span>
+                  </button>
+                  <button
+                    className="apple-btn-primary text-xs px-3 py-2 flex items-center justify-center gap-1"
+                    onClick={() => {
+                      addBundleToCart(bundle);
+                      setActiveTab('cart');
+                    }}
+                    title="Buy bundle and checkout"
+                  >
+                    <span>Buy Now</span>
+                  </button>
+                </div>
               </div>
             </div>
           ))}

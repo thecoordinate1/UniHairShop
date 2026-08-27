@@ -3,7 +3,7 @@ import { Search, Star, ShoppingBag, Eye, SearchX, Tag, CheckCircle2, Truck, Spar
 import { useApp } from '../context/AppContext';
 
 export default function ShopView() {
-  const { products, bundles, addToCart, addBundleToCart, setSelectedProduct, setIsCartOpen } = useApp();
+  const { products, bundles, addToCart, addBundleToCart, setSelectedProduct, setActiveTab } = useApp();
   const [selectedCat, setSelectedCat] = useState('All');
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState('popular');
@@ -24,7 +24,12 @@ export default function ShopView() {
 
   const handleBuyNow = (prd) => {
     addToCart(prd, 1);
-    setIsCartOpen(true);
+    setActiveTab('cart');
+  };
+
+  const handleBuyBundle = (bundle) => {
+    addBundleToCart(bundle);
+    setActiveTab('cart');
   };
 
   return (
@@ -70,13 +75,21 @@ export default function ShopView() {
                 </div>
               </div>
 
-              <button
-                className="apple-btn-primary text-xs w-full py-2"
-                onClick={() => addBundleToCart(bundle)}
-              >
-                <Tag size={13} />
-                <span>Add Bundle to Bag (K {bundle.bundlePrice})</span>
-              </button>
+              <div className="grid grid-cols-2 gap-2 mt-2 pt-3 border-t border-black/5 dark:border-white/10">
+                <button
+                  className="apple-btn-secondary text-xs py-2 flex items-center justify-center gap-1"
+                  onClick={() => addBundleToCart(bundle)}
+                >
+                  <Tag size={13} />
+                  <span>Add to Cart</span>
+                </button>
+                <button
+                  className="apple-btn-primary text-xs py-2 flex items-center justify-center gap-1"
+                  onClick={() => handleBuyBundle(bundle)}
+                >
+                  <span>Buy Now</span>
+                </button>
+              </div>
             </div>
           ))}
         </div>

@@ -25,7 +25,8 @@ import {
   LogOut,
   Edit3,
   Lock,
-  Info
+  Info,
+  Sparkles
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import BookingDetailModal from '../components/BookingDetailModal';

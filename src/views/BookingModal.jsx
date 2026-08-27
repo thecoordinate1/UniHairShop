@@ -7,6 +7,7 @@ export default function BookingModal() {
   const {
     bookingService,
     setBookingService,
+    bookings,
     staffList,
     createBooking,
     exportToCalendar,
@@ -22,8 +23,8 @@ export default function BookingModal() {
   const [selectedTime, setSelectedTime] = useState('14:00');
   const [selectedCampus, setSelectedCampus] = useState(currentCampus);
   const [serviceType, setServiceType] = useState('travel'); // 'travel' | 'studio'
-  const [hostel, setHostel] = useState(user.hostel || 'UNILUS Silverest Hostel, Block C, Room 14');
-  const [phone, setPhone] = useState(user.phone || '0971234567');
+  const [hostel, setHostel] = useState(user?.hostel || '');
+  const [phone, setPhone] = useState(user?.phone || '');
   const [selectedAddOns, setSelectedAddOns] = useState([]);
   const [showLencoWizard, setShowLencoWizard] = useState(false);
   const [confirmedBooking, setConfirmedBooking] = useState(null);

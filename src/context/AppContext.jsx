@@ -96,7 +96,13 @@ export const AppProvider = ({ children }) => {
   });
 
   // 2. User & Vendor Profiles
-  const [user, setUser] = useState(() => safeGetItem('unihair_user', defaultGuestUser));
+  const [user, setUser] = useState(() => {
+    const saved = safeGetItem('unihair_user', defaultGuestUser);
+    if (!saved || !saved.isLoggedIn || saved.name === 'Kondwani Phiri') {
+      return defaultGuestUser;
+    }
+    return saved;
+  });
 
   const [vendorProfile, setVendorProfile] = useState(() => safeGetItem('unihair_vendor_profile', {
     id: 'stf-1',
@@ -132,11 +138,35 @@ export const AppProvider = ({ children }) => {
   const [products, setProducts] = useState(() => safeGetItem('unihair_products', initialProducts));
   const [bundles] = useState(initialBundles);
   const [staffList, setStaffList] = useState(() => safeGetItem('unihair_staff', initialStaff));
-  const [bookings, setBookings] = useState(() => safeGetItem('unihair_bookings', initialBookings));
-  const [orders, setOrders] = useState(() => safeGetItem('unihair_orders', initialOrders));
+  const [bookings, setBookings] = useState(() => {
+    const saved = safeGetItem('unihair_bookings', initialBookings);
+    if (Array.isArray(saved)) {
+      return saved.filter((b) => b.customerName !== 'Kondwani Phiri' && b.id !== 'UHS-B8901');
+    }
+    return initialBookings;
+  });
+  const [orders, setOrders] = useState(() => {
+    const saved = safeGetItem('unihair_orders', initialOrders);
+    if (Array.isArray(saved)) {
+      return saved.filter((o) => o.customerName !== 'Kondwani Phiri' && o.id !== 'UHS-ORD-4102');
+    }
+    return initialOrders;
+  });
   const [cart, setCart] = useState(() => safeGetItem('unihair_cart', []));
-  const [conversations, setConversations] = useState(() => safeGetItem('unihair_conversations', initialConversations));
-  const [activeChatStylistId, setActiveChatStylistId] = useState('stf-1');
+  const [conversations, setConversations] = useState(() => {
+    const saved = safeGetItem('unihair_conversations', initialConversations);
+    if (Array.isArray(saved) && saved.length > 0) {
+      const cleaned = saved.filter((c) => {
+        const hasMessages = Array.isArray(c.messages) && c.messages.length > 0;
+        const isOldSeed = c.messages?.some((m) => m.id === 'm-1' || m.id === 'm-4');
+        const hasKondwani = JSON.stringify(c).includes('Kondwani');
+        return hasMessages && !isOldSeed && !hasKondwani;
+      });
+      return cleaned;
+    }
+    return initialConversations;
+  });
+  const [activeChatStylistId, setActiveChatStylistId] = useState(null);
 
   // 4. Modals & Filters
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -480,13 +510,13 @@ export const AppProvider = ({ children }) => {
       id: bundle.id,
       name: bundle.title,
       category: 'Campus Essentials Bundle',
+      description: bundle.tagline || (bundle.items ? bundle.items.join(', ') : 'Campus Hair & Grooming Bundle'),
       price: bundle.bundlePrice,
       image: bundle.image,
       stock: 10,
       quantity: 1
     };
     addToCart(bundleProduct, 1);
-    setIsCartOpen(true);
     addToast(`Bundle "${bundle.title}" added to cart! (${bundle.savings})`, 'success');
   }, [addToCart, addToast]);
 

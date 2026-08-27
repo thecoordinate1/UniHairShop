@@ -86,7 +86,7 @@ export const initialStaff = Object.freeze([
     hasStudio: true,
     bio: 'UNZA campus nail tech and glam artist. Long-lasting acrylics, trendy 3D nail charms, and camera-ready event makeup.',
     portfolio: [
-      { id: 'port-7', image: '/images/nail_art.jpg', tag: 'French Chrome Acrylics', client: 'Kondwani (UNZA)' },
+      { id: 'port-7', image: '/images/nail_art.jpg', tag: 'French Chrome Acrylics', client: 'Student Client (UNZA)' },
       { id: 'port-8', image: '/images/makeup_glam.jpg', tag: 'Evening Glam Glow', client: 'Lombe (UNZA)' }
     ],
     reviews: [
@@ -315,81 +315,11 @@ export const initialBundles = Object.freeze([
   }
 ]);
 
-export const initialConversations = Object.freeze([
-  {
-    stylistId: 'stf-1',
-    stylistName: 'Junior "The Fade King"',
-    stylistRole: 'Master Barber',
-    avatar: '/images/barber_service.jpg',
-    unreadCount: 1,
-    lastMessage: "I'm ready at Block C, Room 14! Or let me know if you prefer me to come over to Block A.",
-    lastTimestamp: '10:45 AM',
-    messages: [
-      { id: 'm-1', sender: 'stylist', text: 'Hey Kondwani! Thanks for booking the Fresh Campus Fade.', time: '10:30 AM' },
-      { id: 'm-2', sender: 'user', text: 'Hey Junior! Will you bring the hot towel and beard oil?', time: '10:38 AM' },
-      { id: 'm-3', sender: 'stylist', text: "Yes absolutely! I have everything packed in my kit. I'm ready at Block C, Room 14! Or let me know if you prefer me to come over to Block A.", time: '10:45 AM' }
-    ]
-  },
-  {
-    stylistId: 'stf-2',
-    stylistName: 'Chileshe Braids & Wigs',
-    stylistRole: 'Senior Braider',
-    avatar: '/images/hair_braids.jpg',
-    unreadCount: 0,
-    lastMessage: 'Sure, 3 packs of Darling French Curl expression hair is perfect!',
-    lastTimestamp: 'Yesterday',
-    messages: [
-      { id: 'm-4', sender: 'user', text: 'Hi Chileshe! What braiding hair packs should I get for the knotless braids?', time: 'Yesterday' },
-      { id: 'm-5', sender: 'stylist', text: 'Sure, 3 packs of Darling French Curl expression hair is perfect!', time: 'Yesterday' }
-    ]
-  }
-]);
+export const initialConversations = Object.freeze([]);
 
-export const initialBookings = Object.freeze([
-  {
-    id: 'UHS-B8901',
-    serviceId: 'srv-1',
-    serviceName: 'Fresh Campus Fade & Beard Trim',
-    category: 'Barbering',
-    price: 80,
-    selectedAddOns: [{ id: 'add-1', name: 'Beard Sculpt & Hydro Oil', price: 20 }],
-    serviceType: 'Travel to Dorm',
-    travelFee: 20,
-    serviceFee: 5,
-    totalPrice: 125,
-    staffId: 'stf-1',
-    staffName: 'Junior "The Fade King"',
-    date: '2026-08-24',
-    time: '14:00',
-    campus: 'UNILUS Silverest Campus',
-    customerName: 'Kondwani Phiri',
-    customerPhone: '0971234567',
-    hostel: 'UNILUS Silverest Hostel, Block C, Room 14',
-    paymentMethod: 'Airtel Money',
-    paymentStatus: 'Paid',
-    status: 'Confirmed',
-    createdAt: '2026-08-23'
-  }
-]);
+export const initialBookings = Object.freeze([]);
 
-export const initialOrders = Object.freeze([
-  {
-    id: 'UHS-ORD-4102',
-    items: [
-      { id: 'prd-1', name: 'Zambian Miracle Scalp & Growth Oil (100ml)', price: 95, quantity: 1 }
-    ],
-    totalAmount: 95,
-    campus: 'UNILUS Silverest Campus',
-    customerName: 'Kondwani Phiri',
-    customerPhone: '0971234567',
-    deliveryType: 'Hostel Delivery',
-    hostelDetails: 'UNILUS Silverest Hostel, Block A, Room 12',
-    paymentMethod: 'MTN Mobile Money',
-    paymentStatus: 'Paid',
-    status: 'Processing',
-    createdAt: '2026-08-23'
-  }
-]);
+export const initialOrders = Object.freeze([]);
 
 export const initialTransformations = Object.freeze([
   {

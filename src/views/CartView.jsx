@@ -1,13 +1,23 @@
 import React, { useState } from 'react';
-import { ShoppingCart, Trash2, Plus, Minus, ArrowRight, Tag, Truck, Store, CheckCircle } from 'lucide-react';
+import { ShoppingCart, Trash2, Plus, Minus, ArrowRight, Tag, Truck, Store, CheckCircle, Info, Eye, Sparkles } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import LencoCheckoutWizard from '../components/LencoCheckoutWizard';
 
 export default function CartView() {
-  const { cart, updateCartQuantity, removeFromCart, createOrder, setActiveTab, user, addToast } = useApp();
+  const {
+    cart,
+    updateCartQuantity,
+    removeFromCart,
+    createOrder,
+    setActiveTab,
+    products,
+    setSelectedProduct,
+    user,
+    addToast
+  } = useApp();
 
   const [deliveryType, setDeliveryType] = useState('Hostel Delivery');
-  const [hostelDetails, setHostelDetails] = useState(user.hostel || 'October Hall, Room 14');
+  const [hostelDetails, setHostelDetails] = useState(user?.hostel || '');
   const [promoCode, setPromoCode] = useState('');
   const [discountPercent, setDiscountPercent] = useState(0);
   const [showLencoModal, setShowLencoModal] = useState(false);
@@ -17,6 +27,11 @@ export default function CartView() {
   const deliveryFee = deliveryType === 'Hostel Delivery' ? 15 : 0;
   const discountAmount = Math.round((subtotal * discountPercent) / 100);
   const totalAmount = Math.max(0, subtotal + deliveryFee - discountAmount);
+
+  const handleReviewProduct = (cartItem) => {
+    const fullProduct = (products && products.find((p) => p.id === cartItem.id)) || cartItem;
+    setSelectedProduct(fullProduct);
+  };
 
   const handleApplyPromo = () => {
     if (promoCode.trim().toUpperCase() === 'STUDENT15' || promoCode.trim().toUpperCase() === 'UNZA15') {
@@ -107,40 +122,80 @@ export default function CartView() {
       {/* Cart Items List */}
       <div className="flex flex-col gap-3">
         {cart.map((item) => (
-          <div key={item.id} className="card p-3 sm:p-4 flex items-center gap-3 sm:gap-4">
-            <img src={item.image} alt={item.name} className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl object-cover shrink-0" loading="lazy" />
+          <div
+            key={item.id}
+            className="card p-3.5 sm:p-4 flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 transition-all hover:border-amber-400/40 group"
+          >
+            {/* Clickable image thumbnail */}
+            <div
+              className="relative w-20 h-20 rounded-2xl overflow-hidden shrink-0 border border-white/10 cursor-pointer bg-white/5 group-hover:opacity-90"
+              onClick={() => handleReviewProduct(item)}
+              title="Click to review full product details"
+            >
+              <img src={item.image} alt={item.name} className="w-full h-full object-cover" loading="lazy" />
+              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-white">
+                <Eye size={18} />
+              </div>
+            </div>
 
             <div className="flex-1 min-w-0">
-              <h4 className="text-sm font-bold text-white mb-1 truncate">{item.name}</h4>
-              <span className="price-tag text-sm">K {item.price}</span>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="badge badge-in-stock text-[10px] py-0.2 px-1.5">
+                  {item.category || 'Product'}
+                </span>
+                <span className="text-[11px] text-slate-400">Unit: K {item.price}</span>
+              </div>
+
+              <h4
+                onClick={() => handleReviewProduct(item)}
+                className="text-sm font-bold text-white mb-1 truncate cursor-pointer hover:text-amber-400 transition-colors"
+                title={`Click to review ${item.name}`}
+              >
+                {item.name}
+              </h4>
+
+              <div className="flex items-center gap-3 mb-2">
+                <span className="price-tag text-sm">Item Total: K {item.price * item.quantity}</span>
+              </div>
+
+              <button
+                onClick={() => handleReviewProduct(item)}
+                className="text-xs font-bold text-amber-400 hover:text-amber-300 inline-flex items-center gap-1.5 bg-amber-400/10 hover:bg-amber-400/20 px-2.5 py-1 rounded-xl border border-amber-400/25 cursor-pointer transition-all"
+              >
+                <Info size={13} />
+                <span>Review Product Details</span>
+              </button>
             </div>
 
-            {/* Quantity controls */}
-            <div className="flex items-center gap-2 bg-slate-900/80 px-2 py-1 rounded-xl border border-white/10 shrink-0">
+            {/* Quantity controls & Remove button */}
+            <div className="flex items-center justify-between sm:justify-end w-full sm:w-auto gap-3 pt-2 sm:pt-0 border-t sm:border-t-0 border-white/5">
+              <div className="flex items-center gap-2 bg-slate-900/80 px-2.5 py-1 rounded-xl border border-white/10 shrink-0">
+                <button
+                  onClick={() => updateCartQuantity(item.id, -1)}
+                  className="bg-transparent text-white hover:text-amber-400 p-1 flex border-0 cursor-pointer"
+                  aria-label={`Decrease quantity of ${item.name}`}
+                >
+                  <Minus size={14} />
+                </button>
+                <span className="font-bold text-sm min-w-[20px] text-center text-white">{item.quantity}</span>
+                <button
+                  onClick={() => updateCartQuantity(item.id, 1)}
+                  className="bg-transparent text-white hover:text-amber-400 p-1 flex border-0 cursor-pointer"
+                  aria-label={`Increase quantity of ${item.name}`}
+                >
+                  <Plus size={14} />
+                </button>
+              </div>
+
               <button
-                onClick={() => updateCartQuantity(item.id, -1)}
-                className="bg-transparent text-white p-1 flex border-0"
-                aria-label={`Decrease quantity of ${item.name}`}
+                onClick={() => removeFromCart(item.id)}
+                className="bg-transparent text-slate-400 hover:text-[#FF2D55] p-2 border-0 transition-colors shrink-0 cursor-pointer"
+                aria-label={`Remove ${item.name} from cart`}
+                title="Remove item"
               >
-                <Minus size={14} />
-              </button>
-              <span className="font-bold text-sm min-w-[18px] text-center">{item.quantity}</span>
-              <button
-                onClick={() => updateCartQuantity(item.id, 1)}
-                className="bg-transparent text-white p-1 flex border-0"
-                aria-label={`Increase quantity of ${item.name}`}
-              >
-                <Plus size={14} />
+                <Trash2 size={18} />
               </button>
             </div>
-
-            <button
-              onClick={() => removeFromCart(item.id)}
-              className="bg-transparent text-slate-400 hover:text-[#FF2D55] p-1 border-0 transition-colors shrink-0"
-              aria-label={`Remove ${item.name} from cart`}
-            >
-              <Trash2 size={18} />
-            </button>
           </div>
         ))}
       </div>

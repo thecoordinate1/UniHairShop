@@ -229,7 +229,7 @@
 
   /* Modals & Overlays */
   .modal-overlay {
-    @apply fixed inset-0 z-50 bg-black/60 dark:bg-black/75 backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-4 w-full h-full;
+    @apply fixed inset-0 z-[60] bg-black/60 dark:bg-black/75 backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-4 w-full h-full;
   }
 
   .modal-card {
