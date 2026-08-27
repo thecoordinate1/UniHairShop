@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Star, ShieldCheck, Clock, MapPin, MessageCircle, Calendar, CheckCircle2, ChevronRight, Sparkles, Heart } from 'lucide-react';
+import { X, Star, ShieldCheck, Clock, MapPin, MessageCircle, Calendar, CheckCircle2, ChevronRight, Sparkles, Heart, Share2, Copy, Check } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 
 export default function StylistProfileModal() {
@@ -11,10 +11,12 @@ export default function StylistProfileModal() {
     setActiveTab,
     setActiveChatStylistId,
     user,
-    toggleFavorite
+    toggleFavorite,
+    addToast
   } = useApp();
 
   const [activeTab, setActiveProfileTab] = useState('portfolio'); // 'portfolio' | 'services' | 'reviews'
+  const [copiedLink, setCopiedLink] = useState(false);
 
   useEffect(() => {
     if (!selectedStylist) return;
@@ -32,6 +34,31 @@ export default function StylistProfileModal() {
   if (!selectedStylist) return null;
 
   const stylistServices = services.filter((s) => (s.staffIds || s.staff_ids || []).includes(selectedStylist.id));
+  const bioHandle = selectedStylist.handle || selectedStylist.id;
+  const shareUrl = `${window.location.origin}/?stylist=${bioHandle}`;
+
+  const handleShareBioLink = async () => {
+    const shareText = `Book an appointment with verified stylist ${selectedStylist.name} on UniHairShop (${selectedStylist.campus})! 💈✨`;
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `${selectedStylist.name} on UniHairShop`,
+          text: shareText,
+          url: shareUrl
+        });
+        addToast('Profile link shared!', 'success');
+        return;
+      } catch (e) {
+        if (e.name !== 'AbortError') console.warn(e);
+      }
+    }
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(shareUrl);
+      setCopiedLink(true);
+      addToast(`Stylist bio link copied: ${shareUrl}`, 'success');
+      setTimeout(() => setCopiedLink(false), 2500);
+    }
+  };
 
   const handleBookService = (srv) => {
     setSelectedStylist(null);
@@ -60,14 +87,25 @@ export default function StylistProfileModal() {
             <span>{selectedStylist.campus}</span>
           </div>
 
-          <button
-            className="bg-black/60 hover:bg-black/80 text-white w-9 h-9 rounded-full flex items-center justify-center border border-white/15 cursor-pointer"
-            onClick={() => setSelectedStylist(null)}
-            title="Close (Esc)"
-            aria-label="Close profile"
-          >
-            <X size={18} />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleShareBioLink}
+              className="bg-black/60 hover:bg-black/80 text-white px-3 py-1.5 rounded-full flex items-center gap-1.5 text-xs font-bold border border-white/15 cursor-pointer transition-all active:scale-95"
+              title="Share Stylist Direct Bio Link"
+            >
+              {copiedLink ? <Check size={14} className="text-emerald-400" /> : <Share2 size={14} />}
+              <span>{copiedLink ? 'Link Copied' : 'Share Link'}</span>
+            </button>
+
+            <button
+              className="bg-black/60 hover:bg-black/80 text-white w-9 h-9 rounded-full flex items-center justify-center border border-white/15 cursor-pointer"
+              onClick={() => setSelectedStylist(null)}
+              title="Close (Esc)"
+              aria-label="Close profile"
+            >
+              <X size={18} />
+            </button>
+          </div>
         </div>
 
         {/* Profile Details Container */}
@@ -115,7 +153,10 @@ export default function StylistProfileModal() {
               <h2 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight m-0">{selectedStylist.name}</h2>
               <span className="badge badge-verified text-[10px] py-0.5 px-2 font-bold">{selectedStylist.badge}</span>
             </div>
-            <p className="text-xs text-amber-500 font-semibold mt-0.5 mb-2">{selectedStylist.role}</p>
+            <div className="flex items-center gap-2 mt-0.5 mb-2">
+              <span className="text-xs text-amber-500 font-semibold">{selectedStylist.role}</span>
+              <span className="text-[11px] font-mono text-slate-400">@{bioHandle}</span>
+            </div>
 
             <div className="flex flex-wrap gap-y-1 gap-x-4 text-xs text-slate-500 dark:text-slate-400 mb-3">
               <div className="flex items-center gap-1">

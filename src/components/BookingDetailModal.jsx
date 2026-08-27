@@ -175,25 +175,35 @@ export default function BookingDetailModal({ booking, onClose, onReschedule, onC
           {/* Payment & Financial Ledger */}
           <div className="p-3.5 rounded-2xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/5 dark:border-white/10 space-y-2">
             <div className="flex justify-between items-center text-xs">
-              <span className="text-slate-400">Payment Method</span>
-              <span className="font-bold text-slate-900 dark:text-white flex items-center gap-1">
+              <span className="text-slate-400">Payment Status</span>
+              <span className="font-bold text-emerald-500 flex items-center gap-1">
                 <CreditCard size={12} className="text-emerald-500" />
-                <span>{booking.paymentMethod || 'Lenco Mobile Money'}</span>
+                <span>{booking.paymentStatus || booking.paymentMethod || 'Paid'}</span>
               </span>
             </div>
             <div className="flex justify-between items-center text-xs">
               <span className="text-slate-400">Base Service Fee</span>
               <span className="font-semibold text-slate-900 dark:text-white">K {basePrice}</span>
             </div>
-            {booking.locationMode === 'dorm' && (
-              <div className="flex justify-between items-center text-xs">
-                <span className="text-slate-400">Dorm Travel & Campus Safety Fee</span>
-                <span className="font-semibold text-slate-900 dark:text-white">K 25</span>
+            {booking.depositAmount > 0 && (
+              <div className="flex justify-between items-center text-xs text-emerald-600 font-semibold">
+                <span>Commitment Deposit Paid</span>
+                <span>-K {booking.depositAmount}</span>
+              </div>
+            )}
+            {booking.balanceDue > 0 && (
+              <div className="flex justify-between items-center text-xs text-amber-500 font-bold">
+                <span>Balance Due on Arrival</span>
+                <span>K {booking.balanceDue}</span>
               </div>
             )}
             <div className="flex justify-between items-center pt-2 border-t border-black/5 dark:border-white/10">
-              <span className="text-xs font-bold text-slate-900 dark:text-white">Total Amount</span>
+              <span className="text-xs font-bold text-slate-900 dark:text-white">Total Booking Value</span>
               <span className="price-tag text-base">K {totalPrice}</span>
+            </div>
+            <div className="flex justify-between items-center pt-2 border-t border-black/5 dark:border-white/10 text-xs">
+              <span className="text-slate-400">Hostel Safety Verification Code:</span>
+              <span className="font-mono font-bold text-amber-500">SEC-{(booking.id || '4912').slice(-4)}</span>
             </div>
           </div>
         </div>

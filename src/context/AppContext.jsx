@@ -670,16 +670,24 @@ export const AppProvider = ({ children }) => {
     }
   }, [userMode, staffList]);
 
-  // Smart Booking Creation
+  // Smart Booking Creation with Escrow & No-Show Deposit Support
   const createBooking = useCallback(async (newBookingData) => {
     const bookingId = generateId('UHS-B');
+    const paymentMode = newBookingData.paymentMode || (newBookingData.paymentMethod === 'Pay on Arrival' ? 'arrival' : 'full');
+    const totalPrice = Number(newBookingData.totalPrice || newBookingData.price || 0);
+    const depositAmount = paymentMode === 'deposit' ? 25 : (paymentMode === 'full' ? totalPrice : 0);
+    const balanceDue = Math.max(0, totalPrice - depositAmount);
+
     const newBooking = {
       id: bookingId,
       ...newBookingData,
       campus: currentCampus,
       customerName: user.name,
       customerPhone: user.phone,
-      paymentStatus: newBookingData.paymentMethod === 'Pay on Arrival' ? 'Pending' : 'Paid',
+      paymentMode,
+      depositAmount,
+      balanceDue,
+      paymentStatus: paymentMode === 'arrival' ? 'Pending (Pay on Arrival)' : (paymentMode === 'deposit' ? 'Deposit Paid (K25)' : 'Paid in Full'),
       status: 'Confirmed',
       createdAt: new Date().toISOString().split('T')[0]
     };
@@ -705,7 +713,7 @@ export const AppProvider = ({ children }) => {
           customer_phone: user.phone,
           selected_add_ons: newBookingData.selectedAddOns || [],
           price: newBookingData.price || 90,
-          total_price: newBookingData.totalPrice || 110,
+          total_price: totalPrice,
           payment_method: newBookingData.paymentMethod || 'Cash / Mobile Money',
           payment_status: newBooking.paymentStatus,
           status: 'Confirmed'
@@ -715,20 +723,28 @@ export const AppProvider = ({ children }) => {
       }
     }
 
-    // Update vendor wallet pending/earned
-    const bookingAmount = newBookingData.totalPrice || newBookingData.price || 0;
+    // Update vendor wallet
+    const creditedAmount = depositAmount > 0 ? depositAmount : totalPrice;
     setVendorWallet((prev) => ({
       ...prev,
-      availableBalance: prev.availableBalance + bookingAmount,
-      totalEarned: prev.totalEarned + bookingAmount
+      availableBalance: prev.availableBalance + creditedAmount,
+      totalEarned: prev.totalEarned + creditedAmount
     }));
 
-    const pointsEarned = Math.floor(bookingAmount / 10);
+    const pointsEarned = Math.floor(totalPrice / 10);
     setUser((prev) => ({ ...prev, loyaltyPoints: prev.loyaltyPoints + pointsEarned }));
 
     addToast(`Booking ${bookingId} confirmed at ${currentCampus}! +${pointsEarned} points`, 'success');
     return newBooking;
   }, [currentCampus, user.name, user.phone, addToast]);
+
+  const updateVendorSchedule = useCallback((stylistId, newScheduleConfig) => {
+    setStaffList((prev) =>
+      prev.map((s) => (s.id === stylistId ? { ...s, scheduleConfig: newScheduleConfig } : s))
+    );
+    setVendorProfile((prev) => (prev.id === stylistId ? { ...prev, scheduleConfig: newScheduleConfig } : prev));
+    addToast('Schedule & class hours updated successfully!', 'success');
+  }, [addToast]);
 
   const cancelBooking = useCallback(async (bookingId) => {
     setBookings((prev) =>
@@ -1472,6 +1488,7 @@ export const AppProvider = ({ children }) => {
     createBooking,
     cancelBooking,
     rescheduleBooking,
+    updateVendorSchedule,
     exportToCalendar,
     createOrder,
     addService,
@@ -1509,7 +1526,7 @@ export const AppProvider = ({ children }) => {
     toasts,
     addToCart, addBundleToCart, updateCartQuantity, removeFromCart, clearCart,
     toggleFavorite, sendMessage, createBooking, cancelBooking, rescheduleBooking,
-    exportToCalendar, createOrder, addService, updateService, addProduct,
+    updateVendorSchedule, exportToCalendar, createOrder, addService, updateService, addProduct,
     updateProductStock, updateOrderStatus, updateBookingStatus,
     addToast, dismissToast
   ]);

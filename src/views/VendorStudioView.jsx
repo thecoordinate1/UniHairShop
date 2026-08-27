@@ -24,7 +24,10 @@ import {
   Star,
   Settings,
   Eye,
-  Check
+  Check,
+  Copy,
+  Lock,
+  Share2
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 
@@ -42,6 +45,7 @@ export default function VendorStudioView() {
     services,
     bookings,
     staffList,
+    updateVendorSchedule,
     toggleUserMode,
     setActiveTab,
     setActiveChatStylistId,
@@ -49,6 +53,11 @@ export default function VendorStudioView() {
   } = useApp();
 
   const [activeTab, setActiveTabLocal] = useState('overview'); // 'overview' | 'schedule' | 'services' | 'portfolio' | 'wallet'
+
+  // Timetable & Bio Link State
+  const [blockDay, setBlockDay] = useState('Wednesday');
+  const [blockHour, setBlockHour] = useState('10:00');
+  const [copiedBioLink, setCopiedBioLink] = useState(false);
 
   // Service Creation State
   const [showAddServiceModal, setShowAddServiceModal] = useState(false);
@@ -73,6 +82,50 @@ export default function VendorStudioView() {
   const [payoutNumber, setPayoutNumber] = useState(vendorProfile.payoutNumber || '0971234567');
 
   const myStylistObj = staffList.find((s) => s.id === vendorProfile.id) || staffList[0] || {};
+  const currentSchedule = myStylistObj.scheduleConfig || vendorProfile.scheduleConfig || {
+    availableDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
+    workingHours: { start: '08:00', end: '20:00' },
+    blockedSlots: []
+  };
+
+  const bioHandle = vendorProfile.handle || myStylistObj.handle || 'juniorfades';
+  const bioUrl = `${window.location.origin}/?stylist=${bioHandle}`;
+
+  const handleCopyBioUrl = () => {
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(bioUrl);
+      setCopiedBioLink(true);
+      addToast(`Booking link copied: ${bioUrl}`, 'success');
+      setTimeout(() => setCopiedBioLink(false), 2500);
+    }
+  };
+
+  const handleShareBioWhatsApp = () => {
+    const text = encodeURIComponent(`💈 Book your next haircut or braids with me on UniHairShop! Verified campus appointments: ${bioUrl}`);
+    window.open(`https://wa.me/?text=${text}`, '_blank');
+  };
+
+  const handleAddBlockedSlot = () => {
+    const slotString = `${blockDay} ${blockHour}`;
+    if ((currentSchedule.blockedSlots || []).includes(slotString)) {
+      addToast(`${slotString} is already blocked!`, 'error');
+      return;
+    }
+    const updated = {
+      ...currentSchedule,
+      blockedSlots: [...(currentSchedule.blockedSlots || []), slotString]
+    };
+    updateVendorSchedule(vendorProfile.id, updated);
+  };
+
+  const handleRemoveBlockedSlot = (slotString) => {
+    const updated = {
+      ...currentSchedule,
+      blockedSlots: (currentSchedule.blockedSlots || []).filter((s) => s !== slotString)
+    };
+    updateVendorSchedule(vendorProfile.id, updated);
+  };
+
   const myServices = services.filter((s) => (s.staffIds || s.staff_ids || []).includes(vendorProfile.id) || s.category === 'Barbering');
   const myBookings = bookings.filter((b) => {
     const sName = b.staffName || b.staff_name || '';
@@ -307,81 +360,205 @@ export default function VendorStudioView() {
         </div>
       )}
 
-      {/* 2. SCHEDULE & BOOKINGS MANAGER */}
+      {/* 2. SCHEDULE & TIMETABLE MANAGER */}
       {activeTab === 'schedule' && (
-        <div className="flex flex-col gap-4">
-          <div className="flex justify-between items-center">
-            <div>
-              <h2 className="text-lg font-bold text-slate-900 dark:text-white tracking-tight m-0">Client Appointment Schedule</h2>
-              <p className="text-xs text-slate-500 dark:text-slate-400 m-0">Review appointments, dorm addresses, and add-ons</p>
+        <div className="flex flex-col gap-5">
+          {/* Shareable Bio Link Card */}
+          <div className="card p-5 bg-gradient-to-r from-amber-500/15 via-orange-500/10 to-transparent border-amber-400/30">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <span className="badge badge-low-stock text-[10px] font-bold py-0.5 px-2 mb-1.5">Direct Booking Link</span>
+                <h3 className="text-base font-bold text-slate-900 dark:text-white tracking-tight m-0">Share Your Personal Booking Link</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 mb-2">
+                  Paste this link in your WhatsApp status, TikTok bio, or IG to receive direct student appointments on your timetable.
+                </p>
+                <div className="inline-flex items-center gap-2 bg-white/80 dark:bg-black/40 px-3 py-1.5 rounded-xl border border-black/10 dark:border-white/10 font-mono text-xs text-amber-600 dark:text-amber-300">
+                  <span>{bioUrl}</span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  onClick={handleCopyBioUrl}
+                  className="apple-btn-secondary text-xs px-3.5 py-2 flex items-center gap-1.5"
+                >
+                  {copiedBioLink ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
+                  <span>{copiedBioLink ? 'Copied!' : 'Copy Link'}</span>
+                </button>
+                <button
+                  onClick={handleShareBioWhatsApp}
+                  className="apple-btn-primary text-xs px-3.5 py-2 flex items-center gap-1.5 bg-[#25D366] hover:bg-[#20bd5a] text-white border-0"
+                >
+                  <MessageSquare size={14} />
+                  <span>WhatsApp Status</span>
+                </button>
+              </div>
             </div>
           </div>
 
-          <div className="flex flex-col gap-3">
-            {myBookings.map((b) => (
-              <div key={b.id} className="card p-4 sm:p-5">
-                <div className="flex justify-between items-start mb-2">
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="badge badge-in-stock text-[10px]">{b.serviceType || 'Dorm Appointment'}</span>
-                      <span className="text-[11px] text-slate-400 font-mono">Ref: {b.id}</span>
-                    </div>
-                    <h3 className="text-base font-bold text-slate-900 dark:text-white tracking-tight m-0">{b.serviceName}</h3>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 mb-0">
-                      Client: <strong className="text-slate-900 dark:text-white">{b.customerName}</strong> • Phone: <strong className="text-slate-900 dark:text-white">{b.customerPhone}</strong>
-                    </p>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 m-0">Location: {b.campus} — {b.hostel}</p>
-                  </div>
-
-                  <div className="text-right">
-                    <span className="price-tag text-base">K {b.totalPrice || b.price}</span>
-                    <div className={`badge ${b.status === 'Confirmed' ? 'badge-in-stock' : b.status === 'Completed' ? 'badge-verified' : 'badge-out-of-stock'} block mt-1`}>
-                      {b.status}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Selected Add-Ons details */}
-                {b.selectedAddOns?.length > 0 && (
-                  <div className="bg-black/[0.02] dark:bg-slate-900/60 p-2.5 rounded-xl text-xs mb-3 border border-black/5 dark:border-white/5">
-                    <span className="text-slate-400 font-semibold block mb-1">Client Selected Add-ons:</span>
-                    <div className="flex flex-wrap gap-2">
-                      {b.selectedAddOns.map((addon) => (
-                        <span key={addon.id} className="bg-amber-400/15 text-amber-600 dark:text-amber-300 px-2 py-0.5 rounded-md font-semibold text-[11px]">
-                          {addon.name} (+K{addon.price})
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-black/5 dark:border-white/10 text-xs">
-                  <span className="text-slate-500 dark:text-slate-400">Scheduled: <strong className="text-amber-500">{b.date} at {b.time}</strong></span>
-
-                  <div className="flex items-center gap-2">
-                    <a
-                      href={`https://wa.me/260772822579?text=Hi%20${encodeURIComponent(b.customerName)},%20I'm%20ready%20for%20your%20${encodeURIComponent(b.serviceName)}%20appointment%20ref:${b.id}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="apple-btn-secondary text-xs px-3 py-1.5 text-emerald-600 dark:text-emerald-400 flex items-center gap-1"
-                    >
-                      <MessageSquare size={13} />
-                      <span>WhatsApp</span>
-                    </a>
-
-                    {b.status === 'Confirmed' && (
-                      <button
-                        className="apple-btn-primary text-xs px-3.5 py-1.5"
-                        onClick={() => completeBooking(b.id)}
-                      >
-                        <Check size={13} />
-                        <span>Complete Job</span>
-                      </button>
-                    )}
-                  </div>
-                </div>
+          {/* Class & Lecture Hours Timetable Blocker */}
+          <div className="card p-5">
+            <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 mb-4 pb-3 border-b border-black/5 dark:border-white/5">
+              <div>
+                <h3 className="text-base font-bold text-slate-900 dark:text-white tracking-tight m-0">Class & Lecture Hours Blocker</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 m-0">
+                  Block your class, exam, or study hours so students cannot book those slots.
+                </p>
               </div>
-            ))}
+              <span className="badge badge-in-stock text-xs">Working: {currentSchedule.workingHours?.start || '08:00'} – {currentSchedule.workingHours?.end || '20:00'}</span>
+            </div>
+
+            {/* Add Block Form */}
+            <div className="flex flex-wrap items-center gap-2 mb-4 bg-black/[0.02] dark:bg-white/[0.02] p-3 rounded-2xl border border-black/5 dark:border-white/5">
+              <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Block Class Time:</span>
+              <select
+                value={blockDay}
+                onChange={(e) => setBlockDay(e.target.value)}
+                className="form-select py-1.5 px-3 text-xs w-auto rounded-xl"
+              >
+                {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((d) => (
+                  <option key={d} value={d}>{d}</option>
+                ))}
+              </select>
+
+              <select
+                value={blockHour}
+                onChange={(e) => setBlockHour(e.target.value)}
+                className="form-select py-1.5 px-3 text-xs w-auto rounded-xl"
+              >
+                {['08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00'].map((t) => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </select>
+
+              <button
+                type="button"
+                onClick={handleAddBlockedSlot}
+                className="apple-btn-primary text-xs px-3.5 py-2 flex items-center gap-1.5"
+              >
+                <Plus size={13} />
+                <span>Block Slot</span>
+              </button>
+            </div>
+
+            {/* Currently Blocked Slots List */}
+            <div>
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block mb-2">
+                Currently Blocked Timetable Hours ({currentSchedule.blockedSlots?.length || 0}):
+              </span>
+              {!currentSchedule.blockedSlots || currentSchedule.blockedSlots.length === 0 ? (
+                <p className="text-xs text-slate-400 italic m-0">No blocked hours. You are open for all standard working slots.</p>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {currentSchedule.blockedSlots.map((slot) => (
+                    <div
+                      key={slot}
+                      className="bg-red-500/10 border border-red-500/25 text-red-600 dark:text-red-400 px-3 py-1.5 rounded-xl text-xs flex items-center gap-2 font-medium"
+                    >
+                      <Lock size={12} />
+                      <span>{slot} (Blocked)</span>
+                      <button
+                        onClick={() => handleRemoveBlockedSlot(slot)}
+                        className="text-red-400 hover:text-red-600 bg-transparent border-0 cursor-pointer p-0 font-bold"
+                        title="Unblock this slot"
+                      >
+                        <XCircle size={14} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Client Appointments List */}
+          <div>
+            <h3 className="text-base font-bold text-slate-900 dark:text-white tracking-tight mb-3">
+              Upcoming Student Appointments ({myBookings.length})
+            </h3>
+
+            <div className="flex flex-col gap-3">
+              {myBookings.length === 0 ? (
+                <div className="card p-8 text-center text-slate-400">
+                  <Calendar size={32} className="mx-auto mb-2 opacity-50" />
+                  <p className="text-sm font-bold text-slate-900 dark:text-white m-0">No appointments scheduled yet</p>
+                  <p className="text-xs text-slate-400 mt-1">Share your bio link to get booked by campus students!</p>
+                </div>
+              ) : (
+                myBookings.map((b) => (
+                  <div key={b.id} className="card p-4 sm:p-5">
+                    <div className="flex justify-between items-start mb-2">
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="badge badge-in-stock text-[10px]">{b.serviceType || 'Dorm Appointment'}</span>
+                          <span className="text-[11px] text-slate-400 font-mono">Ref: {b.id}</span>
+                          {b.depositAmount > 0 && (
+                            <span className="badge badge-verified text-[10px] bg-emerald-500/15 text-emerald-600">Deposit Paid (K{b.depositAmount})</span>
+                          )}
+                        </div>
+                        <h3 className="text-base font-bold text-slate-900 dark:text-white tracking-tight m-0">{b.serviceName}</h3>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 mb-0">
+                          Client: <strong className="text-slate-900 dark:text-white">{b.customerName}</strong> • Phone: <strong className="text-slate-900 dark:text-white">{b.customerPhone}</strong>
+                        </p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 m-0">Location: {b.campus} — {b.hostel}</p>
+                      </div>
+
+                      <div className="text-right">
+                        <span className="price-tag text-base">K {b.totalPrice || b.price}</span>
+                        {b.balanceDue > 0 ? (
+                          <span className="text-[11px] text-amber-500 block font-semibold">Collect K{b.balanceDue} on Arrival</span>
+                        ) : (
+                          <span className="text-[11px] text-emerald-500 block font-semibold">Paid in Full</span>
+                        )}
+                        <div className={`badge ${b.status === 'Confirmed' ? 'badge-in-stock' : b.status === 'Completed' ? 'badge-verified' : 'badge-out-of-stock'} block mt-1`}>
+                          {b.status}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Selected Add-Ons details */}
+                    {b.selectedAddOns?.length > 0 && (
+                      <div className="bg-black/[0.02] dark:bg-slate-900/60 p-2.5 rounded-xl text-xs mb-3 border border-black/5 dark:border-white/5">
+                        <span className="text-slate-400 font-semibold block mb-1">Client Selected Add-ons:</span>
+                        <div className="flex flex-wrap gap-2">
+                          {b.selectedAddOns.map((addon) => (
+                            <span key={addon.id} className="bg-amber-400/15 text-amber-600 dark:text-amber-300 px-2 py-0.5 rounded-md font-semibold text-[11px]">
+                              {addon.name} (+K{addon.price})
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-black/5 dark:border-white/10 text-xs">
+                      <span className="text-slate-500 dark:text-slate-400">Scheduled: <strong className="text-amber-500">{b.date} at {b.time}</strong></span>
+
+                      <div className="flex items-center gap-2">
+                        <a
+                          href={`https://wa.me/260${(b.customerPhone || '0971234567').replace(/^0/, '')}?text=Hi%20${encodeURIComponent(b.customerName)},%20I'm%20your%20campus%20stylist%20for%20your%20${encodeURIComponent(b.serviceName)}%20appointment%20(Ref:%20${b.id}).%20Looking%20forward%20to%20our%20session!`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="apple-btn-secondary text-xs px-3 py-1.5 text-emerald-600 dark:text-emerald-400 flex items-center gap-1 font-bold"
+                        >
+                          <MessageSquare size={13} />
+                          <span>WhatsApp Client</span>
+                        </a>
+
+                        {b.status === 'Confirmed' && (
+                          <button
+                            className="apple-btn-primary text-xs px-3.5 py-1.5"
+                            onClick={() => completeBooking(b.id)}
+                          >
+                            <Check size={13} />
+                            <span>Complete Job</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
         </div>
       )}

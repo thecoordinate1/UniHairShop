@@ -444,13 +444,25 @@ export default function AccountView() {
                     <div className="flex items-center gap-2 mb-1">
                       <span className="badge badge-in-stock text-[10px]">{b.category}</span>
                       <span className="text-[11px] text-slate-400 font-mono">Ref: {b.id}</span>
+                      {b.depositAmount > 0 && (
+                        <span className="badge badge-verified text-[10px] bg-emerald-500/15 text-emerald-600">
+                          K{b.depositAmount} Deposit Paid
+                        </span>
+                      )}
                     </div>
                     <h3 className="text-base font-bold text-slate-900 dark:text-white tracking-tight">{b.serviceName}</h3>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Location: {b.campus} ({b.hostel || 'Campus'})</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Location: {b.campus} — {b.hostel || 'Campus'}</p>
                   </div>
-                  <span className={`badge ${b.status === 'Confirmed' ? 'badge-in-stock' : b.status === 'Completed' ? 'badge-verified' : 'badge-out-of-stock'}`}>
-                    {b.status}
-                  </span>
+                  <div className="text-right">
+                    <span className={`badge ${b.status === 'Confirmed' ? 'badge-in-stock' : b.status === 'Completed' ? 'badge-verified' : 'badge-out-of-stock'}`}>
+                      {b.status}
+                    </span>
+                    {b.balanceDue > 0 && (
+                      <span className="text-[10px] text-amber-500 font-bold block mt-1">
+                        Due on arrival: K{b.balanceDue}
+                      </span>
+                    )}
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs bg-black/[0.02] dark:bg-slate-900/60 p-3 rounded-2xl border border-black/5 dark:border-white/5 mb-3">
@@ -468,11 +480,41 @@ export default function AccountView() {
                   </div>
                   <div>
                     <span className="text-slate-400 block text-[10px]">Payment</span>
-                    <strong className="text-emerald-500 font-medium">{b.paymentMethod}</strong>
+                    <strong className="text-emerald-500 font-medium">{b.paymentStatus || b.paymentMethod}</strong>
                   </div>
                 </div>
 
                 <div className="flex flex-wrap gap-2 justify-end pt-2 border-t border-black/5 dark:border-white/10">
+                  <a
+                    href={`https://wa.me/260772822579?text=${encodeURIComponent(
+                      `Hi ${b.staffName}, I'm checking in regarding my UniHairShop booking ref: ${b.id} for ${b.serviceName} on ${b.date} at ${b.time}.`
+                    )}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="apple-btn-secondary text-xs px-3 py-1.5 flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-semibold"
+                    title="Send direct WhatsApp message to stylist"
+                  >
+                    <MessageSquare size={13} />
+                    <span>WhatsApp</span>
+                  </a>
+
+                  <button
+                    className="apple-btn-secondary text-xs px-3 py-1.5 flex items-center gap-1 text-amber-500 font-semibold"
+                    onClick={() => {
+                      const shareText = `Got my fresh ${b.serviceName} done with ${b.staffName} on UniHairShop! 💈✨ Use my student referral code ${user.referralCode} to get K15 off your appointment: ${window.location.origin}`;
+                      if (navigator.share) {
+                        navigator.share({ title: 'My UniHairShop Style', text: shareText, url: window.location.origin }).catch(() => {});
+                      } else if (navigator.clipboard) {
+                        navigator.clipboard.writeText(shareText);
+                        addToast('WhatsApp story text copied to clipboard!', 'success');
+                      }
+                    }}
+                    title="Share your style to WhatsApp Status"
+                  >
+                    <Share2 size={13} />
+                    <span>Share Story</span>
+                  </button>
+
                   <button
                     className="apple-btn-primary text-xs px-3 py-1.5 flex items-center gap-1 font-bold"
                     onClick={() => setSelectedBookingDetail(b)}

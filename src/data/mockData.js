@@ -13,9 +13,69 @@ export const lusakaUniversities = Object.freeze([
   { id: 'uni-10', name: 'National Institute of Public Administration (NIPA)', shortName: 'NIPA', area: 'Dapeza, Lusaka', travelFee: 20 }
 ]);
 
+export const campusHostels = Object.freeze({
+  'UNILUS Silverest Campus': [
+    'Hostel Block A',
+    'Hostel Block B',
+    'Hostel Block C',
+    'Hostel Block D',
+    'Silverest Annex Hostels',
+    'Silverest Off-Campus Boarding'
+  ],
+  'UNILUS Pioneer Campus': [
+    'Mass Media Residences',
+    'Parklands Flats',
+    'Longacres Hostels',
+    'Kalingalinga Residences'
+  ],
+  'UNZA Great East Road Campus': [
+    'October Hall',
+    'Soweto Hall',
+    'Presidents Hall',
+    'Kwacha Hall',
+    'Africa Hall',
+    'Kalingalinga Student Hostels',
+    'Vet Hall',
+    'Handsworth Hostels',
+    'International Students Hall'
+  ],
+  'UNZA Ridgeway Campus': [
+    'Ridgeway Medical Hostels',
+    'UTH Student Quarters',
+    'Cathedral Hill Residences'
+  ],
+  'Cavendish University Zambia': [
+    'Villa Elizabetha Hostels',
+    'Longacres Student Houses',
+    'Main Campus Annex'
+  ],
+  'Lusaka Apex Medical University (LAMU)': [
+    'Chalala Campus Hostels',
+    'Foxdale Student Residences',
+    'Woodlands Annex'
+  ],
+  'Texila American University Zambia': [
+    'Lilayi Campus Residences',
+    'Southgate Student Flats'
+  ],
+  'Zambia Open University (ZAOU)': [
+    'Waterfalls Hostels',
+    'Silverest Student Boarding'
+  ],
+  'Information & Communications University (ICU)': [
+    'Mass Media Hostels',
+    'Sunningdale Residences'
+  ],
+  'National Institute of Public Administration (NIPA)': [
+    'Main Campus Hostels',
+    'Dapeza Residences'
+  ]
+});
+
 export const initialStaff = Object.freeze([
   {
     id: 'stf-1',
+    handle: 'juniorfades',
     name: 'Junior "The Fade King"',
     role: 'Master Barber',
     avatar: '/images/barber_service.jpg',
@@ -31,6 +91,11 @@ export const initialStaff = Object.freeze([
     travelsToDorm: true,
     hasStudio: true,
     bio: 'Campus favorite barber at UNILUS Silverest. 4+ years of precision fades and beard sculpting. I travel to student rooms or host in Block C!',
+    scheduleConfig: {
+      availableDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
+      workingHours: { start: '08:00', end: '20:00' },
+      blockedSlots: ['Wednesday 10:00', 'Wednesday 11:00', 'Friday 14:00']
+    },
     portfolio: [
       { id: 'port-1', image: '/images/barber_service.jpg', tag: 'Low Taper Fade', client: 'Mwamba (UNILUS)' },
       { id: 'port-2', image: '/images/barber_service.jpg', tag: 'Sharp Lineup & Beard', client: 'Chimwemwe (UNILUS)' },
@@ -43,6 +108,7 @@ export const initialStaff = Object.freeze([
   },
   {
     id: 'stf-2',
+    handle: 'chileshebraids',
     name: 'Chileshe Braids & Wigs',
     role: 'Senior Braider & Wig Specialist',
     avatar: '/images/hair_braids.jpg',
@@ -58,6 +124,11 @@ export const initialStaff = Object.freeze([
     travelsToDorm: true,
     hasStudio: true,
     bio: 'Certified hair stylist & 3rd year law student. Painless knotless braiding, scalp-friendly parting, and flawless frontal lace melts.',
+    scheduleConfig: {
+      availableDays: ['Monday', 'Tuesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
+      workingHours: { start: '09:00', end: '19:00' },
+      blockedSlots: ['Tuesday 09:00', 'Thursday 11:00']
+    },
     portfolio: [
       { id: 'port-4', image: '/images/hair_braids.jpg', tag: 'Medium Knotless Braids', client: 'Thandiwe (UNILUS)' },
       { id: 'port-5', image: '/images/hair_braids.jpg', tag: 'French Curl Braids', client: 'Sepo (Cavendish)' },
@@ -70,6 +141,7 @@ export const initialStaff = Object.freeze([
   },
   {
     id: 'stf-3',
+    handle: 'natashaglam',
     name: 'Natasha Glam & Nail Bar',
     role: 'Nail Artist & MUA',
     avatar: '/images/nail_art.jpg',
@@ -85,6 +157,11 @@ export const initialStaff = Object.freeze([
     travelsToDorm: true,
     hasStudio: true,
     bio: 'UNZA campus nail tech and glam artist. Long-lasting acrylics, trendy 3D nail charms, and camera-ready event makeup.',
+    scheduleConfig: {
+      availableDays: ['Monday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
+      workingHours: { start: '10:00', end: '18:00' },
+      blockedSlots: ['Monday 14:00']
+    },
     portfolio: [
       { id: 'port-7', image: '/images/nail_art.jpg', tag: 'French Chrome Acrylics', client: 'Student Client (UNZA)' },
       { id: 'port-8', image: '/images/makeup_glam.jpg', tag: 'Evening Glam Glow', client: 'Lombe (UNZA)' }
@@ -95,6 +172,7 @@ export const initialStaff = Object.freeze([
   },
   {
     id: 'stf-4',
+    handle: 'barberkasonde',
     name: 'Barber Kasonde',
     role: 'Barber & Dreadlocks Specialist',
     avatar: '/images/barber_service.jpg',
@@ -110,6 +188,11 @@ export const initialStaff = Object.freeze([
     travelsToDorm: false,
     hasStudio: true,
     bio: 'Located at the campus Student Centre. Specialist in starter locs, palm rolling, and razor skin fades.',
+    scheduleConfig: {
+      availableDays: ['Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
+      workingHours: { start: '08:30', end: '18:00' },
+      blockedSlots: []
+    },
     portfolio: [
       { id: 'port-9', image: '/images/barber_service.jpg', tag: 'Loc Maintenance & Fade', client: 'Derrick (UNILUS)' }
     ],

@@ -62,12 +62,49 @@ function ViewSkeleton() {
 }
 
 export default function App() {
-  const { activeTab, userMode, user, authLoading, isGuestMode, setShowAuthModal } = useApp();
+  const {
+    activeTab,
+    userMode,
+    user,
+    authLoading,
+    isGuestMode,
+    setShowAuthModal,
+    staffList,
+    setSelectedStylist,
+    addToast
+  } = useApp();
 
   // Scroll to top on tab change
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [activeTab, userMode]);
+
+  // Deep-link resolution for stylist handles (?stylist=juniorfades or /@juniorfades)
+  useEffect(() => {
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      const stylistParam = urlParams.get('stylist') || urlParams.get('barber') || urlParams.get('braider');
+      const pathParam = window.location.pathname.replace(/^\/@?/, '');
+
+      const targetIdentifier = stylistParam || (pathParam && pathParam.length > 2 && !['services', 'shop', 'messages', 'account', 'vendor', 'about'].includes(pathParam.toLowerCase()) ? pathParam : null);
+
+      if (targetIdentifier && staffList && staffList.length > 0) {
+        const found = staffList.find(
+          (s) =>
+            s.id.toLowerCase() === targetIdentifier.toLowerCase() ||
+            (s.handle && s.handle.toLowerCase() === targetIdentifier.toLowerCase()) ||
+            s.name.toLowerCase().includes(targetIdentifier.toLowerCase())
+        );
+
+        if (found) {
+          setSelectedStylist(found);
+          addToast(`Viewing verified stylist: ${found.name}`, 'info');
+        }
+      }
+    } catch (e) {
+      console.warn('Deep-link parsing fallback:', e);
+    }
+  }, [staffList, setSelectedStylist, addToast]);
 
   // Session Hydration Screen
   if (authLoading) {
