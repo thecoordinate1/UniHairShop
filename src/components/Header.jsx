@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Scissors, MapPin, ChevronDown, Sun, Moon, ShoppingBag, Store, User, Sparkles, ShieldCheck } from 'lucide-react';
+import { Scissors, MapPin, ChevronDown, Sun, Moon, ShoppingBag, Store, User, Sparkles, ShieldCheck, Trophy, Plus } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import FastStylistOnboardingModal from './FastStylistOnboardingModal';
+import AmbassadorHubModal from './AmbassadorHubModal';
 
 export default function Header() {
   const {
@@ -24,6 +26,8 @@ export default function Header() {
   } = useApp();
 
   const [showCampusDropdown, setShowCampusDropdown] = useState(false);
+  const [showOnboardingModal, setShowOnboardingModal] = useState(false);
+  const [showAmbassadorModal, setShowAmbassadorModal] = useState(false);
   const dropdownRef = useRef(null);
 
   const cartTotalItems = cart.reduce((acc, item) => acc + item.quantity, 0);
@@ -198,6 +202,28 @@ export default function Header() {
             </button>
           )}
 
+          {/* Ambassador MoMo Hub Trigger */}
+          <button
+            onClick={() => setShowAmbassadorModal(true)}
+            className="px-2.5 sm:px-3 py-1.5 rounded-2xl text-[11px] sm:text-xs font-bold transition-all duration-200 flex items-center gap-1.5 cursor-pointer border bg-amber-400/10 border-amber-400/30 text-amber-500 hover:bg-amber-400/20"
+            title="Earn K10 MoMo per booking referral"
+          >
+            <Trophy size={13} className="text-amber-500 shrink-0" />
+            <span className="hidden md:inline">Ambassador</span>
+          </button>
+
+          {/* 60-Second Fast Stylist Onboarding Button (Customer Mode) */}
+          {userMode === 'customer' && (
+            <button
+              onClick={() => setShowOnboardingModal(true)}
+              className="px-2.5 sm:px-3 py-1.5 rounded-2xl text-[11px] sm:text-xs font-bold transition-all duration-200 flex items-center gap-1.5 cursor-pointer border bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 text-slate-700 dark:text-slate-200 hover:border-amber-400/40"
+              title="Join as a Campus Stylist in 60s"
+            >
+              <Plus size={13} className="text-amber-400 shrink-0" />
+              <span className="hidden sm:inline">Become a Stylist</span>
+            </button>
+          )}
+
           {/* Dual Architecture 1-Tap Mode Switcher */}
           <button
             onClick={toggleUserMode}
@@ -266,6 +292,22 @@ export default function Header() {
           )}
         </div>
       </div>
+
+      {/* Fast Stylist Onboarding Wizard Modal */}
+      {showOnboardingModal && (
+        <FastStylistOnboardingModal
+          isOpen={showOnboardingModal}
+          onClose={() => setShowOnboardingModal(false)}
+        />
+      )}
+
+      {/* Campus Ambassador Rewards Modal */}
+      {showAmbassadorModal && (
+        <AmbassadorHubModal
+          isOpen={showAmbassadorModal}
+          onClose={() => setShowAmbassadorModal(false)}
+        />
+      )}
     </header>
   );
 }

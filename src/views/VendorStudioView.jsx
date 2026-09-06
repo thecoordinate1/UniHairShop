@@ -27,9 +27,71 @@ import {
   Check,
   Copy,
   Lock,
-  Share2
+  Share2,
+  ShoppingBag,
+  Package,
+  Award
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { playSuccessChime } from '../lib/soundEffects';
+
+export const wholesaleSupplies = [
+  {
+    id: 'ws-1',
+    name: 'Darling Soft Braid Extensions (3-Pack Bundle)',
+    category: 'Braids & Weaves',
+    wholesalePrice: 85,
+    marketPrice: 115,
+    unit: '3 Packs (Color 1B/27)',
+    image: '/images/hair_braids.jpg',
+    inStock: true,
+    minBookingsRequired: 3
+  },
+  {
+    id: 'ws-2',
+    name: 'Andis / Kemei Clipper Blade Oil & Cool Care Spray',
+    category: 'Barber Supplies',
+    wholesalePrice: 65,
+    marketPrice: 95,
+    unit: '400ml Spray Can',
+    image: '/images/barber_service.jpg',
+    inStock: true,
+    minBookingsRequired: 2
+  },
+  {
+    id: 'ws-3',
+    name: 'Organic Tea Tree Scalp Oil & Strong Edge Control',
+    category: 'Hair Care & Oils',
+    wholesalePrice: 55,
+    marketPrice: 80,
+    unit: '250ml Oil + 150g Wax',
+    image: '/images/scalp_care.jpg',
+    inStock: true,
+    minBookingsRequired: 2
+  },
+  {
+    id: 'ws-4',
+    name: 'Lace Tint Melting Mousse & Ghost Bond Glue Remover',
+    category: 'Wig & Lace Care',
+    wholesalePrice: 75,
+    marketPrice: 110,
+    unit: 'Mousse + 100ml Remover',
+    image: '/images/wig_care.jpg',
+    inStock: true,
+    minBookingsRequired: 3
+  },
+  {
+    id: 'ws-5',
+    name: 'Sanitary Disposable Neck Strips (500-Pack Rolls)',
+    category: 'Barber Supplies',
+    wholesalePrice: 40,
+    marketPrice: 65,
+    unit: '5 Rolls (500 pcs)',
+    image: '/images/barber_service.jpg',
+    inStock: true,
+    minBookingsRequired: 1
+  }
+];
 
 export default function VendorStudioView() {
   const {
@@ -52,7 +114,7 @@ export default function VendorStudioView() {
     addToast
   } = useApp();
 
-  const [activeTab, setActiveTabLocal] = useState('overview'); // 'overview' | 'schedule' | 'services' | 'portfolio' | 'wallet'
+  const [activeTab, setActiveTabLocal] = useState('overview'); // 'overview' | 'schedule' | 'services' | 'portfolio' | 'wholesale' | 'wallet'
 
   // Timetable & Bio Link State
   const [blockDay, setBlockDay] = useState('Wednesday');
@@ -250,6 +312,7 @@ export default function VendorStudioView() {
           { id: 'schedule', label: `Schedule & Bookings (${activeConfirmedBookings.length})` },
           { id: 'services', label: `Service Menu (${myServices.length})` },
           { id: 'portfolio', label: `Hairstyle Portfolio (${myStylistObj.portfolio?.length || 0})` },
+          { id: 'wholesale', label: 'Wholesale Supplies (25% Off)' },
           { id: 'wallet', label: `Wallet & Payouts (K ${vendorWallet.availableBalance})` }
         ].map((tab) => (
           <button
@@ -646,7 +709,81 @@ export default function VendorStudioView() {
         </div>
       )}
 
-      {/* 5. WALLET & PAYOUTS */}
+      {/* 5. WHOLESALE SUPPLIES CLUB (ANTI-DISINTERMEDIATION MOAT) */}
+      {activeTab === 'wholesale' && (
+        <div className="flex flex-col gap-5">
+          {/* Wholesale Club Benefits Banner */}
+          <div className="card p-5 bg-gradient-to-r from-amber-500/15 via-orange-500/10 to-transparent border-amber-400/30">
+            <div className="flex items-center gap-3">
+              <div className="bg-amber-400/20 text-amber-500 p-2.5 rounded-2xl border border-amber-400/30 shrink-0">
+                <Package size={24} />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white tracking-tight m-0">
+                    Stylist Wholesale Supplies Club
+                  </h3>
+                  <span className="badge badge-verified text-[10px] py-0.5 px-2 bg-amber-400 text-slate-950 font-extrabold">25% OFF Town Prices</span>
+                </div>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 m-0">
+                  Bulk hair packs, clippers, oils & mousse delivered straight to your campus room ({vendorProfile.dormLocation}). Use your vendor wallet to reorder!
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Wholesale Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {wholesaleSupplies.map((item) => (
+              <div
+                key={item.id}
+                className="card p-4 flex flex-col justify-between border border-black/10 dark:border-white/10 bg-white dark:bg-[#15151c]"
+              >
+                <div>
+                  <div className="relative h-40 w-full rounded-2xl overflow-hidden mb-3 bg-slate-800">
+                    <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                    <span className="badge badge-in-stock absolute top-2.5 left-2.5 text-[10px]">
+                      {item.category}
+                    </span>
+                    <span className="badge bg-black/70 backdrop-blur-md text-emerald-400 border border-emerald-500/30 absolute bottom-2.5 left-2.5 text-[10px] font-bold">
+                      Save K{item.marketPrice - item.wholesalePrice}
+                    </span>
+                  </div>
+
+                  <h4 className="text-sm font-bold text-slate-900 dark:text-white tracking-tight mb-1">
+                    {item.name}
+                  </h4>
+                  <p className="text-[11px] text-slate-400 mb-2">Package: {item.unit}</p>
+
+                  <div className="flex items-baseline gap-2 mb-3">
+                    <span className="price-tag text-lg text-emerald-500">K {item.wholesalePrice}</span>
+                    <span className="text-xs text-slate-400 line-through">Town: K {item.marketPrice}</span>
+                  </div>
+                </div>
+
+                <div className="pt-3 border-t border-black/5 dark:border-white/5 flex items-center justify-between gap-2">
+                  <span className="text-[10px] text-slate-400 font-semibold">Free Hostel Dropoff</span>
+                  <button
+                    onClick={() => {
+                      if (vendorWallet.availableBalance < item.wholesalePrice) {
+                        addToast('Insufficient wallet balance. Complete more bookings or top up!', 'error');
+                        return;
+                      }
+                      playSuccessChime();
+                      addToast(`Order placed for ${item.name}! Delivered to ${vendorProfile.dormLocation} tomorrow.`, 'success');
+                    }}
+                    className="apple-btn-primary text-xs py-1.5 px-3 font-bold"
+                  >
+                    <span>Order (K {item.wholesalePrice})</span>
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 6. WALLET & PAYOUTS */}
       {activeTab === 'wallet' && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Payout Withdrawal Card */}

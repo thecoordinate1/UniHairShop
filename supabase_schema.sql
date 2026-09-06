@@ -12,10 +12,18 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   campus TEXT DEFAULT 'UNILUS Silverest Campus',
   hostel TEXT,
   role TEXT DEFAULT 'student', -- 'student', 'vendor', 'admin'
-  loyalty_points INT DEFAULT 0,
+  loyalty_points INT DEFAULT 50,
   referral_code TEXT UNIQUE,
+  referred_by TEXT,
+  referral_count INT DEFAULT 0,
+  points_history JSONB DEFAULT '[]'::jsonb,
   created_at TIMESTAMPTZ DEFAULT now()
 );
+
+-- Migration helpers if table already exists in Supabase
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS referred_by TEXT;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS referral_count INT DEFAULT 0;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS points_history JSONB DEFAULT '[]'::jsonb;
 
 -- 2. VENDOR PROFILES (Campus Stylists & Barbers)
 CREATE TABLE IF NOT EXISTS public.vendor_profiles (

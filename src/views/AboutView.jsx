@@ -121,7 +121,7 @@ export default function AboutView() {
             <div className="bg-pink-500/20 p-2 rounded-full text-pink-400 shrink-0">
               <Mail size={18} />
             </div>
-            <span>Email Inquiries: info@unihairshop.co.zm</span>
+            <span>Email Inquiries: info@unihair.shop</span>
           </div>
         </div>
       </div>

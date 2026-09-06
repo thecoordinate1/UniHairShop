@@ -24,6 +24,7 @@ import {
   ChevronRight
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { supabase, isSupabaseConfigured } from '../lib/supabaseClient';
 
 export default function AuthWall() {
   const {
@@ -343,17 +344,23 @@ export default function AuthWall() {
                 </div>
               </div>
 
-              {/* Referral Code (Optional) */}
+              {/* Referral Code (Optional) with +25 Pts Tag */}
               <div>
-                <label className="block text-[11px] font-bold text-slate-300 mb-1">
-                  Referral / Promo Code <span className="text-slate-500 font-normal">(Optional)</span>
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-[11px] font-bold text-slate-300">
+                    Friend's 7-Digit Referral Code <span className="text-slate-500 font-normal">(Optional)</span>
+                  </label>
+                  <span className="text-[10px] text-amber-400 font-bold bg-amber-400/10 px-2 py-0.5 rounded-full border border-amber-400/20">
+                    🎁 +25 bonus points
+                  </span>
+                </div>
                 <input
                   type="text"
-                  placeholder="e.g. CAMPUS50"
-                  className="form-input text-xs py-2 bg-black/40 border-white/10 text-white rounded-xl uppercase"
+                  maxLength={10}
+                  placeholder="e.g. 7482910"
+                  className="form-input text-xs py-2 bg-black/40 border-white/10 text-white rounded-xl uppercase font-mono tracking-wider"
                   value={referralCode}
-                  onChange={(e) => setReferralCode(e.target.value)}
+                  onChange={(e) => setReferralCode(e.target.value.trim().toUpperCase())}
                 />
               </div>
 
@@ -383,7 +390,7 @@ export default function AuthWall() {
                   </>
                 ) : (
                   <>
-                    <span>Create Campus Account</span>
+                    <span>{referralCode.trim() ? 'Create Campus Account (+75 Pts Total)' : 'Create Campus Account (+50 Welcome Pts)'}</span>
                     <ArrowRight size={14} />
                   </>
                 )}
@@ -523,17 +530,42 @@ export default function AuthWall() {
 
                   <button
                     type="button"
-                    onClick={() => {
+                    disabled={loading}
+                    onClick={async () => {
                       if (!email.trim()) {
-                        setErrorMsg('Please enter your email.');
+                        setErrorMsg('Please enter your email address.');
                         return;
                       }
-                      setResetSent(true);
-                      addToast('Reset instructions sent to your email!', 'success');
+                      setLoading(true);
+                      setErrorMsg('');
+                      try {
+                        if (isSupabaseConfigured && supabase) {
+                          const redirectUrl = typeof window !== 'undefined' && window.location.origin
+                            ? `${window.location.origin}/`
+                            : 'https://www.unihair.shop/';
+                          const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+                            redirectTo: redirectUrl
+                          });
+                          if (error) throw error;
+                        }
+                        setResetSent(true);
+                        addToast('Password reset link sent to your email!', 'success');
+                      } catch (err) {
+                        setErrorMsg(err.message || 'Failed to send reset email. Please verify your address.');
+                      } finally {
+                        setLoading(false);
+                      }
                     }}
-                    className="apple-btn-primary w-full text-xs py-2.5 rounded-xl font-bold"
+                    className="apple-btn-primary w-full text-xs py-2.5 rounded-xl font-bold flex items-center justify-center gap-1.5 disabled:opacity-50"
                   >
-                    Send Reset Instructions
+                    {loading ? (
+                      <>
+                        <RefreshCw size={13} className="animate-spin" />
+                        <span>Sending Link...</span>
+                      </>
+                    ) : (
+                      <span>Send Reset Instructions</span>
+                    )}
                   </button>
                 </div>
               )}

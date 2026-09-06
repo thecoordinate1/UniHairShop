@@ -38,6 +38,11 @@ function generateId(prefix) {
   return `${prefix}-${timestamp}-${random}`;
 }
 
+// Generate collision-resistant 7-digit numeric referral code
+export function generate7DigitReferralCode() {
+  return Math.floor(1000000 + Math.random() * 9000000).toString();
+}
+
 export const defaultGuestUser = {
   isLoggedIn: false,
   id: null,
@@ -49,6 +54,9 @@ export const defaultGuestUser = {
   role: 'customer',
   loyaltyPoints: 0,
   referralCode: '',
+  referredBy: '',
+  referralCount: 0,
+  pointsHistory: [],
   favorites: []
 };
 
@@ -285,6 +293,27 @@ export const AppProvider = ({ children }) => {
 
   // Supabase Backend Sync, Auth Listener & Realtime Subscription
   useEffect(() => {
+    // Check for auth callback parameters in URL (Email Verification, Password Recovery, Auth Errors)
+    if (typeof window !== 'undefined') {
+      const hash = window.location.hash || '';
+      const search = window.location.search || '';
+
+      if (hash.includes('error_description=') || search.includes('error_description=')) {
+        try {
+          const params = new URLSearchParams(hash.replace(/^#/, '') || search);
+          const errorDesc = params.get('error_description') || 'Authentication verification link failed or expired.';
+          addToast(decodeURIComponent(errorDesc.replace(/\+/g, ' ')), 'error');
+          window.history.replaceState(null, '', window.location.pathname);
+        } catch { /* ignore */ }
+      } else if (hash.includes('type=signup') || hash.includes('type=email_change')) {
+        addToast('🎉 Email verified successfully! Welcome to UniHair Shop!', 'success');
+        window.history.replaceState(null, '', window.location.pathname);
+      } else if (hash.includes('type=recovery')) {
+        addToast('🔑 Password recovery session authenticated. You can update your password in Settings.', 'info');
+        window.history.replaceState(null, '', window.location.pathname);
+      }
+    }
+
     if (!isSupabaseConfigured || !supabase) {
       setAuthLoading(false);
       return;
@@ -305,6 +334,31 @@ export const AppProvider = ({ children }) => {
           .then(({ data: profile }) => {
             if (profile || isMasterAdmin) {
               const assignedRole = isMasterAdmin ? 'admin' : (profile?.role || 'customer');
+              const validPoints = typeof profile?.loyalty_points === 'number' ? profile.loyalty_points : (isMasterAdmin ? 1000 : 50);
+              const validCode = (profile?.referral_code && /^\d{7}$/.test(profile.referral_code))
+                ? profile.referral_code
+                : (isMasterAdmin ? '1000001' : generate7DigitReferralCode());
+              const validCount = typeof profile?.referral_count === 'number' ? profile.referral_count : 0;
+              const validHistory = Array.isArray(profile?.points_history) && profile.points_history.length > 0
+                ? profile.points_history
+                : [{
+                    id: 'pt-welcome',
+                    type: 'welcome',
+                    points: validPoints,
+                    title: 'Welcome Loyalty Balance 🎓',
+                    date: new Date().toISOString()
+                  }];
+
+              // Backfill referral code or missing points if needed in Supabase
+              if (profile && (!profile.referral_code || !/^\d{7}$/.test(profile.referral_code) || profile.loyalty_points === null || profile.loyalty_points === undefined)) {
+                supabase.from('profiles').update({
+                  referral_code: validCode,
+                  loyalty_points: validPoints,
+                  referral_count: validCount,
+                  points_history: validHistory
+                }).eq('id', currentSession.user.id).then(null, () => {});
+              }
+
               setUser({
                 id: profile?.id || currentSession.user.id,
                 isLoggedIn: true,
@@ -314,8 +368,11 @@ export const AppProvider = ({ children }) => {
                 campus: profile?.campus || currentCampus,
                 hostel: profile?.hostel || 'Executive Campus Admin Suite',
                 role: assignedRole,
-                loyaltyPoints: profile?.loyalty_points || 500,
-                referralCode: profile?.referral_code || 'ADMIN-UNIHAIR-01',
+                loyaltyPoints: validPoints,
+                referralCode: validCode,
+                referredBy: profile?.referred_by || '',
+                referralCount: validCount,
+                pointsHistory: validHistory,
                 favorites: []
               });
               if (assignedRole === 'admin') {
@@ -343,6 +400,21 @@ export const AppProvider = ({ children }) => {
           .single();
 
         const assignedRole = isMasterAdmin ? 'admin' : (profile?.role || 'customer');
+        const validPoints = typeof profile?.loyalty_points === 'number' ? profile.loyalty_points : (isMasterAdmin ? 1000 : 50);
+        const validCode = (profile?.referral_code && /^\d{7}$/.test(profile.referral_code))
+          ? profile.referral_code
+          : (isMasterAdmin ? '1000001' : generate7DigitReferralCode());
+        const validCount = typeof profile?.referral_count === 'number' ? profile.referral_count : 0;
+        const validHistory = Array.isArray(profile?.points_history) && profile.points_history.length > 0
+          ? profile.points_history
+          : [{
+              id: 'pt-welcome',
+              type: 'welcome',
+              points: validPoints,
+              title: 'Welcome Loyalty Balance 🎓',
+              date: new Date().toISOString()
+            }];
+
         setUser((prev) => ({
           ...prev,
           id: profile?.id || currentSession.user.id,
@@ -353,8 +425,11 @@ export const AppProvider = ({ children }) => {
           campus: profile?.campus || prev.campus,
           hostel: profile?.hostel || prev.hostel,
           role: assignedRole,
-          loyaltyPoints: profile?.loyalty_points || prev.loyaltyPoints,
-          referralCode: profile?.referral_code || prev.referralCode
+          loyaltyPoints: validPoints,
+          referralCode: validCode,
+          referredBy: profile?.referred_by || prev.referredBy || '',
+          referralCount: validCount,
+          pointsHistory: validHistory
         }));
 
         if (assignedRole === 'admin') {
@@ -622,8 +697,8 @@ export const AppProvider = ({ children }) => {
           sender,
           text: text.trim(),
           time: newMsg.time
-        }]).catch(() => {});
-      }).catch(() => {});
+        }]).then(null, () => {});
+      }, () => {});
     }
 
     // Client assistant simulation if sending in customer mode
@@ -664,7 +739,7 @@ export const AppProvider = ({ children }) => {
             sender: 'stylist',
             text: randomReply,
             time: stylistReply.time
-          }]).catch(() => {});
+          }]).then(null, () => {});
         }
       }, 1800);
     }
@@ -731,10 +806,31 @@ export const AppProvider = ({ children }) => {
       totalEarned: prev.totalEarned + creditedAmount
     }));
 
-    const pointsEarned = Math.floor(totalPrice / 10);
-    setUser((prev) => ({ ...prev, loyaltyPoints: prev.loyaltyPoints + pointsEarned }));
+    const pointsEarned = Math.max(5, Math.floor(totalPrice / 10));
+    const newPtEntry = {
+      id: `pt-bk-${Date.now()}`,
+      type: 'booking',
+      points: pointsEarned,
+      title: `Campus Appointment (${newBookingData.serviceName || 'Hair Service'}) 💈`,
+      date: new Date().toISOString()
+    };
+    setUser((prev) => {
+      const nextPoints = (prev.loyaltyPoints || 0) + pointsEarned;
+      const nextHistory = [newPtEntry, ...(prev.pointsHistory || [])];
+      if (isSupabaseConfigured && supabase && prev.id) {
+        supabase.from('profiles').update({
+          loyalty_points: nextPoints,
+          points_history: nextHistory
+        }).eq('id', prev.id).then(null, () => {});
+      }
+      return {
+        ...prev,
+        loyaltyPoints: nextPoints,
+        pointsHistory: nextHistory
+      };
+    });
 
-    addToast(`Booking ${bookingId} confirmed at ${currentCampus}! +${pointsEarned} points`, 'success');
+    addToast(`Booking ${bookingId} confirmed at ${currentCampus}! +${pointsEarned} loyalty points earned 💎`, 'success');
     return newBooking;
   }, [currentCampus, user.name, user.phone, addToast]);
 
@@ -751,9 +847,44 @@ export const AppProvider = ({ children }) => {
       prev.map((b) => (b.id === bookingId ? { ...b, status: 'Cancelled' } : b))
     );
     if (isSupabaseConfigured && supabase) {
-      supabase.from('bookings').update({ status: 'Cancelled' }).eq('id', bookingId).catch(() => {});
+      supabase.from('bookings').update({ status: 'Cancelled' }).eq('id', bookingId).then(null, () => {});
     }
     addToast(`Booking ${bookingId} has been cancelled.`, 'info');
+  }, [addToast]);
+
+  const claimNoShowRefund = useCallback(async (bookingId) => {
+    const target = bookings.find((b) => b.id === bookingId);
+    const refundAmount = target?.depositAmount > 0 ? target.depositAmount : (target?.totalPrice || 25);
+
+    setBookings((prev) =>
+      prev.map((b) => (b.id === bookingId ? { ...b, status: 'Refunded (Stylist No-Show)', paymentStatus: 'Refunded to MoMo' } : b))
+    );
+
+    setVendorWallet((prev) => ({
+      ...prev,
+      availableBalance: Math.max(0, prev.availableBalance - refundAmount)
+    }));
+
+    setUser((prev) => ({
+      ...prev,
+      loyaltyPoints: prev.loyaltyPoints + 15
+    }));
+
+    if (isSupabaseConfigured && supabase) {
+      supabase.from('bookings').update({ status: 'Refunded (Stylist No-Show)', payment_status: 'Refunded to MoMo' }).eq('id', bookingId).then(null, () => {});
+    }
+
+    addToast(`Escrow refund of K${refundAmount} credited back to your MoMo account!`, 'success');
+  }, [bookings, addToast]);
+
+  const claimClientNoShow = useCallback(async (bookingId) => {
+    setBookings((prev) =>
+      prev.map((b) => (b.id === bookingId ? { ...b, status: 'Client No-Show', paymentStatus: 'Disbursed to Stylist' } : b))
+    );
+    if (isSupabaseConfigured && supabase) {
+      supabase.from('bookings').update({ status: 'Client No-Show', payment_status: 'Disbursed to Stylist' }).eq('id', bookingId).then(null, () => {});
+    }
+    addToast('Client No-Show logged. Deposit fee credited to your wallet for travel compensation.', 'info');
   }, [addToast]);
 
   const rescheduleBooking = useCallback(async (bookingId, newDate, newTime) => {
@@ -761,7 +892,7 @@ export const AppProvider = ({ children }) => {
       prev.map((b) => (b.id === bookingId ? { ...b, date: newDate, time: newTime } : b))
     );
     if (isSupabaseConfigured && supabase) {
-      supabase.from('bookings').update({ date: newDate, time: newTime }).eq('id', bookingId).catch(() => {});
+      supabase.from('bookings').update({ date: newDate, time: newTime }).eq('id', bookingId).then(null, () => {});
     }
     addToast(`Booking ${bookingId} rescheduled to ${newDate} at ${newTime}`, 'success');
   }, [addToast]);
@@ -851,12 +982,33 @@ export const AppProvider = ({ children }) => {
       })
     );
 
-    const pointsEarned = Math.floor(orderData.totalAmount / 10);
-    setUser((prev) => ({ ...prev, loyaltyPoints: prev.loyaltyPoints + pointsEarned }));
+    const pointsEarned = Math.max(5, Math.floor(orderData.totalAmount / 10));
+    const newOrderPtEntry = {
+      id: `pt-ord-${Date.now()}`,
+      type: 'order',
+      points: pointsEarned,
+      title: `Hostel Beauty Order (${orderData.items?.length || 1} items) 🛍️`,
+      date: new Date().toISOString()
+    };
+    setUser((prev) => {
+      const nextPoints = (prev.loyaltyPoints || 0) + pointsEarned;
+      const nextHistory = [newOrderPtEntry, ...(prev.pointsHistory || [])];
+      if (isSupabaseConfigured && supabase && prev.id) {
+        supabase.from('profiles').update({
+          loyalty_points: nextPoints,
+          points_history: nextHistory
+        }).eq('id', prev.id).then(null, () => {});
+      }
+      return {
+        ...prev,
+        loyaltyPoints: nextPoints,
+        pointsHistory: nextHistory
+      };
+    });
 
     clearCart();
     setIsCartOpen(false);
-    addToast(`Order ${orderId} placed for ${currentCampus}!`, 'success');
+    addToast(`Order ${orderId} placed for ${currentCampus}! +${pointsEarned} points earned 💎`, 'success');
     return newOrder;
   }, [cart, currentCampus, user.name, user.phone, clearCart, addToast]);
 
@@ -864,7 +1016,7 @@ export const AppProvider = ({ children }) => {
   const updateVendorProfile = useCallback(async (profileData) => {
     setVendorProfile((prev) => ({ ...prev, ...profileData }));
     if (isSupabaseConfigured && supabase) {
-      supabase.from('vendor_profiles').upsert([{ id: vendorProfile.id, ...profileData }]).catch(() => {});
+      supabase.from('vendor_profiles').upsert([{ id: vendorProfile.id, ...profileData }]).then(null, () => {});
     }
     addToast('Vendor Studio profile updated!', 'success');
   }, [vendorProfile.id, addToast]);
@@ -882,7 +1034,7 @@ export const AppProvider = ({ children }) => {
       prev.map((b) => (b.id === bookingId ? { ...b, status: 'Confirmed' } : b))
     );
     if (isSupabaseConfigured && supabase) {
-      supabase.from('bookings').update({ status: 'Confirmed' }).eq('id', bookingId).catch(() => {});
+      supabase.from('bookings').update({ status: 'Confirmed' }).eq('id', bookingId).then(null, () => {});
     }
     addToast(`Booking ${bookingId} accepted!`, 'success');
   }, [addToast]);
@@ -896,7 +1048,7 @@ export const AppProvider = ({ children }) => {
       completedJobsCount: prev.completedJobsCount + 1
     }));
     if (isSupabaseConfigured && supabase) {
-      supabase.from('bookings').update({ status: 'Completed' }).eq('id', bookingId).catch(() => {});
+      supabase.from('bookings').update({ status: 'Completed' }).eq('id', bookingId).then(null, () => {});
     }
     addToast(`Booking ${bookingId} marked as completed! Funds ready for payout.`, 'success');
   }, [addToast]);
@@ -934,7 +1086,7 @@ export const AppProvider = ({ children }) => {
         number: newPayout.number,
         status: 'Completed',
         reference: newPayout.ref
-      }]).catch(() => {});
+      }]).then(null, () => {});
     }
 
     addToast(`Payout of K${amount} sent to ${provider} (${accountNumber})! Ref: ${newPayout.ref}`, 'success');
@@ -983,7 +1135,7 @@ export const AppProvider = ({ children }) => {
         can_travel: serviceData.canTravel,
         in_studio: serviceData.inStudio,
         staff_ids: [vendorProfile.id]
-      }]).catch(() => {});
+      }]).then(null, () => {});
     }
 
     addToast(`New service "${serviceData.name}" added to your menu!`, 'success');
@@ -1008,7 +1160,7 @@ export const AppProvider = ({ children }) => {
         stock: productData.stock,
         description: productData.description,
         image: newPrd.image
-      }]).catch(() => {});
+      }]).then(null, () => {});
     }
 
     addToast(`New product "${productData.name}" added to shop!`, 'success');
@@ -1019,7 +1171,7 @@ export const AppProvider = ({ children }) => {
       prev.map((p) => (p.id === productId ? { ...p, stock: Number(newStock) } : p))
     );
     if (isSupabaseConfigured && supabase) {
-      supabase.from('products').update({ stock: Number(newStock) }).eq('id', productId).catch(() => {});
+      supabase.from('products').update({ stock: Number(newStock) }).eq('id', productId).then(null, () => {});
     }
     addToast('Stock level updated', 'info');
   }, [addToast]);
@@ -1029,7 +1181,7 @@ export const AppProvider = ({ children }) => {
       prev.map((o) => (o.id === orderId ? { ...o, status: newStatus } : o))
     );
     if (isSupabaseConfigured && supabase) {
-      supabase.from('orders').update({ status: newStatus }).eq('id', orderId).catch(() => {});
+      supabase.from('orders').update({ status: newStatus }).eq('id', orderId).then(null, () => {});
     }
     addToast(`Order ${orderId} updated to "${newStatus}"`, 'success');
   }, [addToast]);
@@ -1039,7 +1191,7 @@ export const AppProvider = ({ children }) => {
       prev.map((b) => (b.id === bookingId ? { ...b, status: newStatus } : b))
     );
     if (isSupabaseConfigured && supabase) {
-      supabase.from('bookings').update({ status: newStatus }).eq('id', bookingId).catch(() => {});
+      supabase.from('bookings').update({ status: newStatus }).eq('id', bookingId).then(null, () => {});
     }
     addToast(`Booking ${bookingId} marked as "${newStatus}"`, 'success');
   }, [addToast]);
@@ -1074,11 +1226,11 @@ export const AppProvider = ({ children }) => {
               email: trimmedEmail,
               password,
               options: { data: { name: 'Mapalo Lungu', role: 'admin' } }
-            }).catch(() => {});
+            }).then(null, () => {});
           } else if (data?.session) {
             setSession(data.session);
           }
-        }).catch(() => {});
+        }, () => {});
       }
       return { success: true };
     }
@@ -1103,7 +1255,36 @@ export const AppProvider = ({ children }) => {
     const cleanPhone = userData.phone.trim();
     const cleanCampus = userData.campus || currentCampus;
     const cleanHostel = userData.hostel?.trim() || 'Campus Hostel';
+    const cleanReferralCode = (userData.referralCode || '').trim().toUpperCase();
     const assignedRole = isStylist ? 'vendor' : 'customer';
+
+    // Unique 7-digit referral code
+    const userReferralCode = generate7DigitReferralCode();
+
+    // Reward points calculation
+    const baseWelcomePoints = 50;
+    const referralBonusPoints = cleanReferralCode ? 25 : 0;
+    const totalInitialPoints = baseWelcomePoints + referralBonusPoints;
+
+    const initialPointsHistory = [
+      {
+        id: `pt-welcome-${Date.now()}`,
+        type: 'welcome',
+        points: baseWelcomePoints,
+        title: 'Welcome to UniHair Shop Bonus 🎓',
+        date: new Date().toISOString()
+      }
+    ];
+
+    if (cleanReferralCode) {
+      initialPointsHistory.push({
+        id: `pt-ref-bonus-${Date.now()}`,
+        type: 'referral_used',
+        points: referralBonusPoints,
+        title: `Campus Referral Bonus (Code: ${cleanReferralCode}) 🎁`,
+        date: new Date().toISOString()
+      });
+    }
 
     if (!isSupabaseConfigured || !supabase) {
       const newUserId = `usr-${Date.now().toString(36)}`;
@@ -1116,8 +1297,11 @@ export const AppProvider = ({ children }) => {
         campus: cleanCampus,
         hostel: cleanHostel,
         role: assignedRole,
-        loyaltyPoints: 50,
-        referralCode: `${cleanCampus.slice(0, 4).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`,
+        loyaltyPoints: totalInitialPoints,
+        referralCode: userReferralCode,
+        referredBy: cleanReferralCode || null,
+        referralCount: 0,
+        pointsHistory: initialPointsHistory,
         favorites: []
       };
       setUser(newUser);
@@ -1153,21 +1337,33 @@ export const AppProvider = ({ children }) => {
           }
         ]);
       }
-      addToast(`Welcome to UniHairShop, ${cleanName}! 🎓`, 'success');
+      addToast(
+        cleanReferralCode
+          ? `Welcome to UniHair Shop, ${cleanName}! 🎓 ${baseWelcomePoints} pts welcome + 25 pts referral bonus added (${totalInitialPoints} Pts total)!`
+          : `Welcome to UniHair Shop, ${cleanName}! 🎓 +${baseWelcomePoints} welcome reward points added!`,
+        'success'
+      );
       return { success: true };
     }
 
     // Remote Supabase Auth SignUp
+    const redirectUrl = typeof window !== 'undefined' && window.location.origin
+      ? `${window.location.origin}/`
+      : 'https://www.unihair.shop/';
+
     const { data, error } = await supabase.auth.signUp({
       email: cleanEmail,
       password: userData.password,
       options: {
+        emailRedirectTo: redirectUrl,
         data: {
           name: cleanName,
           phone: cleanPhone,
           campus: cleanCampus,
           hostel: cleanHostel,
-          role: assignedRole
+          role: assignedRole,
+          referral_code: userReferralCode,
+          referred_by: cleanReferralCode || null
         }
       }
     });
@@ -1176,36 +1372,77 @@ export const AppProvider = ({ children }) => {
 
     if (data?.user) {
       const newUserId = data.user.id;
+
+      // Handle Referrer reward (+25 pts to the referrer and increment their referral count)
+      if (cleanReferralCode) {
+        try {
+          const { data: referrerData } = await supabase
+            .from('profiles')
+            .select('id, loyalty_points, referral_count, points_history')
+            .eq('referral_code', cleanReferralCode)
+            .single();
+
+          if (referrerData) {
+            const currentPoints = Number(referrerData.loyalty_points || 0);
+            const currentCount = Number(referrerData.referral_count || 0);
+            const currentHistory = Array.isArray(referrerData.points_history) ? referrerData.points_history : [];
+
+            await supabase.from('profiles').update({
+              loyalty_points: currentPoints + 25,
+              referral_count: currentCount + 1,
+              points_history: [
+                ...currentHistory,
+                {
+                  id: `pt-ref-reward-${Date.now()}`,
+                  type: 'friend_joined',
+                  points: 25,
+                  title: `Campus friend (${cleanName}) joined using your code! 🚀`,
+                  date: new Date().toISOString()
+                }
+              ]
+            }).eq('id', referrerData.id);
+          }
+        } catch { /* ignore referrer update fail */ }
+      }
+
       // Upsert profile in Supabase profiles table
-      await supabase.from('profiles').upsert([{
-        id: newUserId,
-        email: cleanEmail,
-        name: cleanName,
-        phone: cleanPhone,
-        campus: cleanCampus,
-        hostel: cleanHostel,
-        role: assignedRole,
-        loyalty_points: 50
-      }]).catch(() => {});
+      try {
+        await supabase.from('profiles').upsert([{
+          id: newUserId,
+          email: cleanEmail,
+          name: cleanName,
+          phone: cleanPhone,
+          campus: cleanCampus,
+          hostel: cleanHostel,
+          role: assignedRole,
+          loyalty_points: totalInitialPoints,
+          referral_code: userReferralCode,
+          referred_by: cleanReferralCode || null,
+          referral_count: 0,
+          points_history: initialPointsHistory
+        }]);
+      } catch { /* ignore */ }
 
       if (isStylist) {
-        await supabase.from('vendor_profiles').upsert([{
-          id: newUserId,
-          name: cleanName,
-          role: 'Hair Specialist',
-          campus: cleanCampus,
-          dorm_location: cleanHostel,
-          avatar: '/images/barber_service.jpg',
-          is_verified: false,
-          badge: 'Campus Stylist (Pending Verification)',
-          travels_to_dorm: true,
-          travel_fee: 20,
-          has_studio: true,
-          phone: cleanPhone,
-          bio: `Campus stylist at ${cleanCampus}`,
-          payout_provider: 'Airtel Money',
-          payout_number: cleanPhone
-        }]).catch(() => {});
+        try {
+          await supabase.from('vendor_profiles').upsert([{
+            id: newUserId,
+            name: cleanName,
+            role: 'Hair Specialist',
+            campus: cleanCampus,
+            dorm_location: cleanHostel,
+            avatar: '/images/barber_service.jpg',
+            is_verified: false,
+            badge: 'Campus Stylist (Pending Verification)',
+            travels_to_dorm: true,
+            travel_fee: 20,
+            has_studio: true,
+            phone: cleanPhone,
+            bio: `Campus stylist at ${cleanCampus}`,
+            payout_provider: 'Airtel Money',
+            payout_number: cleanPhone
+          }]);
+        } catch { /* ignore */ }
       }
 
       setUser({
@@ -1217,8 +1454,11 @@ export const AppProvider = ({ children }) => {
         campus: cleanCampus,
         hostel: cleanHostel,
         role: assignedRole,
-        loyaltyPoints: 50,
-        referralCode: `${cleanCampus.slice(0, 4).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`,
+        loyaltyPoints: totalInitialPoints,
+        referralCode: userReferralCode,
+        referredBy: cleanReferralCode || null,
+        referralCount: 0,
+        pointsHistory: initialPointsHistory,
         favorites: []
       });
 
@@ -1231,7 +1471,12 @@ export const AppProvider = ({ children }) => {
       }
     }
 
-    addToast(`Account created successfully! Welcome, ${cleanName}! 🎓`, 'success');
+    addToast(
+      cleanReferralCode
+        ? `Account created successfully! Welcome, ${cleanName}! 🎓 ${baseWelcomePoints} pts welcome + 25 pts referral bonus added (${totalInitialPoints} Pts total)!`
+        : `Account created successfully! Welcome, ${cleanName}! 🎓 +${baseWelcomePoints} welcome points added!`,
+      'success'
+    );
     return { success: true, data };
   }, [currentCampus, addToast]);
 
@@ -1297,12 +1542,14 @@ export const AppProvider = ({ children }) => {
   const updateUserProfile = useCallback(async (profileUpdates) => {
     setUser((prev) => ({ ...prev, ...profileUpdates }));
     if (isSupabaseConfigured && supabase && user.id) {
-      await supabase.from('profiles').update({
-        name: profileUpdates.name,
-        phone: profileUpdates.phone,
-        hostel: profileUpdates.hostel,
-        campus: profileUpdates.campus
-      }).eq('id', user.id).catch(() => {});
+      try {
+        await supabase.from('profiles').update({
+          name: profileUpdates.name,
+          phone: profileUpdates.phone,
+          hostel: profileUpdates.hostel,
+          campus: profileUpdates.campus
+        }).eq('id', user.id);
+      } catch { /* ignore */ }
     }
     addToast('Student profile updated successfully!', 'success');
   }, [user.id, addToast]);
@@ -1331,24 +1578,26 @@ export const AppProvider = ({ children }) => {
     setUserMode('vendor');
 
     if (isSupabaseConfigured && supabase) {
-      await supabase.from('profiles').update({ role: 'vendor' }).eq('id', user.id).catch(() => {});
-      await supabase.from('vendor_profiles').upsert([{
-        id: newVendor.id,
-        name: newVendor.name,
-        role: newVendor.role,
-        campus: newVendor.campus,
-        dorm_location: newVendor.dormLocation,
-        avatar: newVendor.avatar,
-        is_verified: true,
-        badge: newVendor.badge,
-        travels_to_dorm: true,
-        travel_fee: 20,
-        has_studio: true,
-        phone: newVendor.phone,
-        bio: newVendor.bio,
-        payout_provider: newVendor.payoutProvider,
-        payout_number: newVendor.payoutNumber
-      }]).catch(() => {});
+      try {
+        await supabase.from('profiles').update({ role: 'vendor' }).eq('id', user.id);
+        await supabase.from('vendor_profiles').upsert([{
+          id: newVendor.id,
+          name: newVendor.name,
+          role: newVendor.role,
+          campus: newVendor.campus,
+          dorm_location: newVendor.dormLocation,
+          avatar: newVendor.avatar,
+          is_verified: true,
+          badge: newVendor.badge,
+          travels_to_dorm: true,
+          travel_fee: 20,
+          has_studio: true,
+          phone: newVendor.phone,
+          bio: newVendor.bio,
+          payout_provider: newVendor.payoutProvider,
+          payout_number: newVendor.payoutNumber
+        }]);
+      } catch { /* ignore */ }
     }
 
     addToast('Welcome to Vendor Studio! Your stylist workspace is ready.', 'success');
@@ -1365,14 +1614,15 @@ export const AppProvider = ({ children }) => {
     );
 
     if (isSupabaseConfigured && supabase) {
-      await supabase
-        .from('vendor_profiles')
-        .update({
-          is_verified: isVerified,
-          badge: isVerified ? 'Verified Campus Stylist' : 'Campus Stylist'
-        })
-        .eq('id', stylistId)
-        .catch(() => {});
+      try {
+        await supabase
+          .from('vendor_profiles')
+          .update({
+            is_verified: isVerified,
+            badge: isVerified ? 'Verified Campus Stylist' : 'Campus Stylist'
+          })
+          .eq('id', stylistId);
+      } catch { /* ignore */ }
     }
 
     addToast(isVerified ? 'Stylist verification badge approved! 🛡️' : 'Stylist badge removed.', 'success');
@@ -1389,11 +1639,12 @@ export const AppProvider = ({ children }) => {
     }));
 
     if (isSupabaseConfigured && supabase) {
-      await supabase
-        .from('vendor_payouts')
-        .update({ status: 'Completed', reference: txRef })
-        .eq('id', payoutId)
-        .catch(() => {});
+      try {
+        await supabase
+          .from('vendor_payouts')
+          .update({ status: 'Completed', reference: txRef })
+          .eq('id', payoutId);
+      } catch { /* ignore */ }
     }
 
     addToast(`Payout ${payoutId} settled successfully! Ref: ${txRef}`, 'success');
@@ -1488,6 +1739,8 @@ export const AppProvider = ({ children }) => {
     createBooking,
     cancelBooking,
     rescheduleBooking,
+    claimNoShowRefund,
+    claimClientNoShow,
     updateVendorSchedule,
     exportToCalendar,
     createOrder,
@@ -1526,6 +1779,7 @@ export const AppProvider = ({ children }) => {
     toasts,
     addToCart, addBundleToCart, updateCartQuantity, removeFromCart, clearCart,
     toggleFavorite, sendMessage, createBooking, cancelBooking, rescheduleBooking,
+    claimNoShowRefund, claimClientNoShow,
     updateVendorSchedule, exportToCalendar, createOrder, addService, updateService, addProduct,
     updateProductStock, updateOrderStatus, updateBookingStatus,
     addToast, dismissToast

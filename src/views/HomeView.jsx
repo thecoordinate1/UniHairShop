@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { initialTransformations } from '../data/mockData';
+import CampusTransformationFeed from '../components/CampusTransformationFeed';
 
 export default function HomeView() {
   const {
@@ -256,6 +257,11 @@ export default function HomeView() {
             );
           })}
         </div>
+      </section>
+
+      {/* Campus Hair Lookbook & Transformation Feed */}
+      <section className="w-full mx-auto">
+        <CampusTransformationFeed />
       </section>
 
       {/* Granular Service Category Filter Bar */}

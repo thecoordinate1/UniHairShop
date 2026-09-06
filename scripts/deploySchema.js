@@ -6,6 +6,21 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Read .env.local if present
+const envLocalPath = path.join(__dirname, '..', '.env.local');
+if (fs.existsSync(envLocalPath)) {
+  const envContent = fs.readFileSync(envLocalPath, 'utf8');
+  envContent.split('\n').forEach(line => {
+    const trimmed = line.trim();
+    if (trimmed && !trimmed.startsWith('#')) {
+      const [key, ...vals] = trimmed.split('=');
+      if (key && vals.length > 0) {
+        process.env[key.trim()] = vals.join('=').trim();
+      }
+    }
+  });
+}
+
 const supabaseUrl = process.env.VITE_SUPABASE_URL || 'https://mswbdibtcnilsvxxtrdy.supabase.co';
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
 

@@ -16,12 +16,13 @@ import {
   Building,
   RefreshCw,
   XCircle,
-  Tag
+  Tag,
+  ShieldAlert
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 
 export default function BookingDetailModal({ booking, onClose, onReschedule, onCancel }) {
-  const { exportToCalendar, staffList } = useApp();
+  const { exportToCalendar, staffList, claimNoShowRefund, claimClientNoShow, userMode } = useApp();
 
   useEffect(() => {
     if (!booking) return;
@@ -216,8 +217,36 @@ export default function BookingDetailModal({ booking, onClose, onReschedule, onC
             title="Download .ics calendar sync invite"
           >
             <Download size={14} />
-            <span>Sync to Calendar</span>
+            <span>Sync (.ics)</span>
           </button>
+
+          {!isCancelled && !isCompleted && userMode === 'customer' && (
+            <button
+              onClick={() => {
+                claimNoShowRefund(booking.id);
+                onClose();
+              }}
+              className="bg-amber-500/15 text-amber-600 dark:text-amber-300 border border-amber-400/40 text-xs px-3.5 py-2 rounded-full font-bold flex items-center gap-1.5 hover:bg-amber-400/25 transition-all cursor-pointer"
+              title="Stylist is late or did not arrive at your room"
+            >
+              <ShieldAlert size={14} />
+              <span>Stylist No-Show (Claim Refund)</span>
+            </button>
+          )}
+
+          {!isCancelled && !isCompleted && userMode === 'vendor' && (
+            <button
+              onClick={() => {
+                claimClientNoShow(booking.id);
+                onClose();
+              }}
+              className="bg-purple-500/15 text-purple-600 dark:text-purple-300 border border-purple-400/40 text-xs px-3.5 py-2 rounded-full font-bold flex items-center gap-1.5 hover:bg-purple-400/25 transition-all cursor-pointer"
+              title="Student client was unreachable or not in room"
+            >
+              <ShieldAlert size={14} />
+              <span>Client No-Show (Claim Fee)</span>
+            </button>
+          )}
 
           {!isCancelled && !isCompleted && onReschedule && (
             <button

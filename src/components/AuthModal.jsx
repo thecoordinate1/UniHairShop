@@ -31,6 +31,7 @@ export default function AuthModal() {
   const [campus, setCampus] = useState(currentCampus);
   const [hostel, setHostel] = useState('');
   const [specialty, setSpecialty] = useState('Barbering');
+  const [referralCode, setReferralCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [resetSuccess, setResetSuccess] = useState(false);
@@ -108,7 +109,8 @@ export default function AuthModal() {
         phone: phone.trim(),
         campus,
         hostel: hostel.trim() || 'Campus Hostel',
-        role: roleType === 'stylist' ? 'vendor' : 'customer'
+        role: roleType === 'stylist' ? 'vendor' : 'customer',
+        referralCode: referralCode.trim().toUpperCase()
       });
 
       if (roleType === 'stylist') {
@@ -139,8 +141,11 @@ export default function AuthModal() {
     setLoading(true);
     try {
       if (isSupabaseConfigured && supabase) {
+        const redirectUrl = typeof window !== 'undefined' && window.location.origin
+          ? `${window.location.origin}/`
+          : 'https://www.unihair.shop/';
         const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-          redirectTo: `${window.location.origin}/`
+          redirectTo: redirectUrl
         });
         if (error) throw error;
       }
@@ -473,12 +478,29 @@ export default function AuthModal() {
               />
             </div>
 
+            {/* Referral Code with Bonus Tag */}
+            <div className="form-group">
+              <label className="form-label flex items-center justify-between" htmlFor="signup-referral">
+                <span>Friend's Referral Code (Optional):</span>
+                <span className="text-[10px] text-amber-500 font-bold">🎁 +25 bonus points</span>
+              </label>
+              <input
+                id="signup-referral"
+                type="text"
+                maxLength={10}
+                placeholder="e.g. 7482910"
+                className="form-input text-xs uppercase font-mono tracking-wider"
+                value={referralCode}
+                onChange={(e) => setReferralCode(e.target.value.trim().toUpperCase())}
+              />
+            </div>
+
             <button
               type="submit"
               disabled={loading}
               className="apple-btn-primary w-full text-xs py-2.5 mt-2"
             >
-              <span>{loading ? 'Creating Profile...' : 'Complete Registration (+50 Pts)'}</span>
+              <span>{loading ? 'Creating Profile...' : referralCode.trim() ? 'Complete Registration (+75 Pts Total)' : 'Complete Registration (+50 Pts)'}</span>
               <ArrowRight size={14} />
             </button>
           </form>

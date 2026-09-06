@@ -1,3 +1,25 @@
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Read .env.local if present
+const envLocalPath = path.join(__dirname, '..', '.env.local');
+if (fs.existsSync(envLocalPath)) {
+  const envContent = fs.readFileSync(envLocalPath, 'utf8');
+  envContent.split('\n').forEach(line => {
+    const trimmed = line.trim();
+    if (trimmed && !trimmed.startsWith('#')) {
+      const [key, ...vals] = trimmed.split('=');
+      if (key && vals.length > 0) {
+        process.env[key.trim()] = vals.join('=').trim();
+      }
+    }
+  });
+}
+
 const projectRef = process.env.SUPABASE_PROJECT_REF || 'mswbdibtcnilsvxxtrdy';
 const accessToken = process.env.SUPABASE_ACCESS_TOKEN || '';
 

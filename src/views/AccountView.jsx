@@ -26,7 +26,13 @@ import {
   Edit3,
   Lock,
   Info,
-  Sparkles
+  Sparkles,
+  Gift,
+  Users,
+  Copy,
+  Check,
+  TrendingUp,
+  Zap
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import BookingDetailModal from '../components/BookingDetailModal';
@@ -90,16 +96,33 @@ export default function AccountView() {
     };
   }, [rescheduleModal, showEditModal]);
 
+  const [copiedCode, setCopiedCode] = useState(false);
+
+  const handleCopyReferral = () => {
+    const code = user.referralCode || '7482910';
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(code);
+      setCopiedCode(true);
+      setTimeout(() => setCopiedCode(false), 2000);
+      addToast(`7-Digit Referral Code ${code} copied to clipboard!`, 'success');
+    } else {
+      addToast(`Your referral code is: ${code}`, 'info');
+    }
+  };
+
   const handleShareReferral = async () => {
-    const text = `Use my student code ${user.referralCode} on UniHairShop to get K15 off your haircut, braids, or salon appointment!`;
+    const code = user.referralCode || '7482910';
+    const text = `Join UniHair Shop with my 7-digit campus student code ${code} to get K15 off your hair appointment + 25 bonus loyalty points! 💈✨`;
+    const shareUrl = typeof window !== 'undefined' ? `${window.location.origin}` : 'https://www.unihair.shop';
+
     if (navigator.share) {
       try {
         await navigator.share({
-          title: 'UniHairShop Student Discount',
+          title: 'UniHair Shop Student Referral Discount',
           text,
-          url: window.location.origin
+          url: shareUrl
         });
-        addToast('Referral invitation opened!', 'success');
+        addToast('Referral invitation shared!', 'success');
         return;
       } catch (err) {
         if (err.name !== 'AbortError') {
@@ -109,10 +132,12 @@ export default function AccountView() {
     }
 
     if (navigator.clipboard) {
-      navigator.clipboard.writeText(`${text} ${window.location.origin}`);
-      addToast('Referral link copied to clipboard!', 'success');
+      navigator.clipboard.writeText(`${text} ${shareUrl}`);
+      setCopiedCode(true);
+      setTimeout(() => setCopiedCode(false), 2000);
+      addToast('Referral invite copied! Send it on WhatsApp to friends.', 'success');
     } else {
-      addToast(`Your referral code is: ${user.referralCode}`, 'info');
+      addToast(`Your 7-digit referral code is: ${code}`, 'info');
     }
   };
 
@@ -210,13 +235,18 @@ export default function AccountView() {
           )}
 
           {/* Loyalty Points Badge */}
-          <div className="bg-amber-400/15 border border-amber-400/30 p-2.5 rounded-2xl flex items-center gap-2.5 backdrop-blur-md shadow-sm">
+          <button
+            type="button"
+            onClick={() => setAccountTab('rewards')}
+            className="bg-amber-400/15 hover:bg-amber-400/25 border border-amber-400/30 p-2.5 rounded-2xl flex items-center gap-2.5 backdrop-blur-md shadow-sm transition-all cursor-pointer text-left"
+            title="View Loyalty Rewards & Referral Earnings"
+          >
             <Award size={20} className="text-amber-400 shrink-0" aria-hidden="true" />
             <div>
-              <span className="text-[9px] text-slate-300 font-semibold uppercase tracking-wider block">Points</span>
-              <span className="text-sm font-extrabold text-amber-400">{user.loyaltyPoints} Pts</span>
+              <span className="text-[9px] text-slate-300 font-semibold uppercase tracking-wider block">Points Hub</span>
+              <span className="text-sm font-extrabold text-amber-400">{user.loyaltyPoints || 0} Pts</span>
             </div>
-          </div>
+          </button>
         </div>
       </div>
 
@@ -352,16 +382,41 @@ export default function AccountView() {
 
       {/* Student Referral & Safety Quick Bar */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        {/* Referral Card */}
-        <div className="card p-4 flex items-center justify-between gap-3 border-emerald-500/30 bg-emerald-500/5">
-          <div className="min-w-0">
-            <h4 className="text-xs font-bold text-slate-900 dark:text-white m-0 truncate">Invite Friends & Get K15</h4>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 m-0 mt-0.5">Code: <strong className="text-amber-500">{user.referralCode}</strong></p>
+        {/* Referral Card with 7-Digit Code & Counter */}
+        <div className="card p-4 flex flex-col justify-between gap-3 border-emerald-500/30 bg-emerald-500/5">
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5 mb-0.5">
+                <Gift size={14} className="text-emerald-500 shrink-0" />
+                <h4 className="text-xs font-bold text-slate-900 dark:text-white m-0 truncate">Invite Friends & Earn Points</h4>
+              </div>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 m-0">
+                Your 7-Digit Code: <strong className="text-amber-500 font-mono tracking-wider font-extrabold">{user.referralCode || '7482910'}</strong>
+              </p>
+            </div>
+            <span className="badge bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold px-2 py-0.5 shrink-0">
+              {user.referralCount || 0} Joined
+            </span>
           </div>
-          <button className="apple-btn-secondary text-xs px-3 py-1.5 shrink-0" onClick={handleShareReferral}>
-            <Share2 size={13} />
-            <span>Share</span>
-          </button>
+
+          <div className="flex items-center gap-2 pt-1 border-t border-black/5 dark:border-white/5">
+            <button
+              type="button"
+              onClick={handleCopyReferral}
+              className="apple-btn-secondary text-[11px] py-1.5 px-3 flex-1 flex items-center justify-center gap-1"
+            >
+              {copiedCode ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
+              <span>{copiedCode ? 'Copied' : 'Copy'}</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleShareReferral}
+              className="apple-btn-primary text-[11px] py-1.5 px-3 flex-1 flex items-center justify-center gap-1 shadow-apple-gold"
+            >
+              <Share2 size={12} />
+              <span>WhatsApp Invite</span>
+            </button>
+          </div>
         </div>
 
         {/* Safety & Cancellation Policy */}
@@ -419,6 +474,20 @@ export default function AccountView() {
           }`}
         >
           Favorites ({user?.favorites?.length || 0})
+        </button>
+
+        <button
+          onClick={() => setAccountTab('rewards')}
+          role="tab"
+          aria-selected={accountTab === 'rewards'}
+          className={`px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition-all duration-200 cursor-pointer border-0 flex items-center gap-1.5 ${
+            accountTab === 'rewards'
+              ? 'bg-amber-400 text-slate-950 font-extrabold shadow-apple-gold'
+              : 'text-amber-500 hover:text-amber-400 bg-amber-400/10'
+          }`}
+        >
+          <Gift size={13} />
+          <span>Rewards & Referrals ({user.loyaltyPoints || 0} Pts)</span>
         </button>
       </div>
 
@@ -660,6 +729,166 @@ export default function AccountView() {
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* 4. REWARDS & REFERRALS TAB */}
+      {accountTab === 'rewards' && (
+        <div className="flex flex-col gap-4">
+          {/* Main Referral & Points Card */}
+          <div className="card p-6 bg-gradient-to-br from-slate-900 via-amber-950/40 to-slate-950 border border-amber-400/30 text-white relative overflow-hidden shadow-2xl">
+            {/* Background Glow */}
+            <div className="absolute -top-24 -right-24 w-48 h-48 bg-amber-500/20 rounded-full blur-3xl pointer-events-none" />
+
+            <div className="flex flex-wrap items-center justify-between gap-4 mb-5 relative z-10">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="badge bg-amber-400/20 text-amber-300 border border-amber-400/30 text-[10px] font-bold">
+                    🎓 Student Rewards Program
+                  </span>
+                  <span className="text-xs text-slate-400">Level: Campus Trendsetter</span>
+                </div>
+                <h3 className="text-xl font-extrabold text-white m-0">Your Loyalty & Referral Hub</h3>
+              </div>
+
+              <div className="bg-amber-400 text-slate-950 px-4 py-2.5 rounded-2xl shadow-apple-gold text-right shrink-0">
+                <span className="text-[10px] uppercase font-bold tracking-wider block text-slate-800">Available Points</span>
+                <span className="text-xl font-extrabold">{user.loyaltyPoints || 0} Pts</span>
+              </div>
+            </div>
+
+            {/* 7-Digit Referral Code Highlight Box */}
+            <div className="p-4 sm:p-5 rounded-2xl bg-black/60 border border-amber-400/25 flex flex-col sm:flex-row items-center justify-between gap-4 relative z-10 backdrop-blur-md">
+              <div className="text-center sm:text-left">
+                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                  Your Unique 7-Digit Referral Code
+                </span>
+                <div className="text-3xl sm:text-4xl font-extrabold font-mono tracking-widest text-amber-400 select-all">
+                  {user.referralCode || '7482910'}
+                </div>
+                <p className="text-[11px] text-slate-300 m-0 mt-1.5">
+                  Give friends <strong>K15 off</strong> • You both get <strong>+25 Loyalty Points</strong> when they sign up!
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <button
+                  type="button"
+                  onClick={handleCopyReferral}
+                  className="apple-btn-secondary flex-1 sm:flex-initial text-xs py-2.5 px-4 flex items-center justify-center gap-1.5"
+                >
+                  {copiedCode ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
+                  <span>{copiedCode ? 'Copied!' : 'Copy Code'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleShareReferral}
+                  className="apple-btn-primary flex-1 sm:flex-initial text-xs py-2.5 px-4 flex items-center justify-center gap-1.5 shadow-apple-gold"
+                >
+                  <Share2 size={14} />
+                  <span>WhatsApp Invite</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Stats Counter Grid */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-4 relative z-10">
+              <div className="p-3 rounded-xl bg-white/[0.04] border border-white/10 text-center">
+                <div className="text-xs text-slate-400 flex items-center justify-center gap-1 mb-0.5">
+                  <Users size={13} className="text-amber-400" />
+                  <span>Friends Joined</span>
+                </div>
+                <div className="text-lg font-extrabold text-white">{user.referralCount || 0}</div>
+              </div>
+
+              <div className="p-3 rounded-xl bg-white/[0.04] border border-white/10 text-center">
+                <div className="text-xs text-slate-400 flex items-center justify-center gap-1 mb-0.5">
+                  <Award size={13} className="text-amber-400" />
+                  <span>Referral Earnings</span>
+                </div>
+                <div className="text-lg font-extrabold text-amber-400">{(user.referralCount || 0) * 25} Pts</div>
+              </div>
+
+              <div className="p-3 rounded-xl bg-white/[0.04] border border-white/10 text-center col-span-2 sm:col-span-1">
+                <div className="text-xs text-slate-400 flex items-center justify-center gap-1 mb-0.5">
+                  <Gift size={13} className="text-emerald-400" />
+                  <span>Discount Value</span>
+                </div>
+                <div className="text-lg font-extrabold text-emerald-400">K{Math.floor((user.loyaltyPoints || 0) / 5)} Off</div>
+              </div>
+            </div>
+
+            {/* How It Works Row */}
+            <div className="mt-4 pt-3 border-t border-white/10 grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11px] text-slate-300">
+              <div className="flex items-center gap-1.5">
+                <span className="w-4 h-4 rounded-full bg-amber-400/20 text-amber-400 flex items-center justify-center font-bold text-[10px]">1</span>
+                <span>Share your 7-digit code</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="w-4 h-4 rounded-full bg-amber-400/20 text-amber-400 flex items-center justify-center font-bold text-[10px]">2</span>
+                <span>Friend signs up (+25 pts bonus)</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="w-4 h-4 rounded-full bg-amber-400/20 text-amber-400 flex items-center justify-center font-bold text-[10px]">3</span>
+                <span>You earn 25 pts instantly</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Points Activity & Tracking History Card */}
+          <div className="card p-5">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <TrendingUp size={18} className="text-amber-500" />
+                <h4 className="text-sm font-bold text-slate-900 dark:text-white m-0">Points Activity & Tracking</h4>
+              </div>
+              <span className="text-xs text-slate-500 dark:text-slate-400 font-semibold">
+                {user.pointsHistory?.length || 1} transactions
+              </span>
+            </div>
+
+            <div className="space-y-2.5">
+              {Array.isArray(user.pointsHistory) && user.pointsHistory.length > 0 ? (
+                user.pointsHistory.map((item, idx) => (
+                  <div
+                    key={item.id || idx}
+                    className="p-3.5 rounded-2xl bg-black/[0.02] dark:bg-white/[0.04] border border-black/5 dark:border-white/10 flex items-center justify-between gap-3"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-xl bg-amber-400/15 text-amber-500 flex items-center justify-center font-bold text-base shrink-0">
+                        {item.type === 'welcome' ? '🎓' : item.type === 'referral_used' ? '🎁' : item.type === 'friend_joined' ? '🚀' : '💈'}
+                      </div>
+                      <div>
+                        <h5 className="text-xs font-bold text-slate-900 dark:text-white m-0">{item.title}</h5>
+                        <span className="text-[10px] text-slate-400">
+                          {item.date ? new Date(item.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : 'Recent'}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="text-xs font-extrabold text-emerald-500 shrink-0">
+                      +{item.points} Pts
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="p-3.5 rounded-2xl bg-black/[0.02] dark:bg-white/[0.04] border border-black/5 dark:border-white/10 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-amber-400/15 text-amber-500 flex items-center justify-center font-bold text-base shrink-0">
+                      🎓
+                    </div>
+                    <div>
+                      <h5 className="text-xs font-bold text-slate-900 dark:text-white m-0">Welcome to UniHair Shop Bonus</h5>
+                      <span className="text-[10px] text-slate-400">Account registration</span>
+                    </div>
+                  </div>
+                  <div className="text-xs font-extrabold text-emerald-500 shrink-0">
+                    +{user.loyaltyPoints || 50} Pts
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
 

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Search, Clock, Heart, Sparkles, SearchX, Truck } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import CampusTransformationFeed from '../components/CampusTransformationFeed';
 
 export default function ServicesView() {
   const { services, setBookingService, toggleFavorite, user } = useApp();
@@ -25,7 +26,7 @@ export default function ServicesView() {
   });
 
   return (
-    <div className="w-full flex flex-col gap-6 mx-auto">
+    <div className="w-full flex flex-col gap-8 mx-auto">
       {/* Header & Search */}
       <div className="flex flex-col gap-4">
         <div>
@@ -135,6 +136,14 @@ export default function ServicesView() {
           ))}
         </div>
       )}
+
+      {/* Campus Lookbook / Transformation Feed */}
+      <div className="pt-4 border-t border-black/10 dark:border-white/10">
+        <CampusTransformationFeed
+          title="Campus Hair Transformation Lookbook"
+          subtitle="Explore real student transformations. Click 'Book This Look' to schedule with the stylist!"
+        />
+      </div>
     </div>
   );
 }
