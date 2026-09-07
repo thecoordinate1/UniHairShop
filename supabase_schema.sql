@@ -389,6 +389,17 @@ BEGIN
   IF p_status = 'Completed' AND NOT EXISTS (SELECT 1 FROM public.points_ledger WHERE booking_id = p_booking_id AND reason = 'Completed booking reward') THEN
     v_points := GREATEST(5, floor(v_booking.total_price / 10));
     PERFORM public.apply_points(v_booking.customer_id, v_points, 'Completed booking reward', p_booking_id);
+    -- This is the only place a vendor's real earnings are ever credited — a
+    -- completed job pays out its total_price into their wallet, once per booking.
+    IF v_booking.staff_id IS NOT NULL THEN
+      INSERT INTO public.vendor_wallets (id, vendor_id, available_balance, total_earned, completed_jobs_count, updated_at)
+      VALUES (v_booking.staff_id, v_booking.staff_id, v_booking.total_price, v_booking.total_price, 1, now())
+      ON CONFLICT (vendor_id) DO UPDATE SET
+        available_balance = public.vendor_wallets.available_balance + v_booking.total_price,
+        total_earned = public.vendor_wallets.total_earned + v_booking.total_price,
+        completed_jobs_count = public.vendor_wallets.completed_jobs_count + 1,
+        updated_at = now();
+    END IF;
   END IF;
   INSERT INTO public.audit_log (actor_id, action, entity_type, entity_id, metadata) VALUES (auth.uid(), lower(replace(p_status, ' ', '_')), 'booking', p_booking_id, jsonb_build_object('status', p_status));
   RETURN v_booking;
@@ -433,6 +444,39 @@ $$;
 
 REVOKE ALL ON FUNCTION public.submit_review(TEXT, INT, TEXT) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.submit_review(TEXT, INT, TEXT) TO authenticated;
+
+-- A vendor's payout can only ever debit their own wallet, by their own
+-- request, for no more than what transition_booking has actually credited
+-- them — never a client-supplied balance.
+CREATE OR REPLACE FUNCTION public.request_vendor_payout(p_amount NUMERIC, p_provider TEXT, p_number TEXT)
+RETURNS public.vendor_payouts LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE v_wallet public.vendor_wallets; v_payout public.vendor_payouts; v_vendor_id TEXT;
+BEGIN
+  IF auth.uid() IS NULL THEN RAISE EXCEPTION 'Authentication required'; END IF;
+  IF p_amount IS NULL OR p_amount <= 0 THEN RAISE EXCEPTION 'Invalid payout amount'; END IF;
+  v_vendor_id := auth.uid()::text;
+  SELECT * INTO v_wallet FROM public.vendor_wallets WHERE vendor_id = v_vendor_id FOR UPDATE;
+  IF v_wallet.vendor_id IS NULL OR p_amount > v_wallet.available_balance THEN RAISE EXCEPTION 'Amount exceeds your available balance'; END IF;
+  UPDATE public.vendor_wallets SET available_balance = available_balance - p_amount, updated_at = now() WHERE vendor_id = v_vendor_id;
+  INSERT INTO public.vendor_payouts (id, vendor_id, date, amount, provider, number, status, reference)
+  VALUES (
+    'PAY-' || replace(gen_random_uuid()::text, '-', ''),
+    v_vendor_id,
+    to_char(now(), 'YYYY-MM-DD'),
+    p_amount,
+    COALESCE(p_provider, 'Airtel Money'),
+    p_number,
+    'Completed',
+    upper(left(COALESCE(p_provider, 'PAY'), 3)) || '-TX-' || floor(random() * 9000 + 1000)::text
+  )
+  RETURNING * INTO v_payout;
+  INSERT INTO public.audit_log (actor_id, action, entity_type, entity_id, metadata) VALUES (auth.uid(), 'vendor_payout_requested', 'vendor_payout', v_payout.id, jsonb_build_object('amount', p_amount));
+  RETURN v_payout;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.request_vendor_payout(NUMERIC, TEXT, TEXT) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.request_vendor_payout(NUMERIC, TEXT, TEXT) TO authenticated;
 
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created AFTER INSERT ON auth.users FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();

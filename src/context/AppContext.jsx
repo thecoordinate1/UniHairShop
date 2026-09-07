@@ -829,13 +829,9 @@ export const AppProvider = ({ children }) => {
       }
     }
 
-    // Update vendor wallet
-    const creditedAmount = depositAmount > 0 ? depositAmount : totalPrice;
-    setVendorWallet((prev) => ({
-      ...prev,
-      availableBalance: prev.availableBalance + creditedAmount,
-      totalEarned: prev.totalEarned + creditedAmount
-    }));
+    // The vendor's wallet is credited only when the job is actually completed
+    // (see transition_booking / completeBooking) — never at request time,
+    // and never for a payment that hasn't actually been collected yet.
 
     // In production, points are credited by the protected transition_booking
     // function only after a stylist marks the appointment completed.
@@ -1080,15 +1076,50 @@ export const AppProvider = ({ children }) => {
     addToast(`Booking ${bookingId} accepted!`, 'success');
   }, [addToast]);
 
+  // The wallet shown in Vendor Studio is server-authoritative: transition_booking
+  // is the only thing that credits it (on completion) and request_vendor_payout
+  // the only thing that debits it, so we always pull real numbers here rather
+  // than trust a locally-mutated balance.
+  const refreshVendorWallet = useCallback(async (vendorId) => {
+    if (!isSupabaseConfigured || !supabase || !vendorId) return;
+    const { data: walletRow } = await supabase
+      .from('vendor_wallets')
+      .select('*')
+      .eq('vendor_id', vendorId)
+      .maybeSingle();
+    const { data: payoutRows } = await supabase
+      .from('vendor_payouts')
+      .select('*')
+      .eq('vendor_id', vendorId)
+      .order('created_at', { ascending: false });
+    setVendorWallet({
+      availableBalance: Number(walletRow?.available_balance || 0),
+      pendingBalance: Number(walletRow?.pending_balance || 0),
+      totalEarned: Number(walletRow?.total_earned || 0),
+      completedJobsCount: walletRow?.completed_jobs_count || 0,
+      payouts: (payoutRows || []).map((p) => ({
+        id: p.id,
+        date: p.date,
+        amount: Number(p.amount),
+        provider: p.provider,
+        number: p.number,
+        status: p.status,
+        ref: p.reference
+      }))
+    });
+  }, []);
+
+  useEffect(() => {
+    if (userMode !== 'vendor' || !vendorProfile.id) return;
+    refreshVendorWallet(vendorProfile.id);
+  }, [userMode, vendorProfile.id, refreshVendorWallet]);
+
   const completeBooking = useCallback(async (bookingId) => {
-    const previousStatus = bookings.find((b) => b.id === bookingId)?.status;
+    const targetBooking = bookings.find((b) => b.id === bookingId);
+    const previousStatus = targetBooking?.status;
     setBookings((prev) =>
       prev.map((b) => (b.id === bookingId ? { ...b, status: 'Completed' } : b))
     );
-    setVendorWallet((prev) => ({
-      ...prev,
-      completedJobsCount: prev.completedJobsCount + 1
-    }));
     if (isSupabaseConfigured && supabase) {
       const { error } = await supabase.rpc('transition_booking', {
         p_booking_id: bookingId,
@@ -1100,10 +1131,6 @@ export const AppProvider = ({ children }) => {
         setBookings((prev) =>
           prev.map((b) => (b.id === bookingId ? { ...b, status: previousStatus || b.status } : b))
         );
-        setVendorWallet((prev) => ({
-          ...prev,
-          completedJobsCount: Math.max(0, prev.completedJobsCount - 1)
-        }));
         addToast(error.message || 'Unable to complete this booking.', 'error');
         return;
       }
@@ -1115,10 +1142,19 @@ export const AppProvider = ({ children }) => {
       if (profile) {
         setUser((prev) => ({ ...prev, loyaltyPoints: profile.loyalty_points || 0, pointsHistory: profile.points_history || [] }));
       }
+      await refreshVendorWallet(vendorProfile.id);
+    } else {
+      const amount = Number(targetBooking?.totalPrice || targetBooking?.total_price || 0);
+      setVendorWallet((prev) => ({
+        ...prev,
+        availableBalance: prev.availableBalance + amount,
+        totalEarned: prev.totalEarned + amount,
+        completedJobsCount: prev.completedJobsCount + 1
+      }));
     }
     addToast(`Booking ${bookingId} marked as completed! Funds ready for payout.`, 'success');
     trackEvent('booking_completed', { bookingId });
-  }, [addToast, bookings, user.id, trackEvent]);
+  }, [addToast, bookings, user.id, trackEvent, refreshVendorWallet, vendorProfile.id]);
 
   // Real customer reviews, written server-side only via submit_review() so a
   // vendor's rating/reviews_count can never be forged by the client.
@@ -1159,6 +1195,21 @@ export const AppProvider = ({ children }) => {
       return false;
     }
 
+    if (isSupabaseConfigured && supabase) {
+      const { data: payout, error } = await supabase.rpc('request_vendor_payout', {
+        p_amount: Number(amount),
+        p_provider: provider || 'Airtel Money',
+        p_number: accountNumber || vendorProfile.payoutNumber
+      });
+      if (error) {
+        addToast(error.message || 'Unable to request payout.', 'error');
+        return false;
+      }
+      await refreshVendorWallet(vendorProfile.id);
+      addToast(`Payout of K${amount} sent to ${provider} (${accountNumber})! Ref: ${payout?.reference}`, 'success');
+      return true;
+    }
+
     const payoutId = generateId('PAY');
     const newPayout = {
       id: payoutId,
@@ -1169,29 +1220,14 @@ export const AppProvider = ({ children }) => {
       status: 'Completed',
       ref: `${provider.slice(0, 3).toUpperCase()}-TX-${Math.floor(1000 + Math.random() * 9000)}`
     };
-
     setVendorWallet((prev) => ({
       ...prev,
       availableBalance: prev.availableBalance - Number(amount),
       payouts: [newPayout, ...prev.payouts]
     }));
-
-    if (isSupabaseConfigured && supabase) {
-      supabase.from('vendor_payouts').insert([{
-        id: payoutId,
-        vendor_id: vendorProfile.id,
-        date: newPayout.date,
-        amount: Number(amount),
-        provider: newPayout.provider,
-        number: newPayout.number,
-        status: 'Completed',
-        reference: newPayout.ref
-      }]).then(null, () => {});
-    }
-
     addToast(`Payout of K${amount} sent to ${provider} (${accountNumber})! Ref: ${newPayout.ref}`, 'success');
     return true;
-  }, [vendorWallet.availableBalance, vendorProfile.id, vendorProfile.payoutNumber, addToast]);
+  }, [vendorWallet.availableBalance, vendorProfile.id, vendorProfile.payoutNumber, addToast, refreshVendorWallet]);
 
   const addVendorPortfolioItem = useCallback((item) => {
     const newItem = {
