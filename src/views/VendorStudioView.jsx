@@ -413,7 +413,11 @@ export default function VendorStudioView() {
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white tracking-tight m-0">{vendorProfile.name}</h1>
-              <span className="badge badge-verified text-[10px] py-0.2 px-2">Verified Campus Stylist</span>
+              {vendorProfile.isVerified ? (
+                <span className="badge badge-verified text-[10px] py-0.2 px-2">Verified Campus Stylist</span>
+              ) : (
+                <span className="badge badge-out-of-stock text-[10px] py-0.2 px-2">Pending Verification</span>
+              )}
             </div>
             <p className="text-xs text-amber-500 font-semibold mt-0.5 mb-0.5">{vendorProfile.role} • {vendorProfile.campus}</p>
             <p className="text-[11px] text-slate-500 dark:text-slate-400 m-0">Studio Room: {vendorProfile.dormLocation}</p>
@@ -562,7 +566,7 @@ export default function VendorStudioView() {
 
                     <div className="flex items-center gap-2">
                       <a
-                        href={`https://wa.me/260772822579?text=Hi%20${encodeURIComponent(b.customerName)},%20I'm%20your%20campus%20stylist%20for%20your%20appointment%20ref:${b.id}`}
+                        href={`https://wa.me/260${(b.customerPhone || '').replace(/^0/, '')}?text=Hi%20${encodeURIComponent(b.customerName)},%20I'm%20your%20campus%20stylist%20for%20your%20appointment%20ref:${b.id}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="apple-btn-secondary text-xs px-3 py-1.5 text-emerald-600 dark:text-emerald-400 flex items-center gap-1"
