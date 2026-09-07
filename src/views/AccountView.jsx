@@ -328,7 +328,7 @@ export default function AccountView() {
         </div>
       )}
 
-      {/* Missing Phone Nudge — Google/Apple sign-in doesn't collect one, but bookings require it */}
+      {/* Missing Phone Nudge — Google sign-in doesn't collect one, but bookings require it */}
       {user?.isLoggedIn && !user?.phone && (
         <div className="card p-5 bg-gradient-to-r from-rose-500/15 via-rose-400/10 to-transparent border border-rose-400/30 flex flex-wrap items-center justify-between gap-4 shadow-sm">
           <div className="flex items-center gap-3.5 min-w-0">

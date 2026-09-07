@@ -774,7 +774,7 @@ export const AppProvider = ({ children }) => {
 
   // Smart Booking Creation with Escrow & No-Show Deposit Support
   const createBooking = useCallback(async (newBookingData) => {
-    // Google/Apple sign-in doesn't collect a phone number, and bookings require
+    // Google sign-in doesn't collect a phone number, and bookings require
     // one (the stylist needs a way to reach you). Fail clearly here instead of
     // letting it hit a raw database constraint error.
     if (!user.phone || !user.phone.trim()) {
@@ -1323,13 +1323,13 @@ export const AppProvider = ({ children }) => {
     return { success: true, data };
   }, [addToast]);
 
-  // Google/Apple both use the same OAuth redirect flow: this call navigates the
-  // browser away to the provider and back, so there's no local state to set here
-  // — the existing onAuthStateChange listener picks up the session on return.
+  // OAuth is a redirect flow: this call navigates the browser away to the
+  // provider and back, so there's no local state to set here — the existing
+  // onAuthStateChange listener picks up the session on return.
   // Requires the provider to actually be enabled in the Supabase dashboard first.
   const signInWithOAuth = useCallback(async (provider) => {
     if (!isSupabaseConfigured || !supabase) {
-      addToast(`Sign in with ${provider === 'google' ? 'Google' : 'Apple'} requires a live connection.`, 'error');
+      addToast('Sign in with Google requires a live connection.', 'error');
       return;
     }
     const redirectUrl = typeof window !== 'undefined' && window.location.origin
@@ -1340,7 +1340,7 @@ export const AppProvider = ({ children }) => {
       options: { redirectTo: redirectUrl }
     });
     if (error) {
-      addToast(error.message || `Unable to sign in with ${provider === 'google' ? 'Google' : 'Apple'}.`, 'error');
+      addToast(error.message || 'Unable to sign in with Google.', 'error');
     }
   }, [addToast]);
 
