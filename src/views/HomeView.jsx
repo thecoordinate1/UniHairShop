@@ -21,7 +21,6 @@ import {
   Tag
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
-import { initialTransformations } from '../data/mockData';
 import CampusTransformationFeed from '../components/CampusTransformationFeed';
 
 export default function HomeView() {
@@ -440,28 +439,6 @@ export default function HomeView() {
         </div>
       </section>
 
-      {/* Student Transformations */}
-      <section className="w-full card p-6 sm:p-8">
-        <div className="text-center max-w-md mx-auto mb-6">
-          <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-1 tracking-tight">Campus Student Transformations</h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400">Real results from our campus stylists across Lusaka hostels</p>
-        </div>
-
-        <div className="grid-2">
-          {initialTransformations.map((item) => (
-            <div key={item.id} className="p-4 rounded-2xl bg-black/[0.02] dark:bg-white/[0.04] border border-black/5 dark:border-white/10">
-              <div className="h-44 rounded-xl overflow-hidden relative mb-3 bg-slate-800">
-                <img src={item.beforeImg} alt={`${item.title} transformation result`} className="w-full h-full object-cover" loading="lazy" />
-                <span className="absolute bottom-2 left-2 bg-black/75 backdrop-blur-md border border-white/10 text-white text-[10px] px-2 py-0.5 rounded-full font-semibold">
-                  Verified Result
-                </span>
-              </div>
-              <h4 className="text-sm font-bold text-slate-900 dark:text-white tracking-tight">{item.title}</h4>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Student Client: {item.student}</p>
-            </div>
-          ))}
-        </div>
-      </section>
     </div>
   );
 }

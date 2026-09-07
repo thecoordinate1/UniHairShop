@@ -188,11 +188,11 @@ export default function VendorStudioView() {
     updateVendorSchedule(vendorProfile.id, updated);
   };
 
-  const myServices = services.filter((s) => (s.staffIds || s.staff_ids || []).includes(vendorProfile.id) || s.category === 'Barbering');
+  const myServices = services.filter((s) => (s.staffIds || s.staff_ids || []).includes(vendorProfile.id));
   const myBookings = bookings.filter((b) => {
     const sName = b.staffName || b.staff_name || '';
     const sId = b.staffId || b.staff_id || '';
-    return sId === vendorProfile.id || sName.includes(vendorProfile.name) || sName === 'Junior "The Fade King"';
+    return sId === vendorProfile.id || (vendorProfile.name && sName.includes(vendorProfile.name));
   });
 
   const activeConfirmedBookings = myBookings.filter((b) => b.status === 'Confirmed');

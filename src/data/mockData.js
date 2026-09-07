@@ -72,135 +72,10 @@ export const campusHostels = Object.freeze({
   ]
 });
 
-export const initialStaff = Object.freeze([
-  {
-    id: 'stf-1',
-    handle: 'juniorfades',
-    name: 'Junior "The Fade King"',
-    role: 'Master Barber',
-    avatar: '/images/barber_service.jpg',
-    campus: 'UNILUS Silverest Campus',
-    dormLocation: 'Silverest Hostel, Block C, Room 14',
-    rating: 4.9,
-    reviewsCount: 148,
-    isVerified: true,
-    badge: 'Verified Campus Stylist',
-    responseTime: '~5 mins',
-    completedCount: 430,
-    specialties: ['Taper Fade', 'Burst Fade', 'Beard Lineup', 'Hot Towel Treatment'],
-    travelsToDorm: true,
-    hasStudio: true,
-    bio: 'Campus favorite barber at UNILUS Silverest. 4+ years of precision fades and beard sculpting. I travel to student rooms or host in Block C!',
-    scheduleConfig: {
-      availableDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
-      workingHours: { start: '08:00', end: '20:00' },
-      blockedSlots: ['Wednesday 10:00', 'Wednesday 11:00', 'Friday 14:00']
-    },
-    portfolio: [
-      { id: 'port-1', image: '/images/barber_service.jpg', tag: 'Low Taper Fade', client: 'Mwamba (UNILUS)' },
-      { id: 'port-2', image: '/images/barber_service.jpg', tag: 'Sharp Lineup & Beard', client: 'Chimwemwe (UNILUS)' },
-      { id: 'port-3', image: '/images/barber_service.jpg', tag: 'Textured Crop Cut', client: 'Bwalya (UNZA)' }
-    ],
-    reviews: [
-      { id: 'rev-1', student: 'Mwamba K.', rating: 5, date: 'Yesterday', text: 'Best fade on campus hands down! Came right to my room in Block A.', verifiedDorm: true },
-      { id: 'rev-2', student: 'Chola M.', rating: 5, date: '3 days ago', text: 'Clean clippers, super fast, and very professional.', verifiedDorm: true }
-    ]
-  },
-  {
-    id: 'stf-2',
-    handle: 'chileshebraids',
-    name: 'Chileshe Braids & Wigs',
-    role: 'Senior Braider & Wig Specialist',
-    avatar: '/images/hair_braids.jpg',
-    campus: 'UNILUS Silverest Campus',
-    dormLocation: 'Silverest Block F, Flat 02',
-    rating: 5.0,
-    reviewsCount: 192,
-    isVerified: true,
-    badge: 'Top Rated Stylist',
-    responseTime: '~8 mins',
-    completedCount: 512,
-    specialties: ['Knotless Braids', 'Boho Curls', 'Frontal Melt', 'Loc Retwist'],
-    travelsToDorm: true,
-    hasStudio: true,
-    bio: 'Certified hair stylist & 3rd year law student. Painless knotless braiding, scalp-friendly parting, and flawless frontal lace melts.',
-    scheduleConfig: {
-      availableDays: ['Monday', 'Tuesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
-      workingHours: { start: '09:00', end: '19:00' },
-      blockedSlots: ['Tuesday 09:00', 'Thursday 11:00']
-    },
-    portfolio: [
-      { id: 'port-4', image: '/images/hair_braids.jpg', tag: 'Medium Knotless Braids', client: 'Thandiwe (UNILUS)' },
-      { id: 'port-5', image: '/images/hair_braids.jpg', tag: 'French Curl Braids', client: 'Sepo (Cavendish)' },
-      { id: 'port-6', image: '/images/hair_braids.jpg', tag: 'Wig Melt & Styling', client: 'Mutinta (UNZA)' }
-    ],
-    reviews: [
-      { id: 'rev-3', student: 'Thandiwe N.', rating: 5, date: '2 days ago', text: 'My knotless braids lasted 6 weeks! Neat parts and zero tension.', verifiedDorm: true },
-      { id: 'rev-4', student: 'Sepo K.', rating: 5, date: '1 week ago', text: 'She did my hair right in my room before our campus gala. 10/10!', verifiedDorm: true }
-    ]
-  },
-  {
-    id: 'stf-3',
-    handle: 'natashaglam',
-    name: 'Natasha Glam & Nail Bar',
-    role: 'Nail Artist & MUA',
-    avatar: '/images/nail_art.jpg',
-    campus: 'UNZA Great East Road Campus',
-    dormLocation: 'October Hall, Room 28',
-    rating: 4.9,
-    reviewsCount: 116,
-    isVerified: true,
-    badge: 'Verified Student Artist',
-    responseTime: '~10 mins',
-    completedCount: 290,
-    specialties: ['Acrylic Full Sets', 'Chrome Nails', 'Soft Glam Makeup', 'Lash Extensions'],
-    travelsToDorm: true,
-    hasStudio: true,
-    bio: 'UNZA campus nail tech and glam artist. Long-lasting acrylics, trendy 3D nail charms, and camera-ready event makeup.',
-    scheduleConfig: {
-      availableDays: ['Monday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
-      workingHours: { start: '10:00', end: '18:00' },
-      blockedSlots: ['Monday 14:00']
-    },
-    portfolio: [
-      { id: 'port-7', image: '/images/nail_art.jpg', tag: 'French Chrome Acrylics', client: 'Student Client (UNZA)' },
-      { id: 'port-8', image: '/images/makeup_glam.jpg', tag: 'Evening Glam Glow', client: 'Lombe (UNZA)' }
-    ],
-    reviews: [
-      { id: 'rev-5', student: 'Lombe C.', rating: 5, date: '4 days ago', text: 'My acrylic set is still rock solid after 3 weeks. Absolutely love her work.', verifiedDorm: true }
-    ]
-  },
-  {
-    id: 'stf-4',
-    handle: 'barberkasonde',
-    name: 'Barber Kasonde',
-    role: 'Barber & Dreadlocks Specialist',
-    avatar: '/images/barber_service.jpg',
-    campus: 'UNILUS Silverest Campus',
-    dormLocation: 'Student Centre Pavilion',
-    rating: 4.8,
-    reviewsCount: 84,
-    isVerified: true,
-    badge: 'Locs Specialist',
-    responseTime: '~15 mins',
-    completedCount: 210,
-    specialties: ['Loc Interlocking', 'Skin Fade', 'Beard Dye', 'Scalp Detox'],
-    travelsToDorm: false,
-    hasStudio: true,
-    bio: 'Located at the campus Student Centre. Specialist in starter locs, palm rolling, and razor skin fades.',
-    scheduleConfig: {
-      availableDays: ['Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
-      workingHours: { start: '08:30', end: '18:00' },
-      blockedSlots: []
-    },
-    portfolio: [
-      { id: 'port-9', image: '/images/barber_service.jpg', tag: 'Loc Maintenance & Fade', client: 'Derrick (UNILUS)' }
-    ],
-    reviews: [
-      { id: 'rev-6', student: 'Derrick P.', rating: 5, date: 'Last week', text: 'Best loc retwist in Silverest area.', verifiedDorm: true }
-    ]
-  }
-]);
+// No stylists are seeded — real stylists sign up and get verified through
+// the normal onboarding flow (AuthGuard/onboardAsStylist), then appear here
+// live from Supabase.
+export const initialStaff = Object.freeze([]);
 
 export const initialServices = Object.freeze([
   {
@@ -214,7 +89,7 @@ export const initialServices = Object.freeze([
     popular: true,
     canTravel: true,
     inStudio: true,
-    staffIds: ['stf-1', 'stf-4'],
+    staffIds: [],
     addOns: [
       { id: 'add-1', name: 'Beard Sculpt & Hydro Oil', price: 20, duration: 10 },
       { id: 'add-2', name: 'Black Mask Exfoliation', price: 30, duration: 15 },
@@ -232,7 +107,7 @@ export const initialServices = Object.freeze([
     popular: true,
     canTravel: true,
     inStudio: true,
-    staffIds: ['stf-2'],
+    staffIds: [],
     addOns: [
       { id: 'add-4', name: 'Curly Human Hair Ends (Boho)', price: 60, duration: 25 },
       { id: 'add-5', name: 'Wash & Deep Condition Blowout', price: 40, duration: 20 },
@@ -250,7 +125,7 @@ export const initialServices = Object.freeze([
     popular: true,
     canTravel: true,
     inStudio: true,
-    staffIds: ['stf-3'],
+    staffIds: [],
     addOns: [
       { id: 'add-7', name: 'Swarovski Crystal Accents', price: 30, duration: 10 },
       { id: 'add-8', name: 'Gel Pedicure Add-on', price: 50, duration: 25 },
@@ -268,7 +143,7 @@ export const initialServices = Object.freeze([
     popular: true,
     canTravel: true,
     inStudio: true,
-    staffIds: ['stf-3'],
+    staffIds: [],
     addOns: [
       { id: 'add-10', name: '25mm Fluffy 3D Lashes', price: 25, duration: 5 },
       { id: 'add-11', name: 'Eyebrow Wax & Tint', price: 35, duration: 15 }
@@ -285,7 +160,7 @@ export const initialServices = Object.freeze([
     popular: false,
     canTravel: true,
     inStudio: true,
-    staffIds: ['stf-4', 'stf-2'],
+    staffIds: [],
     addOns: [
       { id: 'add-12', name: 'Hot Oil Scalp Treatment', price: 30, duration: 15 },
       { id: 'add-13', name: 'Custom Loc Style (Barrel / Fishtail)', price: 35, duration: 20 }
@@ -302,7 +177,7 @@ export const initialServices = Object.freeze([
     popular: true,
     canTravel: true,
     inStudio: true,
-    staffIds: ['stf-2'],
+    staffIds: [],
     addOns: [
       { id: 'add-14', name: 'Wig Wash & Revitalize', price: 40, duration: 20 },
       { id: 'add-15', name: 'Curling & Barrel Wand Styling', price: 35, duration: 15 }
@@ -318,8 +193,8 @@ export const initialProducts = Object.freeze([
     description: 'Nourishing cold-pressed coconut, castor, and rosemary oil enriched with Vitamin E for fast scalp regrowth and edge retention.',
     price: 95,
     stock: 24,
-    rating: 4.9,
-    reviewsCount: 42,
+    rating: 0,
+    reviewsCount: 0,
     image: '/images/hair_product.jpg',
     featured: true
   },
@@ -330,8 +205,8 @@ export const initialProducts = Object.freeze([
     description: 'Rechargeable precision hair clipper set with zero-gap T-blade, guard combs, and sandalwood beard balm.',
     price: 380,
     stock: 8,
-    rating: 4.8,
-    reviewsCount: 18,
+    rating: 0,
+    reviewsCount: 0,
     image: '/images/grooming_kit.jpg',
     featured: true
   },
@@ -342,8 +217,8 @@ export const initialProducts = Object.freeze([
     description: '18-shade ultra-pigmented warm eyeshadow palette plus non-sticky hydrating nude lip gloss for campus life.',
     price: 160,
     stock: 15,
-    rating: 4.9,
-    reviewsCount: 31,
+    rating: 0,
+    reviewsCount: 0,
     image: '/images/cosmetics_set.jpg',
     featured: true
   },
@@ -354,8 +229,8 @@ export const initialProducts = Object.freeze([
     description: 'Sulfate-free deep hydrating shampoo for natural African curls, coils, locs, and braided hair.',
     price: 65,
     stock: 30,
-    rating: 4.7,
-    reviewsCount: 22,
+    rating: 0,
+    reviewsCount: 0,
     image: '/images/hair_product.jpg',
     featured: false
   },
@@ -366,8 +241,8 @@ export const initialProducts = Object.freeze([
     description: 'Double-layer reversible silk satin bonnet to prevent breakage, paired with max-hold non-flaking edge control.',
     price: 85,
     stock: 28,
-    rating: 5.0,
-    reviewsCount: 54,
+    rating: 0,
+    reviewsCount: 0,
     image: '/images/hair_product.jpg',
     featured: true
   }
@@ -403,25 +278,4 @@ export const initialConversations = Object.freeze([]);
 export const initialBookings = Object.freeze([]);
 
 export const initialOrders = Object.freeze([]);
-
-export const initialTransformations = Object.freeze([
-  {
-    id: 'tr-1',
-    title: 'Burst Fade & Lineup',
-    student: 'Mwamba (UNILUS Silverest)',
-    service: 'Barbing',
-    beforeImg: '/images/barber_service.jpg',
-    afterImg: '/images/barber_service.jpg',
-    rating: 5
-  },
-  {
-    id: 'tr-2',
-    title: 'Knotless Boho Braids Transformation',
-    student: 'Thandiwe (UNILUS Silverest)',
-    service: 'Hair Dressing',
-    beforeImg: '/images/hair_braids.jpg',
-    afterImg: '/images/hair_braids.jpg',
-    rating: 5
-  }
-]);
 

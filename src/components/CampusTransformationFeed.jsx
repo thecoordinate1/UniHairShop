@@ -1,86 +1,17 @@
 import React, { useState } from 'react';
-import { Sparkles, Heart, Share2, Calendar, MapPin, CheckCircle2, Scissors, Eye, MessageSquare, ChevronRight } from 'lucide-react';
+import { Sparkles, Heart, Share2, Calendar, MapPin, Scissors, ArrowLeft, Clock, Tag } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 
-export const transformationPosts = [
-  {
-    id: 'tr-1',
-    title: 'Low Taper Fade & Sharp Beard Sculpt',
-    category: 'Barbering',
-    serviceName: 'Men\'s Clean Haircut & Beard Sculpt',
-    stylistId: 'stf-1',
-    stylistName: 'Junior "The Fade King"',
-    stylistHandle: 'juniorfades',
-    stylistAvatar: '/images/barber_service.jpg',
-    image: '/images/barber_service.jpg',
-    campus: 'UNILUS Silverest Campus',
-    hostel: 'Block C, Room 14',
-    price: 90,
-    duration: 35,
-    likes: 184,
-    tags: ['#TaperFade', '#BeardLineup', '#UNILUSGrooming'],
-    clientComment: 'Zero tension, came straight to my room in Block A. Looked 10/10 for the gala!'
-  },
-  {
-    id: 'tr-2',
-    title: 'Medium Knotless French Curl Braids',
-    category: 'Braids & Wigs',
-    serviceName: 'Knotless Braids (Medium Length)',
-    stylistId: 'stf-2',
-    stylistName: 'Chileshe Braids & Wigs',
-    stylistHandle: 'chileshebraids',
-    stylistAvatar: '/images/hair_braids.jpg',
-    image: '/images/hair_braids.jpg',
-    campus: 'UNILUS Silverest Campus',
-    hostel: 'Block F, Flat 02',
-    price: 250,
-    duration: 180,
-    likes: 242,
-    tags: ['#FrenchCurls', '#KnotlessBraids', '#CampusBraids'],
-    clientComment: 'Lightweight and lasted 6 full weeks during semester exams!'
-  },
-  {
-    id: 'tr-3',
-    title: 'Chrome French Tip Acrylics & 3D Charms',
-    category: 'Nails & Makeup',
-    serviceName: 'Acrylic Full Set & Nail Art',
-    stylistId: 'stf-3',
-    stylistName: 'Natasha Glam & Nail Bar',
-    stylistHandle: 'natashaglam',
-    stylistAvatar: '/images/nail_art.jpg',
-    image: '/images/nail_art.jpg',
-    campus: 'UNZA Great East Road Campus',
-    hostel: 'October Hall, Room 28',
-    price: 160,
-    duration: 60,
-    likes: 198,
-    tags: ['#ChromeNails', '#UNZAGlam', '#Acrylics'],
-    clientComment: 'Still rock solid after 3 weeks. Natasha is the GOAT nail tech at UNZA.'
-  },
-  {
-    id: 'tr-4',
-    title: 'Starter Locs & Palm Roll Retwist',
-    category: 'Locs & Natural',
-    serviceName: 'Loc Maintenance & Scalp Treatment',
-    stylistId: 'stf-4',
-    stylistName: 'Barber Kasonde',
-    stylistHandle: 'barberkasonde',
-    stylistAvatar: '/images/barber_service.jpg',
-    image: '/images/barber_service.jpg',
-    campus: 'UNILUS Silverest Campus',
-    hostel: 'Student Centre Pavilion',
-    price: 180,
-    duration: 90,
-    likes: 126,
-    tags: ['#LocRetwist', '#NaturalHair', '#SilverestBarber'],
-    clientComment: 'Clean parting and hot towel scalp detox. 100% recommended.'
-  }
-];
+// Populated from real completed bookings/portfolio uploads once real stylists
+// and customers exist — intentionally empty until that data source is wired up,
+// rather than showing fabricated "transformations" as if they were real.
+export const transformationPosts = [];
 
 export default function CampusTransformationFeed({ title = 'Campus Trending Looks', subtitle = 'Real hairstyles done on campus. Tap any look to book instantly!' }) {
-  const { setBookingService, services, setSelectedStylist, staffList, addToast, user } = useApp();
+  const { setBookingService, services, setSelectedStylist, staffList, addToast } = useApp();
   const [selectedFilter, setSelectedFilter] = useState('All');
   const [likedPosts, setLikedPosts] = useState({});
+  const [selectedLook, setSelectedLook] = useState(null);
 
   const categories = ['All', 'Barbering', 'Braids & Wigs', 'Nails & Makeup', 'Locs & Natural'];
 
@@ -102,6 +33,11 @@ export default function CampusTransformationFeed({ title = 'Campus Trending Look
       (s) => s.name.toLowerCase().includes(post.serviceName.toLowerCase()) || s.category === post.category
     ) || services[0];
 
+    if (!matchedService) {
+      addToast('No matching service available to book yet.', 'error');
+      return;
+    }
+
     // Find matching stylist
     const matchedStylist = staffList.find((s) => s.id === post.stylistId) || staffList[0];
 
@@ -109,7 +45,7 @@ export default function CampusTransformationFeed({ title = 'Campus Trending Look
     setBookingService({
       ...matchedService,
       price: post.price,
-      preferredStaff: matchedStylist.name
+      preferredStaff: matchedStylist?.name
     });
   };
 
@@ -133,6 +69,60 @@ export default function CampusTransformationFeed({ title = 'Campus Trending Look
       addToast('Story link copied to clipboard!', 'success');
     }
   };
+
+  const handleOpenLook = (post) => {
+    setSelectedLook(post);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  if (selectedLook) {
+    const isLiked = likedPosts[selectedLook.id];
+    const totalLikes = selectedLook.likes + (isLiked ? 1 : 0);
+
+    return (
+      <article className="w-full max-w-4xl mx-auto animate-in fade-in slide-in-from-bottom-2 duration-300">
+        <button type="button" onClick={() => setSelectedLook(null)} className="apple-btn-secondary text-xs px-3 py-2 mb-4">
+          <ArrowLeft size={14} /> Back to Lookbook
+        </button>
+        <div className="card overflow-hidden bg-white dark:bg-[#15151c]">
+          <div className="grid grid-cols-1 md:grid-cols-2">
+            <div className="relative min-h-[18rem] md:min-h-[34rem] bg-slate-900">
+              <img src={selectedLook.image} alt={selectedLook.title} className="absolute inset-0 w-full h-full object-cover" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-transparent to-black/10" />
+              <div className="absolute top-4 left-4 right-4 flex justify-between gap-3">
+                <span className="badge bg-black/60 backdrop-blur-md text-white border border-white/15 text-xs">{selectedLook.category}</span>
+                <button type="button" onClick={() => toggleLike(selectedLook.id)} className={`w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-md border transition-all active:scale-95 ${isLiked ? 'bg-rose-500 border-rose-400 text-white' : 'bg-black/50 border-white/20 text-white'}`} aria-label="Like this look">
+                  <Heart size={17} fill={isLiked ? '#FFFFFF' : 'none'} />
+                </button>
+              </div>
+              <div className="absolute bottom-4 left-4 right-4 text-white">
+                <p className="text-xs text-amber-200 flex items-center gap-1 mb-1"><MapPin size={13} />{selectedLook.campus} · {selectedLook.hostel}</p>
+                <p className="text-2xl font-extrabold m-0">K {selectedLook.price}</p>
+              </div>
+            </div>
+            <div className="p-5 sm:p-7 flex flex-col">
+              <div className="flex items-center gap-2 text-amber-500 text-xs font-bold mb-2"><Sparkles size={14} /> Campus transformation</div>
+              <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white m-0 mb-3">{selectedLook.title}</h1>
+              <div className="flex items-center gap-2.5 pb-4 border-b border-black/5 dark:border-white/10">
+                <img src={selectedLook.stylistAvatar} alt="" className="w-10 h-10 rounded-full object-cover border border-amber-400/40" />
+                <div><p className="text-sm font-bold text-slate-900 dark:text-white m-0">{selectedLook.stylistName}</p><p className="text-xs text-amber-500 m-0">@{selectedLook.stylistHandle}</p></div>
+              </div>
+              <div className="grid grid-cols-2 gap-2.5 my-5">
+                <div className="rounded-2xl p-3 bg-black/[0.03] dark:bg-white/[0.05] border border-black/5 dark:border-white/10"><p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold m-0 mb-1 flex items-center gap-1"><Clock size={12} />Duration</p><p className="text-sm font-bold text-slate-900 dark:text-white m-0">{selectedLook.duration} min</p></div>
+                <div className="rounded-2xl p-3 bg-black/[0.03] dark:bg-white/[0.05] border border-black/5 dark:border-white/10"><p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold m-0 mb-1 flex items-center gap-1"><Heart size={12} />Loved by</p><p className="text-sm font-bold text-slate-900 dark:text-white m-0">{totalLikes} students</p></div>
+              </div>
+              <div className="rounded-2xl bg-amber-400/10 border border-amber-400/20 p-4 mb-4"><p className="text-[10px] uppercase tracking-wider text-amber-600 dark:text-amber-300 font-bold m-0 mb-1">Client review</p><p className="text-sm italic text-slate-600 dark:text-slate-300 leading-relaxed m-0">“{selectedLook.clientComment}”</p></div>
+              <div className="flex flex-wrap gap-1.5 mb-6">{selectedLook.tags.map((tag) => <span key={tag} className="text-[11px] text-slate-500 dark:text-slate-400 bg-black/[0.03] dark:bg-white/[0.05] rounded-full px-2.5 py-1"><Tag size={10} className="inline mr-1" />{tag}</span>)}</div>
+              <div className="mt-auto flex gap-2.5">
+                <button type="button" onClick={() => handleShareLook(selectedLook)} className="apple-btn-secondary p-3 shrink-0" aria-label="Share this look"><Share2 size={16} /></button>
+                <button type="button" onClick={() => handleBookLook(selectedLook)} className="apple-btn-primary flex-1 text-xs py-3"><Calendar size={15} />Book This Look</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </article>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -169,6 +159,19 @@ export default function CampusTransformationFeed({ title = 'Campus Trending Look
         </div>
       </div>
 
+      {/* Empty State */}
+      {filteredPosts.length === 0 && (
+        <div className="card p-10 text-center flex flex-col items-center gap-2 border border-dashed border-black/10 dark:border-white/10">
+          <div className="w-12 h-12 rounded-2xl bg-amber-400/15 text-amber-500 flex items-center justify-center mb-1">
+            <Scissors size={22} />
+          </div>
+          <h3 className="text-sm font-bold text-slate-900 dark:text-white m-0">No transformations yet</h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400 max-w-xs m-0">
+            Once campus stylists complete real bookings, their transformations will appear here.
+          </p>
+        </div>
+      )}
+
       {/* Cards Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {filteredPosts.map((post) => {
@@ -176,9 +179,14 @@ export default function CampusTransformationFeed({ title = 'Campus Trending Look
           const totalLikes = post.likes + (isLiked ? 1 : 0);
 
           return (
-            <div
+            <article
               key={post.id}
-              className="card p-0 overflow-hidden flex flex-col justify-between group hover:shadow-apple-card transition-all duration-300 border border-black/10 dark:border-white/10 bg-white dark:bg-[#15151c]"
+              onClick={() => handleOpenLook(post)}
+              onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); handleOpenLook(post); } }}
+              tabIndex={0}
+              role="button"
+              aria-label={`Open details for ${post.title}`}
+              className="card p-0 overflow-hidden flex flex-col justify-between group hover:shadow-apple-card transition-all duration-300 border border-black/10 dark:border-white/10 bg-white dark:bg-[#15151c] cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400"
             >
               {/* Media Container */}
               <div className="relative h-48 sm:h-52 w-full overflow-hidden bg-slate-900">
@@ -199,7 +207,7 @@ export default function CampusTransformationFeed({ title = 'Campus Trending Look
                   </span>
 
                   <button
-                    onClick={() => toggleLike(post.id)}
+                    onClick={(event) => { event.stopPropagation(); toggleLike(post.id); }}
                     className={`w-8 h-8 rounded-full flex items-center justify-center backdrop-blur-md transition-all active:scale-90 cursor-pointer border ${
                       isLiked
                         ? 'bg-rose-500 border-rose-400 text-white shadow-sm'
@@ -254,7 +262,7 @@ export default function CampusTransformationFeed({ title = 'Campus Trending Look
                 {/* Action Buttons */}
                 <div className="flex items-center gap-2 pt-2 border-t border-black/5 dark:border-white/5">
                   <button
-                    onClick={() => handleShareLook(post)}
+                    onClick={(event) => { event.stopPropagation(); handleShareLook(post); }}
                     className="apple-btn-secondary text-xs p-2 shrink-0 text-slate-500 hover:text-amber-500"
                     title="Share transformation to WhatsApp"
                   >
@@ -262,7 +270,7 @@ export default function CampusTransformationFeed({ title = 'Campus Trending Look
                   </button>
 
                   <button
-                    onClick={() => handleBookLook(post)}
+                    onClick={(event) => { event.stopPropagation(); handleBookLook(post); }}
                     className="apple-btn-primary text-xs w-full py-2 flex items-center justify-center gap-1.5 font-bold"
                   >
                     <Calendar size={13} />
@@ -270,7 +278,7 @@ export default function CampusTransformationFeed({ title = 'Campus Trending Look
                   </button>
                 </div>
               </div>
-            </div>
+            </article>
           );
         })}
       </div>

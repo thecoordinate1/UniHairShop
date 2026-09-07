@@ -105,39 +105,36 @@ export const AppProvider = ({ children }) => {
   // 2. User & Vendor Profiles
   const [user, setUser] = useState(() => {
     const saved = safeGetItem('unihair_user', defaultGuestUser);
-    if (!saved || !saved.isLoggedIn || saved.name === 'Kondwani Phiri') {
+    if (!saved || !saved.isLoggedIn) {
       return defaultGuestUser;
     }
     return saved;
   });
 
   const [vendorProfile, setVendorProfile] = useState(() => safeGetItem('unihair_vendor_profile', {
-    id: 'stf-1',
-    name: 'Junior "The Fade King"',
-    role: 'Master Barber & Stylist',
-    campus: 'UNILUS Silverest Campus',
-    dormLocation: 'Silverest Hostel, Block C, Room 14',
+    id: null,
+    name: '',
+    role: '',
+    campus: '',
+    dormLocation: '',
     avatar: '/images/barber_service.jpg',
-    isVerified: true,
-    badge: 'Verified Campus Stylist',
+    isVerified: false,
+    badge: 'Campus Stylist (Pending Verification)',
     travelsToDorm: true,
     travelFee: 20,
     hasStudio: true,
-    phone: '0971234567',
+    phone: '',
     payoutProvider: 'Airtel Money',
-    payoutNumber: '0971234567',
-    bio: 'Campus favorite barber at UNILUS Silverest. 4+ years precision fades and beard sculpting. I travel to student rooms or host in Block C!'
+    payoutNumber: '',
+    bio: ''
   }));
 
   const [vendorWallet, setVendorWallet] = useState(() => safeGetItem('unihair_vendor_wallet', {
-    availableBalance: 640,
-    pendingBalance: 125,
-    totalEarned: 3450,
-    completedJobsCount: 42,
-    payouts: [
-      { id: 'PAY-891', date: '2026-08-20', amount: 450, provider: 'Airtel Money', number: '0971234567', status: 'Completed', ref: 'AM-TX-9841' },
-      { id: 'PAY-742', date: '2026-08-14', amount: 600, provider: 'MTN Mobile Money', number: '0961234567', status: 'Completed', ref: 'MTN-TX-1029' }
-    ]
+    availableBalance: 0,
+    pendingBalance: 0,
+    totalEarned: 0,
+    completedJobsCount: 0,
+    payouts: []
   }));
 
   // 3. Platform Data & Chat
@@ -145,34 +142,10 @@ export const AppProvider = ({ children }) => {
   const [products, setProducts] = useState(() => safeGetItem('unihair_products', initialProducts));
   const [bundles] = useState(initialBundles);
   const [staffList, setStaffList] = useState(() => safeGetItem('unihair_staff', initialStaff));
-  const [bookings, setBookings] = useState(() => {
-    const saved = safeGetItem('unihair_bookings', initialBookings);
-    if (Array.isArray(saved)) {
-      return saved.filter((b) => b.customerName !== 'Kondwani Phiri' && b.id !== 'UHS-B8901');
-    }
-    return initialBookings;
-  });
-  const [orders, setOrders] = useState(() => {
-    const saved = safeGetItem('unihair_orders', initialOrders);
-    if (Array.isArray(saved)) {
-      return saved.filter((o) => o.customerName !== 'Kondwani Phiri' && o.id !== 'UHS-ORD-4102');
-    }
-    return initialOrders;
-  });
+  const [bookings, setBookings] = useState(() => safeGetItem('unihair_bookings', initialBookings));
+  const [orders, setOrders] = useState(() => safeGetItem('unihair_orders', initialOrders));
   const [cart, setCart] = useState(() => safeGetItem('unihair_cart', []));
-  const [conversations, setConversations] = useState(() => {
-    const saved = safeGetItem('unihair_conversations', initialConversations);
-    if (Array.isArray(saved) && saved.length > 0) {
-      const cleaned = saved.filter((c) => {
-        const hasMessages = Array.isArray(c.messages) && c.messages.length > 0;
-        const isOldSeed = c.messages?.some((m) => m.id === 'm-1' || m.id === 'm-4');
-        const hasKondwani = JSON.stringify(c).includes('Kondwani');
-        return hasMessages && !isOldSeed && !hasKondwani;
-      });
-      return cleaned;
-    }
-    return initialConversations;
-  });
+  const [conversations, setConversations] = useState(() => safeGetItem('unihair_conversations', initialConversations));
   const [activeChatStylistId, setActiveChatStylistId] = useState(null);
 
   // 4. Modals & Filters

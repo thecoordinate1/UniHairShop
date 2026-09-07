@@ -620,10 +620,7 @@ export default function AdminDashboardView() {
             </p>
 
             <div className="space-y-3">
-              {[
-                { id: 'PAY-891', date: '2026-08-20', stylist: 'Junior "The Fade King"', amount: 450, provider: 'Airtel Money', number: '0971234567', status: 'Completed', ref: 'AM-TX-9841' },
-                { id: 'PAY-742', date: '2026-08-14', stylist: 'Junior "The Fade King"', amount: 600, provider: 'MTN Mobile Money', number: '0961234567', status: 'Completed', ref: 'MTN-TX-1029' }
-              ].map((payout) => (
+              {[].map((payout) => (
                 <div key={payout.id} className="p-4 rounded-2xl border border-black/10 dark:border-white/10 flex flex-wrap justify-between items-center gap-3">
                   <div>
                     <div className="flex items-center gap-2">
@@ -638,6 +635,7 @@ export default function AdminDashboardView() {
                   <span className="text-xs text-slate-400">{payout.date}</span>
                 </div>
               ))}
+              <p className="text-xs text-slate-400 dark:text-slate-500 text-center py-4">No payouts dispatched yet.</p>
             </div>
           </div>
         </div>

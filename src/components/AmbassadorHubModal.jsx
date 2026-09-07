@@ -1,31 +1,27 @@
 import React, { useState } from 'react';
-import { X, Award, Users, DollarSign, Share2, Copy, Check, TrendingUp, Trophy, ArrowRight, ShieldCheck, Sparkles, MessageSquare } from 'lucide-react';
+import { X, Award, Users, DollarSign, Share2, Copy, Check, TrendingUp, Trophy, ShieldCheck, Sparkles, MessageSquare } from 'lucide-react';
 import { useApp } from '../context/AppContext';
-import { playSuccessChime } from '../lib/soundEffects';
 
 export default function AmbassadorHubModal({ isOpen, onClose }) {
   const { user, addToast } = useApp();
 
   const [copiedLink, setCopiedLink] = useState(false);
-  const [payoutRequested, setPayoutRequested] = useState(false);
-  const [momoNumber, setMomoNumber] = useState(user?.phone || '0971234567');
-  const [provider, setProvider] = useState('Airtel Money');
 
   if (!isOpen) return null;
 
   const referralCode = user?.referralCode || 'STUDENT15';
   const ambassadorLink = `${window.location.origin}/?ref=${referralCode}`;
 
-  // Mock ambassador stats
-  const totalReferrals = 8;
-  const earnedBounty = totalReferrals * 10; // K10 per booking
-  const availableBounty = 60; // K60 ready for payout
+  // Real referral count from the user's profile (signup referral bonuses are
+  // already live via the DB trigger). The K10-per-booking cash bounty and
+  // leaderboard prize described below aren't backed by any tracking yet —
+  // see the "Coming Soon" notice on the payout form.
+  const totalReferrals = user?.referralCount || 0;
+  const earnedBounty = totalReferrals * 10;
+  const availableBounty = 0;
 
   const leaderboard = [
-    { rank: 1, name: 'Chileshe M.', campus: 'UNZA Great East', hostel: 'Soweto Hall', count: 48, earnings: 'K 480' },
-    { rank: 2, name: 'Mwamba K.', campus: 'UNILUS Silverest', hostel: 'Hostel Block C', count: 35, earnings: 'K 350' },
-    { rank: 3, name: 'Sepo N.', campus: 'CBU Riverside', hostel: 'Copperbelt Hall', count: 29, earnings: 'K 290' },
-    { rank: 4, name: 'You (' + (user?.name || 'Student') + ')', campus: 'UNILUS Silverest', hostel: 'Block A', count: totalReferrals, earnings: `K ${earnedBounty}`, isMe: true }
+    { rank: 1, name: 'You (' + (user?.name || 'Student') + ')', campus: user?.campus || '', hostel: user?.hostel || '', count: totalReferrals, earnings: `K ${earnedBounty}`, isMe: true }
   ];
 
   const handleCopyLink = () => {
@@ -44,16 +40,6 @@ export default function AmbassadorHubModal({ isOpen, onClose }) {
     window.open(`https://wa.me/?text=${text}`, '_blank');
   };
 
-  const handleRequestPayout = (e) => {
-    e.preventDefault();
-    if (!momoNumber || momoNumber.length < 10) {
-      addToast('Enter a valid 10-digit mobile money number', 'error');
-      return;
-    }
-    playSuccessChime();
-    setPayoutRequested(true);
-    addToast(`Payout request of K${availableBounty} sent to ${provider} (${momoNumber})!`, 'success');
-  };
 
   return (
     <div className="modal-overlay" onClick={onClose} role="dialog" aria-modal="true">
@@ -122,65 +108,22 @@ export default function AmbassadorHubModal({ isOpen, onClose }) {
           </button>
         </div>
 
-        {/* 1-Tap Cash Payout Box */}
-        <div className="card p-4 border border-black/10 dark:border-white/10 mb-5">
-          <h3 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider mb-2">
-            Withdraw Earnings (Airtel / MTN MoMo)
+        {/* Cash Payout — not yet live */}
+        <div className="card p-4 border border-amber-400/25 bg-amber-400/5 mb-5">
+          <h3 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider mb-1">
+            Cash Payouts — Coming Soon
           </h3>
-
-          {!payoutRequested ? (
-            <form onSubmit={handleRequestPayout} className="space-y-3">
-              <div className="grid grid-cols-2 gap-2">
-                {['Airtel Money', 'MTN MoMo'].map((prov) => (
-                  <button
-                    key={prov}
-                    type="button"
-                    onClick={() => setProvider(prov)}
-                    className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
-                      provider === prov
-                        ? 'bg-[#007AFF] text-white border-[#007AFF]'
-                        : 'bg-black/[0.02] dark:bg-white/[0.02] border-black/10 dark:border-white/10 text-slate-600 dark:text-slate-400'
-                    }`}
-                  >
-                    {prov}
-                  </button>
-                ))}
-              </div>
-
-              <div className="form-group">
-                <input
-                  type="tel"
-                  placeholder="0971234567"
-                  className="form-input text-xs"
-                  value={momoNumber}
-                  onChange={(e) => setMomoNumber(e.target.value)}
-                />
-              </div>
-
-              <button
-                type="submit"
-                disabled={availableBounty <= 0}
-                className="apple-btn-primary w-full text-xs py-2.5 font-bold"
-              >
-                <span>Withdraw K{availableBounty} to {provider}</span>
-                <ArrowRight size={13} />
-              </button>
-            </form>
-          ) : (
-            <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-center text-xs text-emerald-600 dark:text-emerald-400 font-semibold">
-              <Check size={16} className="mx-auto mb-1" />
-              Payout request of K{availableBounty} processed! Disbursed to {momoNumber}.
-            </div>
-          )}
+          <p className="text-xs text-slate-500 dark:text-slate-400 m-0">
+            Direct MoMo cash payouts for referral bookings aren't live yet. Your referral link and code above already work — friends who sign up with it earn you real loyalty points today.
+          </p>
         </div>
 
-        {/* Campus Hostel Leaderboard */}
+        {/* Your Referral Stats */}
         <div>
           <div className="flex justify-between items-center mb-2">
             <span className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">
-              Campus Leaderboard (This Month)
+              Your Referral Stats
             </span>
-            <span className="text-[10px] text-amber-500 font-bold">Top Prize: K500 Cash</span>
           </div>
 
           <div className="space-y-1.5">

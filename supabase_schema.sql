@@ -450,32 +450,23 @@ END $$;
 
 -- ==============================================================================
 -- Initial Seed Data (safe to re-run — ON CONFLICT DO NOTHING)
+-- No stylists/vendor wallets are seeded — real stylists sign up and get
+-- verified through the normal onboarding flow. The service/product catalog
+-- below is real starter inventory, not tied to any fake stylist or reviews.
 -- ==============================================================================
-INSERT INTO public.vendor_profiles (id, name, role, campus, dorm_location, avatar, is_verified, badge, travels_to_dorm, travel_fee, has_studio, phone, bio, rating, reviews_count, payout_provider, payout_number)
-VALUES
-('stf-1', 'Junior "The Fade King"', 'Master Barber & Stylist', 'UNILUS Silverest Campus', 'Silverest Hostel, Block C, Room 14', '/images/barber_service.jpg', true, 'Verified Campus Stylist', true, 20, true, '0971234567', 'Campus favorite barber at UNILUS Silverest. 4+ years precision fades and beard sculpting. I travel to student rooms or host in Block C!', 4.9, 128, 'Airtel Money', '0971234567'),
-('stf-2', 'Thandiwe Banda', 'Lead Natural Hair & Braids Specialist', 'UNILUS Silverest Campus', 'Silverest Girls Hostel, Block A, Room 08', '/images/hair_braids.jpg', true, 'Verified Campus Stylist', true, 25, true, '0977654321', 'Specialist in painless knotless braids, stitch lines, wig styling and natural hair maintenance for university students.', 5.0, 94, 'MTN Mobile Money', '0977654321'),
-('stf-3', 'Lupita Mwale', 'Nail Artist & Lash Technician', 'UNZA Great East Campus', 'October Hostel, Room 22', '/images/nail_care.jpg', true, 'Verified Campus Stylist', false, 0, true, '0966543210', 'Acrylic sets, gel overlays, polygel, and lash extensions. Quick turnaround between lectures!', 4.8, 67, 'Airtel Money', '0966543210')
-ON CONFLICT (id) DO NOTHING;
-
 INSERT INTO public.services (id, name, category, price, duration, description, image, popular, can_travel, in_studio, staff_ids)
 VALUES
-('srv-1', 'Student Signature Fade & Lineup', 'Barbering', 90, 40, 'Crisp skin fade, taper or low cut with clean razor edge lineup, hot towel treatment and aftershave spritz.', '/images/barber_service.jpg', true, true, true, ARRAY['stf-1']),
-('srv-2', 'Medium Knotless Boho Braids', 'Braids & Natural Hair', 240, 180, 'Painless, feather-light knotless box braids with curly human-blend tendrils. Gentle on campus edges.', '/images/hair_braids.jpg', true, true, true, ARRAY['stf-2']),
-('srv-3', 'Wig Revamp & Glueless Install', 'Wigs & Weaves', 180, 75, 'Wig wash, deep condition, lace customization, plucking and flat glueless band installation.', '/images/wig_care.jpg', true, true, true, ARRAY['stf-2']),
-('srv-4', 'Loc Retwist & Scalp Detox', 'Locs', 150, 90, 'Organic apple cider vinegar wash, deep conditioning scalp steam, palm roll retwist, and styling.', '/images/locs_care.jpg', false, true, true, ARRAY['stf-1']),
-('srv-5', 'Gel Overlay & French Tip Nails', 'Nails & Lashes', 120, 60, 'Long-lasting Russian prep manicure with builder gel overlay and hand-painted French tips.', '/images/nail_care.jpg', true, false, true, ARRAY['stf-3'])
+('srv-1', 'Student Signature Fade & Lineup', 'Barbering', 90, 40, 'Crisp skin fade, taper or low cut with clean razor edge lineup, hot towel treatment and aftershave spritz.', '/images/barber_service.jpg', true, true, true, ARRAY[]::TEXT[]),
+('srv-2', 'Medium Knotless Boho Braids', 'Braids & Natural Hair', 240, 180, 'Painless, feather-light knotless box braids with curly human-blend tendrils. Gentle on campus edges.', '/images/hair_braids.jpg', true, true, true, ARRAY[]::TEXT[]),
+('srv-3', 'Wig Revamp & Glueless Install', 'Wigs & Weaves', 180, 75, 'Wig wash, deep condition, lace customization, plucking and flat glueless band installation.', '/images/wig_care.jpg', true, true, true, ARRAY[]::TEXT[]),
+('srv-4', 'Loc Retwist & Scalp Detox', 'Locs', 150, 90, 'Organic apple cider vinegar wash, deep conditioning scalp steam, palm roll retwist, and styling.', '/images/locs_care.jpg', false, true, true, ARRAY[]::TEXT[]),
+('srv-5', 'Gel Overlay & French Tip Nails', 'Nails & Lashes', 120, 60, 'Long-lasting Russian prep manicure with builder gel overlay and hand-painted French tips.', '/images/nail_care.jpg', true, false, true, ARRAY[]::TEXT[])
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO public.products (id, name, category, price, stock, image, rating, reviews_count, description)
 VALUES
-('prd-1', 'Miracle Scalp Growth Oil (100ml)', 'Hair Care Products', 120, 24, '/images/hair_product.jpg', 4.9, 38, 'Infused with rosemary, peppermint, and biotin. Fast hair growth, combats itchy scalp in student dorms.'),
-('prd-2', 'Silk Satin Night Bonnet (Reversible)', 'Hair Care Products', 75, 40, '/images/hair_product.jpg', 4.8, 52, 'Premium double-layer mulberry satin bonnet. Protects braids, wigs, and curls while sleeping.'),
-('prd-3', '24H Max Edge Taming Gel (150g)', 'Hair Care Products', 60, 35, '/images/hair_product.jpg', 4.7, 41, 'Non-flaking, non-greasy extreme hold edge control formulated for all-day Lusaka campus weather.'),
-('prd-4', 'Professional Cordless T-Blade Trimmer', 'Hair Care Products', 350, 8, '/images/hair_product.jpg', 5.0, 19, 'Zero-gap stainless steel blades, rechargeable USB-C battery. Perfect for personal dorm grooming.')
+('prd-1', 'Miracle Scalp Growth Oil (100ml)', 'Hair Care Products', 120, 24, '/images/hair_product.jpg', 0, 0, 'Infused with rosemary, peppermint, and biotin. Fast hair growth, combats itchy scalp in student dorms.'),
+('prd-2', 'Silk Satin Night Bonnet (Reversible)', 'Hair Care Products', 75, 40, '/images/hair_product.jpg', 0, 0, 'Premium double-layer mulberry satin bonnet. Protects braids, wigs, and curls while sleeping.'),
+('prd-3', '24H Max Edge Taming Gel (150g)', 'Hair Care Products', 60, 35, '/images/hair_product.jpg', 0, 0, 'Non-flaking, non-greasy extreme hold edge control formulated for all-day Lusaka campus weather.'),
+('prd-4', 'Professional Cordless T-Blade Trimmer', 'Hair Care Products', 350, 8, '/images/hair_product.jpg', 0, 0, 'Zero-gap stainless steel blades, rechargeable USB-C battery. Perfect for personal dorm grooming.')
 ON CONFLICT (id) DO NOTHING;
-
-INSERT INTO public.vendor_wallets (id, vendor_id, available_balance, pending_balance, total_earned, completed_jobs_count)
-VALUES
-('w-stf-1', 'stf-1', 640, 125, 3450, 42)
-ON CONFLICT (vendor_id) DO NOTHING;
