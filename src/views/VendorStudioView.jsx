@@ -34,6 +34,7 @@ import {
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { playSuccessChime } from '../lib/soundEffects';
+import { uploadImage } from '../lib/uploadImage';
 
 export const wholesaleSupplies = [
   {
@@ -95,6 +96,7 @@ export const wholesaleSupplies = [
 
 export default function VendorStudioView() {
   const {
+    user,
     vendorProfile,
     updateVendorProfile,
     toggleVendorDormTravel,
@@ -105,6 +107,10 @@ export default function VendorStudioView() {
     addVendorPortfolioItem,
     addService,
     services,
+    products,
+    addProduct,
+    updateProductStock,
+    deleteProduct,
     bookings,
     staffList,
     updateVendorSchedule,
@@ -114,7 +120,7 @@ export default function VendorStudioView() {
     addToast
   } = useApp();
 
-  const [activeTab, setActiveTabLocal] = useState('overview'); // 'overview' | 'schedule' | 'services' | 'portfolio' | 'wholesale' | 'wallet'
+  const [activeTab, setActiveTabLocal] = useState('overview'); // 'overview' | 'schedule' | 'services' | 'portfolio' | 'shop' | 'wholesale' | 'wallet'
 
   // Timetable & Bio Link State
   const [blockDay, setBlockDay] = useState('Wednesday');
@@ -136,21 +142,46 @@ export default function VendorStudioView() {
   const [showPortfolioModal, setShowPortfolioModal] = useState(false);
   const [portTag, setPortTag] = useState('');
   const [portClient, setPortClient] = useState('');
-  const [portImg, setPortImg] = useState('/images/barber_service.jpg');
+  const [portImg, setPortImg] = useState(null);
+  const [uploadingPortfolioPhoto, setUploadingPortfolioPhoto] = useState(false);
+
+  // Edit Profile State
+  const [showEditProfileModal, setShowEditProfileModal] = useState(false);
+  const [editName, setEditName] = useState(vendorProfile.name || '');
+  const [editBio, setEditBio] = useState(vendorProfile.bio || '');
+  const [editPhone, setEditPhone] = useState(vendorProfile.phone || '');
+  const [editAvatar, setEditAvatar] = useState(vendorProfile.avatar || '');
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [savingProfile, setSavingProfile] = useState(false);
+
+  // My Shop (Vendor Product Listings) State
+  const [showAddProductModal, setShowAddProductModal] = useState(false);
+  const [newPrdName, setNewPrdName] = useState('');
+  const [newPrdCategory, setNewPrdCategory] = useState('Hair Care Products');
+  const [newPrdPrice, setNewPrdPrice] = useState('100');
+  const [newPrdStock, setNewPrdStock] = useState('10');
+  const [newPrdDesc, setNewPrdDesc] = useState('');
+  const [newPrdImage, setNewPrdImage] = useState(null);
+  const [uploadingProductPhoto, setUploadingProductPhoto] = useState(false);
 
   // Payout Form State
   const [payoutAmount, setPayoutAmount] = useState('');
   const [payoutProvider, setPayoutProvider] = useState(vendorProfile.payoutProvider || 'Airtel Money');
   const [payoutNumber, setPayoutNumber] = useState(vendorProfile.payoutNumber || '0971234567');
 
-  const myStylistObj = staffList.find((s) => s.id === vendorProfile.id) || staffList[0] || {};
+  const myStylistObj = staffList.find((s) => s.id === vendorProfile.id) || {};
   const currentSchedule = myStylistObj.scheduleConfig || vendorProfile.scheduleConfig || {
     availableDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
     workingHours: { start: '08:00', end: '20:00' },
     blockedSlots: []
   };
 
-  const bioHandle = vendorProfile.handle || myStylistObj.handle || 'juniorfades';
+  const myRating = myStylistObj.rating ?? vendorProfile.rating ?? 0;
+  const myReviewsCount = myStylistObj.reviewsCount ?? myStylistObj.reviews_count ?? 0;
+
+  const myProducts = products.filter((p) => (p.vendorId || p.vendor_id) === vendorProfile.id);
+
+  const bioHandle = vendorProfile.handle || myStylistObj.handle || vendorProfile.id || '';
   const bioUrl = `${window.location.origin}/?stylist=${bioHandle}`;
 
   const handleCopyBioUrl = () => {
@@ -226,9 +257,29 @@ export default function VendorStudioView() {
     setTempAddOns([]);
   };
 
+  const handlePortfolioImagePicker = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingPortfolioPhoto(true);
+    try {
+      const url = await uploadImage(file, { userId: user?.id, folder: 'portfolio' });
+      if (url) {
+        setPortImg(url);
+      } else {
+        addToast('Could not upload photo. Please try again.', 'error');
+      }
+    } finally {
+      setUploadingPortfolioPhoto(false);
+    }
+  };
+
   const handleSavePortfolio = () => {
     if (!portTag.trim()) {
       addToast('Please enter a hairstyle or cut tag', 'error');
+      return;
+    }
+    if (!portImg) {
+      addToast('Please upload a photo of the finished look', 'error');
       return;
     }
     addVendorPortfolioItem({
@@ -239,6 +290,78 @@ export default function VendorStudioView() {
     setShowPortfolioModal(false);
     setPortTag('');
     setPortClient('');
+    setPortImg(null);
+  };
+
+  const handleAvatarPicker = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingAvatar(true);
+    try {
+      const url = await uploadImage(file, { userId: user?.id, folder: 'avatars' });
+      if (url) {
+        setEditAvatar(url);
+      } else {
+        addToast('Could not upload photo. Please try again.', 'error');
+      }
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
+
+  const handleSaveProfile = async () => {
+    if (!editName.trim()) {
+      addToast('Please enter your name or stylist brand name', 'error');
+      return;
+    }
+    setSavingProfile(true);
+    try {
+      await updateVendorProfile({
+        name: editName.trim(),
+        bio: editBio.trim(),
+        phone: editPhone.trim(),
+        avatar: editAvatar || vendorProfile.avatar
+      });
+      setShowEditProfileModal(false);
+    } finally {
+      setSavingProfile(false);
+    }
+  };
+
+  const handleProductImagePicker = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingProductPhoto(true);
+    try {
+      const url = await uploadImage(file, { userId: user?.id, folder: 'products' });
+      if (url) {
+        setNewPrdImage(url);
+      } else {
+        addToast('Could not upload photo. Please try again.', 'error');
+      }
+    } finally {
+      setUploadingProductPhoto(false);
+    }
+  };
+
+  const handleSaveProduct = () => {
+    if (!newPrdName.trim()) {
+      addToast('Please enter a product name', 'error');
+      return;
+    }
+    addProduct({
+      name: newPrdName.trim(),
+      category: newPrdCategory,
+      price: Number(newPrdPrice) || 0,
+      stock: Number(newPrdStock) || 0,
+      description: newPrdDesc.trim() || 'Sold directly by this campus stylist.',
+      image: newPrdImage,
+      vendorId: vendorProfile.id
+    });
+    setShowAddProductModal(false);
+    setNewPrdName('');
+    setNewPrdDesc('');
+    setNewPrdImage(null);
   };
 
   const handlePayoutSubmit = (e) => {
@@ -280,6 +403,21 @@ export default function VendorStudioView() {
 
         {/* Action Toggle & Customer Switcher */}
         <div className="flex flex-wrap items-center gap-2.5">
+          {/* Edit Profile */}
+          <button
+            onClick={() => {
+              setEditName(vendorProfile.name || '');
+              setEditBio(vendorProfile.bio || '');
+              setEditPhone(vendorProfile.phone || '');
+              setEditAvatar(vendorProfile.avatar || '');
+              setShowEditProfileModal(true);
+            }}
+            className="apple-btn-secondary text-xs px-3.5 py-2 flex items-center gap-2"
+          >
+            <Settings size={14} />
+            <span>Edit Profile</span>
+          </button>
+
           {/* Dorm Travel Availability Switch */}
           <button
             onClick={toggleVendorDormTravel}
@@ -312,6 +450,7 @@ export default function VendorStudioView() {
           { id: 'schedule', label: `Schedule & Bookings (${activeConfirmedBookings.length})` },
           { id: 'services', label: `Service Menu (${myServices.length})` },
           { id: 'portfolio', label: `Hairstyle Portfolio (${myStylistObj.portfolio?.length || 0})` },
+          { id: 'shop', label: `My Shop (${myProducts.length})` },
           { id: 'wholesale', label: 'Wholesale Supplies (25% Off)' },
           { id: 'wallet', label: `Wallet & Payouts (K ${vendorWallet.availableBalance})` }
         ].map((tab) => (
@@ -358,10 +497,14 @@ export default function VendorStudioView() {
             <div className="card p-5">
               <span className="text-[11px] text-slate-500 dark:text-slate-300 font-semibold uppercase tracking-wider block">Completed Campus Jobs</span>
               <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white my-1 font-heading">{vendorWallet.completedJobsCount}</h2>
-              <div className="flex items-center gap-1 text-xs text-amber-500 font-bold mt-1">
-                <Star size={13} fill="#F5A623" />
-                <span>4.9 Star Average Rating</span>
-              </div>
+              {myRating > 0 ? (
+                <div className="flex items-center gap-1 text-xs text-amber-500 font-bold mt-1">
+                  <Star size={13} fill="#F5A623" />
+                  <span>{myRating.toFixed(1)} Star Average ({myReviewsCount} reviews)</span>
+                </div>
+              ) : (
+                <p className="text-xs text-slate-400 mt-1 m-0">No ratings yet</p>
+              )}
             </div>
           </div>
 
@@ -695,21 +838,91 @@ export default function VendorStudioView() {
             </button>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            {myStylistObj.portfolio?.map((item) => (
-              <div key={item.id} className="relative rounded-3xl overflow-hidden aspect-square border border-black/10 dark:border-white/10 bg-slate-900 group">
-                <img src={item.image} alt={item.tag} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-transparent to-transparent flex flex-col justify-end p-3 text-white">
-                  <span className="text-xs font-bold leading-tight">{item.tag}</span>
-                  <span className="text-[10px] text-slate-300">{item.client}</span>
+          {(!myStylistObj.portfolio || myStylistObj.portfolio.length === 0) ? (
+            <div className="card p-8 text-center text-slate-400">
+              <UploadCloud size={32} className="mx-auto mb-2 opacity-50" />
+              <p className="text-sm font-bold text-slate-900 dark:text-white m-0">No transformations uploaded yet</p>
+              <p className="text-xs text-slate-400 mt-1">Add your first hairstyle photo to start attracting bookings!</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {myStylistObj.portfolio.map((item) => (
+                <div key={item.id} className="relative rounded-3xl overflow-hidden aspect-square border border-black/10 dark:border-white/10 bg-slate-900 group">
+                  <img src={item.image} alt={item.tag} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-transparent to-transparent flex flex-col justify-end p-3 text-white">
+                    <span className="text-xs font-bold leading-tight">{item.tag}</span>
+                    <span className="text-[10px] text-slate-300">{item.client}</span>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
-      {/* 5. WHOLESALE SUPPLIES CLUB (ANTI-DISINTERMEDIATION MOAT) */}
+      {/* 5. MY SHOP — vendor-owned product listings */}
+      {activeTab === 'shop' && (
+        <div className="flex flex-col gap-4">
+          <div className="flex justify-between items-center">
+            <div>
+              <h2 className="text-lg font-bold text-slate-900 dark:text-white tracking-tight m-0">My Shop</h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400 m-0">List your own hair products, tools, or kits for students to buy</p>
+            </div>
+            <button
+              className="apple-btn-primary text-xs px-3.5 py-2"
+              onClick={() => setShowAddProductModal(true)}
+            >
+              <Plus size={14} />
+              <span>Add Product</span>
+            </button>
+          </div>
+
+          {myProducts.length === 0 ? (
+            <div className="card p-8 text-center text-slate-400">
+              <ShoppingBag size={32} className="mx-auto mb-2 opacity-50" />
+              <p className="text-sm font-bold text-slate-900 dark:text-white m-0">No products listed yet</p>
+              <p className="text-xs text-slate-400 mt-1">Add a product to start selling directly to campus students.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {myProducts.map((prd) => (
+                <div key={prd.id} className="card p-4 flex flex-col justify-between border border-black/10 dark:border-white/10 bg-white dark:bg-[#15151c]">
+                  <div>
+                    <div className="relative h-36 w-full rounded-2xl overflow-hidden mb-3 bg-slate-800">
+                      <img src={prd.image} alt={prd.name} className="w-full h-full object-cover" />
+                    </div>
+                    <h4 className="text-sm font-bold text-slate-900 dark:text-white tracking-tight mb-1">{prd.name}</h4>
+                    <p className="text-[11px] text-slate-400 mb-2 line-clamp-2">{prd.description}</p>
+                    <span className="price-tag text-base">K {prd.price}</span>
+                  </div>
+
+                  <div className="pt-3 mt-3 border-t border-black/5 dark:border-white/5 flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5">
+                      <label className="text-[10px] text-slate-400 font-semibold" htmlFor={`stock-${prd.id}`}>Stock:</label>
+                      <input
+                        id={`stock-${prd.id}`}
+                        type="number"
+                        min="0"
+                        className="form-input text-xs py-1 w-16"
+                        defaultValue={prd.stock}
+                        onBlur={(e) => updateProductStock(prd.id, e.target.value)}
+                      />
+                    </div>
+                    <button
+                      onClick={() => deleteProduct(prd.id)}
+                      className="text-red-500 hover:text-red-600 bg-transparent border-0 cursor-pointer text-xs font-semibold"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 6. WHOLESALE SUPPLIES CLUB (ANTI-DISINTERMEDIATION MOAT) */}
       {activeTab === 'wholesale' && (
         <div className="flex flex-col gap-5">
           {/* Wholesale Club Benefits Banner */}
@@ -783,7 +996,7 @@ export default function VendorStudioView() {
         </div>
       )}
 
-      {/* 6. WALLET & PAYOUTS */}
+      {/* 7. WALLET & PAYOUTS */}
       {activeTab === 'wallet' && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Payout Withdrawal Card */}
@@ -982,6 +1195,30 @@ export default function VendorStudioView() {
             <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-3">Add Hairstyle Transformation</h3>
 
             <div className="form-group">
+              <label className="form-label">Photo of the Finished Look:</label>
+              <div className="flex items-center gap-4 bg-black/[0.02] dark:bg-white/[0.02] p-3.5 rounded-2xl border border-black/10 dark:border-white/10">
+                <div className="w-16 h-16 rounded-2xl overflow-hidden border-2 border-amber-400 shadow-sm shrink-0 bg-slate-800 flex items-center justify-center">
+                  {portImg ? (
+                    <img src={portImg} alt="Preview" className="w-full h-full object-cover" />
+                  ) : (
+                    <UploadCloud size={20} className="text-slate-500" />
+                  )}
+                </div>
+                <label className={`apple-btn-secondary text-xs px-3 py-1.5 inline-flex items-center gap-1.5 cursor-pointer ${uploadingPortfolioPhoto ? 'opacity-60 pointer-events-none' : ''}`}>
+                  <UploadCloud size={13} />
+                  <span>{uploadingPortfolioPhoto ? 'Uploading…' : portImg ? 'Change Photo' : 'Upload Photo'}</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    disabled={uploadingPortfolioPhoto}
+                    onChange={handlePortfolioImagePicker}
+                  />
+                </label>
+              </div>
+            </div>
+
+            <div className="form-group">
               <label className="form-label">Hairstyle / Cut Tag:</label>
               <input
                 type="text"
@@ -1007,8 +1244,173 @@ export default function VendorStudioView() {
               <button className="apple-btn-secondary text-xs flex-1" onClick={() => setShowPortfolioModal(false)}>
                 Cancel
               </button>
-              <button className="apple-btn-primary text-xs flex-1" onClick={handleSavePortfolio}>
+              <button className="apple-btn-primary text-xs flex-1" disabled={uploadingPortfolioPhoto} onClick={handleSavePortfolio}>
                 Save Photo
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* EDIT PROFILE MODAL */}
+      {showEditProfileModal && (
+        <div className="modal-overlay" onClick={() => setShowEditProfileModal(false)}>
+          <div className="modal-card max-w-md" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-3">Edit My Stylist Profile</h3>
+
+            <div className="form-group">
+              <label className="form-label">Profile Photo:</label>
+              <div className="flex items-center gap-4 bg-black/[0.02] dark:bg-white/[0.02] p-3.5 rounded-2xl border border-black/10 dark:border-white/10">
+                <img
+                  src={editAvatar || vendorProfile.avatar}
+                  alt="Preview"
+                  className="w-16 h-16 rounded-2xl object-cover border-2 border-amber-400 shadow-sm shrink-0 bg-slate-800"
+                />
+                <label className={`apple-btn-secondary text-xs px-3 py-1.5 inline-flex items-center gap-1.5 cursor-pointer ${uploadingAvatar ? 'opacity-60 pointer-events-none' : ''}`}>
+                  <UploadCloud size={13} />
+                  <span>{uploadingAvatar ? 'Uploading…' : 'Change Photo'}</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    disabled={uploadingAvatar}
+                    onChange={handleAvatarPicker}
+                  />
+                </label>
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Full Name / Brand Name:</label>
+              <input
+                type="text"
+                className="form-input text-xs"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">WhatsApp Phone Number:</label>
+              <input
+                type="tel"
+                className="form-input text-xs"
+                value={editPhone}
+                onChange={(e) => setEditPhone(e.target.value)}
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Bio / Tagline:</label>
+              <textarea
+                rows={3}
+                className="form-input text-xs"
+                value={editBio}
+                onChange={(e) => setEditBio(e.target.value)}
+              />
+            </div>
+
+            <div className="flex gap-2 mt-4">
+              <button className="apple-btn-secondary text-xs flex-1" onClick={() => setShowEditProfileModal(false)}>
+                Cancel
+              </button>
+              <button className="apple-btn-primary text-xs flex-1" disabled={uploadingAvatar || savingProfile} onClick={handleSaveProfile}>
+                {savingProfile ? 'Saving…' : 'Save Profile'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ADD PRODUCT MODAL */}
+      {showAddProductModal && (
+        <div className="modal-overlay" onClick={() => setShowAddProductModal(false)}>
+          <div className="modal-card max-w-md" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-3">Add Product to My Shop</h3>
+
+            <div className="form-group">
+              <label className="form-label">Product Photo:</label>
+              <div className="flex items-center gap-4 bg-black/[0.02] dark:bg-white/[0.02] p-3.5 rounded-2xl border border-black/10 dark:border-white/10">
+                <div className="w-16 h-16 rounded-2xl overflow-hidden border-2 border-amber-400 shadow-sm shrink-0 bg-slate-800 flex items-center justify-center">
+                  {newPrdImage ? (
+                    <img src={newPrdImage} alt="Preview" className="w-full h-full object-cover" />
+                  ) : (
+                    <UploadCloud size={20} className="text-slate-500" />
+                  )}
+                </div>
+                <label className={`apple-btn-secondary text-xs px-3 py-1.5 inline-flex items-center gap-1.5 cursor-pointer ${uploadingProductPhoto ? 'opacity-60 pointer-events-none' : ''}`}>
+                  <UploadCloud size={13} />
+                  <span>{uploadingProductPhoto ? 'Uploading…' : 'Upload Photo'}</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    disabled={uploadingProductPhoto}
+                    onChange={handleProductImagePicker}
+                  />
+                </label>
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Product Name:</label>
+              <input
+                type="text"
+                className="form-input text-xs"
+                placeholder="e.g. Edge Control Gel (100g)"
+                value={newPrdName}
+                onChange={(e) => setNewPrdName(e.target.value)}
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Category:</label>
+              <select className="form-select text-xs" value={newPrdCategory} onChange={(e) => setNewPrdCategory(e.target.value)}>
+                <option value="Hair Care Products">Hair Care Products</option>
+                <option value="Nails & Lashes">Nails & Lashes</option>
+                <option value="Wigs & Weaves">Wigs & Weaves</option>
+                <option value="Barber Supplies">Barber Supplies</option>
+              </select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 form-group">
+              <div>
+                <label className="form-label">Price (K):</label>
+                <input
+                  type="number"
+                  className="form-input text-xs"
+                  value={newPrdPrice}
+                  onChange={(e) => setNewPrdPrice(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="form-label">Stock Quantity:</label>
+                <input
+                  type="number"
+                  className="form-input text-xs"
+                  value={newPrdStock}
+                  onChange={(e) => setNewPrdStock(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Description:</label>
+              <textarea
+                rows={2}
+                className="form-input text-xs"
+                placeholder="Describe the product for student buyers"
+                value={newPrdDesc}
+                onChange={(e) => setNewPrdDesc(e.target.value)}
+              />
+            </div>
+
+            <div className="flex gap-2 mt-4">
+              <button className="apple-btn-secondary text-xs flex-1" onClick={() => setShowAddProductModal(false)}>
+                Cancel
+              </button>
+              <button className="apple-btn-primary text-xs flex-1" disabled={uploadingProductPhoto} onClick={handleSaveProduct}>
+                Add to Shop
               </button>
             </div>
           </div>

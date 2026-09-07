@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Award, Users, DollarSign, Share2, Copy, Check, TrendingUp, Trophy, ShieldCheck, Sparkles, MessageSquare } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 
@@ -41,7 +42,7 @@ export default function AmbassadorHubModal({ isOpen, onClose }) {
   };
 
 
-  return (
+  return createPortal(
     <div className="modal-overlay" onClick={onClose} role="dialog" aria-modal="true">
       <div className="modal-card max-w-lg p-6 overflow-y-auto max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
         <button className="modal-close" onClick={onClose} aria-label="Close modal">
@@ -157,6 +158,7 @@ export default function AmbassadorHubModal({ isOpen, onClose }) {
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

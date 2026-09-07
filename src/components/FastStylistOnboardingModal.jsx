@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Sparkles, Check, ArrowRight, ArrowLeft, UploadCloud, Scissors, MapPin, Phone, ShieldCheck, DollarSign, Clock, Store, Truck, Camera } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { campusHostels, lusakaUniversities } from '../data/mockData';
 import { playSuccessChime } from '../lib/soundEffects';
+import { uploadImage } from '../lib/uploadImage';
 
 export default function FastStylistOnboardingModal({ isOpen, onClose }) {
   const { currentCampus, staffList, user, onboardAsStylist, addToast } = useApp();
@@ -29,6 +31,7 @@ export default function FastStylistOnboardingModal({ isOpen, onClose }) {
   // Step 3 State
   const [bio, setBio] = useState('Passionate student stylist offering clean, scalp-friendly hair services right on campus!');
   const [portfolioImage, setPortfolioImage] = useState('/images/barber_service.jpg');
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [completedStylist, setCompletedStylist] = useState(null);
 
   // Auto-generate handle from name
@@ -46,15 +49,20 @@ export default function FastStylistOnboardingModal({ isOpen, onClose }) {
 
   if (!isOpen) return null;
 
-  const handleImagePicker = (e) => {
+  const handleImagePicker = async (e) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        setPortfolioImage(event.target.result);
-        addToast('Portfolio photo attached!', 'success');
-      };
-      reader.readAsDataURL(file);
+    if (!file) return;
+    setUploadingPhoto(true);
+    try {
+      const url = await uploadImage(file, { userId: user?.id, folder: 'avatars' });
+      if (url) {
+        setPortfolioImage(url);
+        addToast('Portfolio photo uploaded!', 'success');
+      } else {
+        addToast('Could not upload photo. Please try again.', 'error');
+      }
+    } finally {
+      setUploadingPhoto(false);
     }
   };
 
@@ -107,7 +115,7 @@ export default function FastStylistOnboardingModal({ isOpen, onClose }) {
     }
   };
 
-  return (
+  return createPortal(
     <div className="modal-overlay" onClick={onClose} role="dialog" aria-modal="true">
       <div className="modal-card max-w-lg p-6 overflow-y-auto max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
         <button className="modal-close" onClick={onClose} aria-label="Close modal">
@@ -376,13 +384,14 @@ export default function FastStylistOnboardingModal({ isOpen, onClose }) {
                       className="w-16 h-16 rounded-2xl object-cover border-2 border-amber-400 shadow-sm shrink-0 bg-slate-800"
                     />
                     <div className="flex-1">
-                      <label className="apple-btn-secondary text-xs px-3 py-1.5 inline-flex items-center gap-1.5 cursor-pointer">
+                      <label className={`apple-btn-secondary text-xs px-3 py-1.5 inline-flex items-center gap-1.5 cursor-pointer ${uploadingPhoto ? 'opacity-60 pointer-events-none' : ''}`}>
                         <Camera size={13} />
-                        <span>Upload Photo</span>
+                        <span>{uploadingPhoto ? 'Uploading…' : 'Upload Photo'}</span>
                         <input
                           type="file"
                           accept="image/*"
                           className="hidden"
+                          disabled={uploadingPhoto}
                           onChange={handleImagePicker}
                         />
                       </label>
@@ -426,9 +435,10 @@ export default function FastStylistOnboardingModal({ isOpen, onClose }) {
                   <button
                     type="button"
                     onClick={handleCompleteOnboarding}
+                    disabled={uploadingPhoto}
                     className="apple-btn-primary flex-1 text-xs py-3 font-bold bg-gradient-to-r from-amber-400 to-orange-500 border-0 shadow-apple-gold"
                   >
-                    <span>Launch My Stylist Studio 🚀</span>
+                    <span>{uploadingPhoto ? 'Uploading photo…' : 'Launch My Stylist Studio 🚀'}</span>
                   </button>
                 </div>
               </div>
@@ -490,6 +500,7 @@ export default function FastStylistOnboardingModal({ isOpen, onClose }) {
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

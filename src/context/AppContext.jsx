@@ -1132,17 +1132,19 @@ export const AppProvider = ({ children }) => {
       client: item.client || 'Campus Client'
     };
 
+    const currentEntry = staffList.find((s) => s.id === vendorProfile.id);
+    const nextPortfolio = [newItem, ...(currentEntry?.portfolio || [])];
+
     setStaffList((prev) =>
-      prev.map((s) => {
-        if (s.id === vendorProfile.id) {
-          return { ...s, portfolio: [newItem, ...(s.portfolio || [])] };
-        }
-        return s;
-      })
+      prev.map((s) => (s.id === vendorProfile.id ? { ...s, portfolio: nextPortfolio } : s))
     );
 
+    if (isSupabaseConfigured && supabase && vendorProfile.id) {
+      supabase.from('vendor_profiles').update({ portfolio: nextPortfolio }).eq('id', vendorProfile.id).then(null, () => {});
+    }
+
     addToast(`New hairstyle "${item.tag}" added to your portfolio!`, 'success');
-  }, [vendorProfile.id, addToast]);
+  }, [vendorProfile.id, staffList, addToast]);
 
   const addService = useCallback(async (serviceData) => {
     const newId = generateId('srv');
@@ -1179,7 +1181,7 @@ export const AppProvider = ({ children }) => {
 
   const addProduct = useCallback(async (productData) => {
     const newId = generateId('prd');
-    const newPrd = { id: newId, ...productData, image: productData.image || '/images/hair_product.jpg', rating: 5.0, reviewsCount: 1 };
+    const newPrd = { id: newId, ...productData, image: productData.image || '/images/hair_product.jpg', rating: 0, reviewsCount: 0 };
     setProducts((prev) => [...prev, newPrd]);
 
     if (isSupabaseConfigured && supabase) {
@@ -1190,11 +1192,13 @@ export const AppProvider = ({ children }) => {
         price: productData.price,
         stock: productData.stock,
         description: productData.description,
-        image: newPrd.image
+        image: newPrd.image,
+        vendor_id: productData.vendorId || null
       }]).then(null, () => {});
     }
 
     addToast(`New product "${productData.name}" added to shop!`, 'success');
+    return newPrd;
   }, [addToast]);
 
   const updateProductStock = useCallback((productId, newStock) => {
@@ -1205,6 +1209,14 @@ export const AppProvider = ({ children }) => {
       supabase.from('products').update({ stock: Number(newStock) }).eq('id', productId).then(null, () => {});
     }
     addToast('Stock level updated', 'info');
+  }, [addToast]);
+
+  const deleteProduct = useCallback((productId) => {
+    setProducts((prev) => prev.filter((p) => p.id !== productId));
+    if (isSupabaseConfigured && supabase) {
+      supabase.from('products').delete().eq('id', productId).then(null, () => {});
+    }
+    addToast('Product removed from shop', 'info');
   }, [addToast]);
 
   const updateOrderStatus = useCallback((orderId, newStatus) => {
@@ -1683,6 +1695,8 @@ export const AppProvider = ({ children }) => {
     addService,
     updateService,
     addProduct,
+    updateProductStock,
+    deleteProduct,
     updateOrderStatus,
     updateBookingStatus,
     verifyStylist,
@@ -1716,7 +1730,7 @@ export const AppProvider = ({ children }) => {
     toggleFavorite, sendMessage, createBooking, cancelBooking, rescheduleBooking,
     claimNoShowRefund, claimClientNoShow,
     updateVendorSchedule, exportToCalendar, createOrder, addService, updateService, addProduct,
-    updateProductStock, updateOrderStatus, updateBookingStatus,
+    updateProductStock, deleteProduct, updateOrderStatus, updateBookingStatus,
     addToast, dismissToast
   ]);
 

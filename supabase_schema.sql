@@ -47,13 +47,17 @@ CREATE TABLE IF NOT EXISTS public.vendor_profiles (
   has_studio BOOLEAN DEFAULT true,
   phone TEXT,
   bio TEXT,
-  rating NUMERIC DEFAULT 4.9,
+  rating NUMERIC DEFAULT 0,
   reviews_count INT DEFAULT 0,
   portfolio JSONB DEFAULT '[]'::jsonb,
   payout_provider TEXT DEFAULT 'Airtel Money',
   payout_number TEXT,
   created_at TIMESTAMPTZ DEFAULT now()
 );
+
+-- Existing tables created before this fix still have the old fake default —
+-- correct it so newly-inserted rows never get a fabricated rating.
+ALTER TABLE public.vendor_profiles ALTER COLUMN rating SET DEFAULT 0;
 
 -- 3. SERVICES (Hairstyles & Grooming)
 CREATE TABLE IF NOT EXISTS public.services (
@@ -80,7 +84,7 @@ CREATE TABLE IF NOT EXISTS public.service_add_ons (
   duration INT DEFAULT 10
 );
 
--- 5. PRODUCTS (Campus Hair Care Essentials & Cosmetics)
+-- 5. PRODUCTS (Campus Hair Care Essentials & Cosmetics + Vendor Shop Items)
 CREATE TABLE IF NOT EXISTS public.products (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
@@ -88,11 +92,17 @@ CREATE TABLE IF NOT EXISTS public.products (
   price NUMERIC NOT NULL,
   stock INT DEFAULT 10,
   image TEXT,
-  rating NUMERIC DEFAULT 5.0,
+  rating NUMERIC DEFAULT 0,
   reviews_count INT DEFAULT 0,
   description TEXT,
+  vendor_id TEXT REFERENCES public.vendor_profiles(id) ON DELETE CASCADE,
   created_at TIMESTAMPTZ DEFAULT now()
 );
+
+-- Existing tables created before this fix still have the old fake default —
+-- correct it so newly-inserted rows never get a fabricated rating.
+ALTER TABLE public.products ALTER COLUMN rating SET DEFAULT 0;
+ALTER TABLE public.products ADD COLUMN IF NOT EXISTS vendor_id TEXT REFERENCES public.vendor_profiles(id) ON DELETE CASCADE;
 
 -- 6. BOOKINGS (Appointment Queue)
 CREATE TABLE IF NOT EXISTS public.bookings (
@@ -406,6 +416,7 @@ CREATE POLICY addons_public_read ON public.service_add_ons FOR SELECT TO anon, a
 CREATE POLICY addons_admin_write ON public.service_add_ons FOR ALL TO authenticated USING (public.is_admin()) WITH CHECK (public.is_admin());
 CREATE POLICY products_public_read ON public.products FOR SELECT TO anon, authenticated USING (true);
 CREATE POLICY products_admin_write ON public.products FOR ALL TO authenticated USING (public.is_admin()) WITH CHECK (public.is_admin());
+CREATE POLICY products_vendor_write ON public.products FOR ALL TO authenticated USING (vendor_id = auth.uid()::text) WITH CHECK (vendor_id = auth.uid()::text);
 
 CREATE POLICY bookings_participant_read ON public.bookings FOR SELECT TO authenticated USING (customer_id = auth.uid() OR staff_id = auth.uid()::text OR public.is_admin());
 CREATE POLICY orders_customer_read ON public.orders FOR SELECT TO authenticated USING (customer_id = auth.uid() OR public.is_admin());
@@ -427,6 +438,31 @@ GRANT EXECUTE ON FUNCTION public.transition_booking(TEXT, TEXT, TEXT, TEXT) TO a
 
 -- Provision administrators by SQL only; never by email or password logic in the client:
 -- UPDATE public.profiles SET role = 'admin' WHERE id = '<auth-user-uuid>';
+
+-- ==============================================================================
+-- Storage: real photo uploads (vendor avatars, portfolio, product images)
+-- replacing the old base64-data-URL-in-a-text-column approach. Each user
+-- writes only inside a folder named after their own auth uid; anyone can read.
+-- ==============================================================================
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('media', 'media', true)
+ON CONFLICT (id) DO NOTHING;
+
+DROP POLICY IF EXISTS media_public_read ON storage.objects;
+CREATE POLICY media_public_read ON storage.objects FOR SELECT TO anon, authenticated USING (bucket_id = 'media');
+
+DROP POLICY IF EXISTS media_owner_write ON storage.objects;
+CREATE POLICY media_owner_write ON storage.objects FOR INSERT TO authenticated
+  WITH CHECK (bucket_id = 'media' AND (storage.foldername(name))[1] = auth.uid()::text);
+
+DROP POLICY IF EXISTS media_owner_update ON storage.objects;
+CREATE POLICY media_owner_update ON storage.objects FOR UPDATE TO authenticated
+  USING (bucket_id = 'media' AND (storage.foldername(name))[1] = auth.uid()::text)
+  WITH CHECK (bucket_id = 'media' AND (storage.foldername(name))[1] = auth.uid()::text);
+
+DROP POLICY IF EXISTS media_owner_delete ON storage.objects;
+CREATE POLICY media_owner_delete ON storage.objects FOR DELETE TO authenticated
+  USING (bucket_id = 'media' AND (storage.foldername(name))[1] = auth.uid()::text);
 
 -- ==============================================================================
 -- Enable Realtime for live updates (guarded — ALTER PUBLICATION ... ADD TABLE
