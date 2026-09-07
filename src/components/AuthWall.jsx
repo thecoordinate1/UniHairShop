@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient';
+import OAuthButtons from './OAuthButtons';
 
 export default function AuthWall() {
   const {
@@ -177,6 +178,18 @@ export default function AuthWall() {
               <span>Log In</span>
             </button>
           </div>
+
+          {/* OAuth Quick Sign-In */}
+          {authMode !== 'forgot' && (
+            <div className="mb-5">
+              <OAuthButtons theme="dark" />
+              <div className="flex items-center gap-3 mt-4 mb-1">
+                <div className="flex-1 h-px bg-white/10" />
+                <span className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">or use email</span>
+                <div className="flex-1 h-px bg-white/10" />
+              </div>
+            </div>
+          )}
 
           {/* Error Alert Box */}
           {errorMsg && (

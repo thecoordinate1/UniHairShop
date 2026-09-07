@@ -774,6 +774,13 @@ export const AppProvider = ({ children }) => {
 
   // Smart Booking Creation with Escrow & No-Show Deposit Support
   const createBooking = useCallback(async (newBookingData) => {
+    // Google/Apple sign-in doesn't collect a phone number, and bookings require
+    // one (the stylist needs a way to reach you). Fail clearly here instead of
+    // letting it hit a raw database constraint error.
+    if (!user.phone || !user.phone.trim()) {
+      addToast('Please add a phone number to your profile before booking (Account → Edit Profile).', 'error');
+      throw new Error('Missing phone number');
+    }
     const bookingId = generateId('UHS-B');
     const paymentMode = newBookingData.paymentMode || (newBookingData.paymentMethod === 'Pay on Arrival' ? 'arrival' : 'full');
     const totalPrice = Number(newBookingData.totalPrice || newBookingData.price || 0);
@@ -1316,6 +1323,27 @@ export const AppProvider = ({ children }) => {
     return { success: true, data };
   }, [addToast]);
 
+  // Google/Apple both use the same OAuth redirect flow: this call navigates the
+  // browser away to the provider and back, so there's no local state to set here
+  // — the existing onAuthStateChange listener picks up the session on return.
+  // Requires the provider to actually be enabled in the Supabase dashboard first.
+  const signInWithOAuth = useCallback(async (provider) => {
+    if (!isSupabaseConfigured || !supabase) {
+      addToast(`Sign in with ${provider === 'google' ? 'Google' : 'Apple'} requires a live connection.`, 'error');
+      return;
+    }
+    const redirectUrl = typeof window !== 'undefined' && window.location.origin
+      ? `${window.location.origin}/`
+      : 'https://www.unihair.shop/';
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider,
+      options: { redirectTo: redirectUrl }
+    });
+    if (error) {
+      addToast(error.message || `Unable to sign in with ${provider === 'google' ? 'Google' : 'Apple'}.`, 'error');
+    }
+  }, [addToast]);
+
   const signUp = useCallback(async (userData) => {
     const isStylist = userData.role === 'vendor';
     const cleanEmail = userData.email.trim();
@@ -1712,6 +1740,7 @@ export const AppProvider = ({ children }) => {
     user,
     setUser,
     signIn,
+    signInWithOAuth,
     signUp,
     signOut,
     terminateAllSessions,
@@ -1789,7 +1818,7 @@ export const AppProvider = ({ children }) => {
     vendorProfile, updateVendorProfile, toggleVendorDormTravel, vendorWallet,
     requestVendorPayout, acceptBooking, completeBooking, addVendorPortfolioItem,
     activeTab, currentCampus, session, authLoading, isGuestMode, continueAsGuest, exitGuestMode, user,
-    signIn, signUp, signOut, terminateAllSessions, requireAuth, pendingAuthCallback, updateUserProfile, onboardAsStylist,
+    signIn, signInWithOAuth, signUp, signOut, terminateAllSessions, requireAuth, pendingAuthCallback, updateUserProfile, onboardAsStylist,
     verifyStylist, settleVendorPayout,
     services, products, bundles, staffList, bookings, orders, cart,
     showAuthModal, isCartOpen, bookingService, selectedProduct, selectedStylist,

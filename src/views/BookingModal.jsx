@@ -138,7 +138,7 @@ export default function BookingModal() {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleProceedToPayment = () => {
+  const handleProceedToPayment = async () => {
     if (!validate()) {
       addToast('Please fix the highlighted errors before proceeding.', 'error');
       return;
@@ -146,7 +146,42 @@ export default function BookingModal() {
 
     if (paymentMode === 'arrival') {
       // Create directly with pending arrival payment
-      const newBooking = createBooking({
+      try {
+        const newBooking = await createBooking({
+          serviceId: bookingService.id,
+          serviceName: bookingService.name,
+          category: bookingService.category,
+          basePrice,
+          selectedAddOns,
+          serviceType: serviceType === 'travel' ? 'Travel to Dorm' : 'Visit Studio',
+          travelFee,
+          serviceFee,
+          roommateDiscount,
+          isRoommateBooking,
+          totalPrice: grandTotal,
+          price: grandTotal,
+          paymentMode: 'arrival',
+          staffName: selectedStaff,
+          date: selectedDate,
+          time: selectedTime,
+          campus: selectedCampus,
+          hostel: serviceType === 'travel' ? `${selectedHostelHall} (${roomNumber})` : 'Campus Studio / Student Centre',
+          paymentMethod: 'Pay on Arrival (Cash / MoMo)'
+        });
+        setConfirmedBooking(newBooking);
+      } catch {
+        // createBooking already shows a toast explaining what went wrong
+      }
+      return;
+    }
+
+    setShowLencoWizard(true);
+  };
+
+  const handleLencoSuccess = async (lencoResult) => {
+    setShowLencoWizard(false);
+    try {
+      const newBooking = await createBooking({
         serviceId: bookingService.id,
         serviceName: bookingService.name,
         category: bookingService.category,
@@ -159,46 +194,19 @@ export default function BookingModal() {
         isRoommateBooking,
         totalPrice: grandTotal,
         price: grandTotal,
-        paymentMode: 'arrival',
+        paymentMode,
         staffName: selectedStaff,
         date: selectedDate,
         time: selectedTime,
         campus: selectedCampus,
         hostel: serviceType === 'travel' ? `${selectedHostelHall} (${roomNumber})` : 'Campus Studio / Student Centre',
-        paymentMethod: 'Pay on Arrival (Cash / MoMo)'
+        paymentMethod: lencoResult.paymentMethod,
+        lencoRef: lencoResult.lencoReference
       });
       setConfirmedBooking(newBooking);
-      return;
+    } catch {
+      // createBooking already shows a toast explaining what went wrong
     }
-
-    setShowLencoWizard(true);
-  };
-
-  const handleLencoSuccess = (lencoResult) => {
-    setShowLencoWizard(false);
-    const newBooking = createBooking({
-      serviceId: bookingService.id,
-      serviceName: bookingService.name,
-      category: bookingService.category,
-      basePrice,
-      selectedAddOns,
-      serviceType: serviceType === 'travel' ? 'Travel to Dorm' : 'Visit Studio',
-      travelFee,
-      serviceFee,
-      roommateDiscount,
-      isRoommateBooking,
-      totalPrice: grandTotal,
-      price: grandTotal,
-      paymentMode,
-      staffName: selectedStaff,
-      date: selectedDate,
-      time: selectedTime,
-      campus: selectedCampus,
-      hostel: serviceType === 'travel' ? `${selectedHostelHall} (${roomNumber})` : 'Campus Studio / Student Centre',
-      paymentMethod: lencoResult.paymentMethod,
-      lencoRef: lencoResult.lencoReference
-    });
-    setConfirmedBooking(newBooking);
   };
 
   const handleClose = () => {

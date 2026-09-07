@@ -32,7 +32,8 @@ import {
   Copy,
   Check,
   TrendingUp,
-  Zap
+  Zap,
+  Phone
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import BookingDetailModal from '../components/BookingDetailModal';
@@ -323,6 +324,34 @@ export default function AccountView() {
             className="apple-btn-primary text-xs py-2 px-4 shrink-0 font-bold shadow-apple-gold cursor-pointer"
           >
             Sign In / Register
+          </button>
+        </div>
+      )}
+
+      {/* Missing Phone Nudge — Google/Apple sign-in doesn't collect one, but bookings require it */}
+      {user?.isLoggedIn && !user?.phone && (
+        <div className="card p-5 bg-gradient-to-r from-rose-500/15 via-rose-400/10 to-transparent border border-rose-400/30 flex flex-wrap items-center justify-between gap-4 shadow-sm">
+          <div className="flex items-center gap-3.5 min-w-0">
+            <div className="bg-rose-400/20 text-rose-500 w-11 h-11 rounded-2xl flex items-center justify-center font-extrabold shadow-sm shrink-0 border border-rose-400/30">
+              <Phone size={20} />
+            </div>
+            <div>
+              <h2 className="text-sm font-bold text-slate-900 dark:text-white m-0">Add Your Phone Number</h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400 m-0 mt-0.5">
+                Your stylist needs a way to reach you — add a phone number before booking your first appointment.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => {
+              setEditName(user.name);
+              setEditPhone(user.phone || '');
+              setEditHostel(user.hostel);
+              setShowEditModal(true);
+            }}
+            className="apple-btn-primary text-xs py-2 px-4 shrink-0 font-bold shadow-apple-gold cursor-pointer"
+          >
+            Add Phone Number
           </button>
         </div>
       )}
