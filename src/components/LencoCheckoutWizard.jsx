@@ -92,6 +92,10 @@ export default function LencoCheckoutWizard({ amount, title, onSuccess, onClose,
           </div>
         </div>
 
+        <div className="mb-4 rounded-2xl border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-[11px] leading-relaxed text-amber-700 dark:text-amber-200">
+          <strong>Demo checkout:</strong> no money is collected here. Connect Lenco hosted checkout and verified webhooks before enabling live payments.
+        </div>
+
         {/* Amount Summary */}
         <div className="bg-slate-900/80 p-3 rounded-xl mb-4 flex justify-between items-center border border-white/10">
           <div>
@@ -119,7 +123,7 @@ export default function LencoCheckoutWizard({ amount, title, onSuccess, onClose,
                 <div className="momo-logo airtel">Airtel</div>
                 <div className="flex-1">
                   <p className="font-semibold text-sm m-0">Airtel Money (Zambia)</p>
-                  <p className="text-[11px] text-slate-400 m-0">Direct mobile money STK prompt</p>
+                  <p className="text-[11px] text-slate-400 m-0">Demo mobile-money flow</p>
                 </div>
               </div>
 
@@ -130,7 +134,7 @@ export default function LencoCheckoutWizard({ amount, title, onSuccess, onClose,
                 <div className="momo-logo mtn">MTN</div>
                 <div className="flex-1">
                   <p className="font-semibold text-sm m-0">MTN Mobile Money</p>
-                  <p className="text-[11px] text-slate-400 m-0">Instant MoMo pin request</p>
+                  <p className="text-[11px] text-slate-400 m-0">Demo mobile-money flow</p>
                 </div>
               </div>
 
@@ -141,7 +145,7 @@ export default function LencoCheckoutWizard({ amount, title, onSuccess, onClose,
                 <div className="momo-logo zamtel">Zamtel</div>
                 <div className="flex-1">
                   <p className="font-semibold text-sm m-0">Zamtel Kwacha</p>
-                  <p className="text-[11px] text-slate-400 m-0">Zamtel mobile wallet push</p>
+                  <p className="text-[11px] text-slate-400 m-0">Demo mobile-money flow</p>
                 </div>
               </div>
 
@@ -154,7 +158,7 @@ export default function LencoCheckoutWizard({ amount, title, onSuccess, onClose,
                 </div>
                 <div className="flex-1">
                   <p className="font-semibold text-sm m-0">Bank Card (Visa / Mastercard)</p>
-                  <p className="text-[11px] text-slate-400 m-0">Processed by Lenco Gateway</p>
+                  <p className="text-[11px] text-slate-400 m-0">Unavailable until hosted checkout is connected</p>
                 </div>
               </div>
 
@@ -229,7 +233,7 @@ export default function LencoCheckoutWizard({ amount, title, onSuccess, onClose,
               className="btn-success w-full mt-2"
               onClick={handleStartPayment}
             >
-              <span>{method === 'arrival' ? 'Confirm Booking / Order' : `Pay K ${amount} via Lenco`}</span>
+                  <span>{method === 'arrival' ? 'Confirm Booking / Order' : `Continue with demo payment`}</span>
               <ArrowRight size={16} />
             </button>
 

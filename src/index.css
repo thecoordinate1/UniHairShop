@@ -141,6 +141,22 @@
     @apply w-full max-w-[1200px] mx-auto flex items-center justify-between gap-2 sm:gap-4 box-border;
   }
 
+  @media (max-width: 639px) {
+    .header-inner {
+      gap: 0.35rem;
+    }
+
+    .brand-logo span {
+      display: none;
+    }
+
+    .campus-badge {
+      max-width: 6.5rem;
+      padding-left: 0.45rem;
+      padding-right: 0.45rem;
+    }
+  }
+
   .brand-logo {
     @apply flex items-center gap-2 text-lg sm:text-xl font-extrabold font-heading bg-transparent border-0 p-0 tracking-tight transition-transform active:scale-95 cursor-pointer;
     color: var(--text-main);
@@ -234,6 +250,7 @@
 
   .modal-card {
     @apply bg-white dark:bg-[#121217] border border-black/10 dark:border-white/15 rounded-t-[36px] sm:rounded-[36px] max-w-lg w-full max-h-[90vh] overflow-y-auto p-6 sm:p-7 shadow-2xl relative box-border mx-auto;
+    padding-bottom: max(1.5rem, calc(env(safe-area-inset-bottom) + 1.25rem));
     animation: popIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
   }
 
