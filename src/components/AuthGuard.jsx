@@ -159,6 +159,25 @@ export default function AuthGuard({ children, requiredRole = 'authenticated', fa
     );
   }
 
-  // 3. User is authorized!
+  // 3. Requires Admin Role, but user is not an Admin
+  if (requiredRole === 'admin' && user.role !== 'admin') {
+    return (
+      <div className="w-full max-w-md mx-auto py-12 px-4">
+        <div className="apple-card p-6 text-center border-red-400/30">
+          <div className="w-14 h-14 rounded-3xl bg-red-400/15 text-red-500 flex items-center justify-center mx-auto mb-4 shadow-sm">
+            <ShieldCheck size={26} />
+          </div>
+          <h2 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight mb-1.5">
+            Access Denied
+          </h2>
+          <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+            This area is restricted to UniHairShop administrators. Your account does not have admin access.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // 4. User is authorized!
   return children;
 }

@@ -3,6 +3,16 @@ import { X, Sparkles, Lock, Mail, Phone, MapPin, User, Building, Store, Scissors
 import { useApp } from '../context/AppContext';
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient';
 
+// Deep-link into the webmail inbox for common providers; fall back to mailto:
+// (opens the device's default mail app) for anything else.
+function getEmailProviderLink(emailAddress) {
+  const domain = (emailAddress.split('@')[1] || '').toLowerCase();
+  if (domain.includes('gmail')) return 'https://mail.google.com/mail/u/0/#inbox';
+  if (domain.includes('outlook') || domain.includes('hotmail') || domain.includes('live')) return 'https://outlook.live.com/mail/0/inbox';
+  if (domain.includes('yahoo')) return 'https://mail.yahoo.com/d/folders/1';
+  return `mailto:${emailAddress}`;
+}
+
 export default function AuthModal() {
   const {
     showAuthModal,
@@ -14,7 +24,6 @@ export default function AuthModal() {
     currentCampus,
     lusakaUniversities,
     userMode,
-    setUserMode,
     pendingAuthCallback,
     setPendingAuthCallback,
     addToast
@@ -35,6 +44,8 @@ export default function AuthModal() {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [resetSuccess, setResetSuccess] = useState(false);
+  const [verificationEmail, setVerificationEmail] = useState('');
+  const [resendingVerification, setResendingVerification] = useState(false);
 
   useEffect(() => {
     if (!showAuthModal) return;
@@ -102,7 +113,7 @@ export default function AuthModal() {
 
     setLoading(true);
     try {
-      await signUp({
+      const result = await signUp({
         name: name.trim(),
         email: email.trim(),
         password,
@@ -113,20 +124,46 @@ export default function AuthModal() {
         referralCode: referralCode.trim().toUpperCase()
       });
 
-      if (roleType === 'stylist') {
-        setUserMode('vendor');
-      }
-
-      setShowAuthModal(false);
-
-      if (pendingAuthCallback) {
-        pendingAuthCallback();
-        setPendingAuthCallback(null);
+      // A live session means either local/no-Supabase mode (always instant) or
+      // Supabase with email confirmation disabled — either way they're already
+      // signed in, so continue straight into the app. Otherwise (real Supabase
+      // with confirmation required) signUp() intentionally did NOT log them in,
+      // so show the verify-your-email wizard instead.
+      if (!isSupabaseConfigured || result?.data?.session) {
+        setShowAuthModal(false);
+        if (pendingAuthCallback) {
+          pendingAuthCallback();
+          setPendingAuthCallback(null);
+        }
+      } else {
+        setVerificationEmail(email.trim());
+        setAuthMode('verify');
       }
     } catch (err) {
       setErrorMsg(err.message || 'Failed to create account.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleResendVerification = async () => {
+    if (!verificationEmail || !isSupabaseConfigured || !supabase) return;
+    setResendingVerification(true);
+    setErrorMsg('');
+    try {
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email: verificationEmail,
+        options: {
+          emailRedirectTo: typeof window !== 'undefined' ? `${window.location.origin}/` : 'https://www.unihair.shop/'
+        }
+      });
+      if (error) throw error;
+      addToast('A new verification email is on its way.', 'success');
+    } catch (err) {
+      setErrorMsg(err.message || 'Could not resend the verification email.');
+    } finally {
+      setResendingVerification(false);
     }
   };
 
@@ -186,6 +223,8 @@ export default function AuthModal() {
               ? 'Welcome Back to UniHair'
               : authMode === 'signup'
               ? 'Join UniHairShop Campus'
+              : authMode === 'verify'
+              ? 'Check Your Email'
               : 'Reset Your Password'}
           </h2>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 mb-0">
@@ -193,12 +232,14 @@ export default function AuthModal() {
               ? 'Sign in to access your appointments & student rewards'
               : authMode === 'signup'
               ? 'Create a profile to book styles and earn K15 student rewards'
+              : authMode === 'verify'
+              ? 'Verify your email to activate your UniHairShop account'
               : 'Enter your email to receive a password reset link'}
           </p>
         </div>
 
         {/* Segmented Control Tabs */}
-        {authMode !== 'forgot' && (
+        {authMode !== 'forgot' && authMode !== 'verify' && (
           <div className="flex bg-black/[0.04] dark:bg-white/[0.06] p-1 rounded-2xl border border-black/5 dark:border-white/10 mb-4" role="tablist">
             <button
               type="button"
@@ -238,7 +279,35 @@ export default function AuthModal() {
         )}
 
         {/* FORGOT PASSWORD RESET SUCCESS */}
-        {resetSuccess ? (
+        {authMode === 'verify' ? (
+          <div className="text-center py-3" role="status" aria-live="polite">
+            <div className="w-14 h-14 rounded-full bg-emerald-500/15 text-emerald-500 flex items-center justify-center mx-auto mb-3 border border-emerald-500/25">
+              <Mail size={26} />
+            </div>
+            <h3 className="text-base font-bold text-slate-900 dark:text-white mb-1">Verify your account</h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed mb-4">
+              We sent a verification link to <strong className="text-slate-700 dark:text-slate-200 break-all">{verificationEmail}</strong>. Open it, then return here to sign in.
+            </p>
+            <div className="rounded-2xl bg-amber-400/10 border border-amber-400/25 px-3 py-2.5 text-left text-[11px] text-slate-600 dark:text-slate-300 mb-4">
+              <span className="font-bold text-amber-600 dark:text-amber-300">1.</span> Check your inbox and spam folder&nbsp; <span className="font-bold text-amber-600 dark:text-amber-300">2.</span> Tap “Verify email”&nbsp; <span className="font-bold text-amber-600 dark:text-amber-300">3.</span> Sign in
+            </div>
+            <a
+              href={getEmailProviderLink(verificationEmail)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="apple-btn-primary w-full text-xs py-2.5 mb-2 flex items-center justify-center gap-1.5"
+            >
+              <Mail size={14} />
+              <span>Open Email App</span>
+            </a>
+            <button type="button" onClick={handleResendVerification} disabled={resendingVerification || !isSupabaseConfigured} className="apple-btn-secondary w-full text-xs py-2.5 mb-2">
+              {resendingVerification ? 'Sending verification email…' : 'Resend Verification Email'}
+            </button>
+            <button type="button" onClick={() => { setAuthMode('signin'); setErrorMsg(''); }} className="text-xs text-amber-600 dark:text-amber-300 hover:underline bg-transparent border-0 cursor-pointer py-2">
+              I’ve verified my email — Sign In
+            </button>
+          </div>
+        ) : resetSuccess ? (
           <div className="text-center py-4">
             <div className="w-12 h-12 rounded-full bg-emerald-500/20 text-emerald-500 flex items-center justify-center mx-auto mb-3">
               <CheckCircle2 size={24} />

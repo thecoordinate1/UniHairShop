@@ -89,7 +89,6 @@ export const AppProvider = ({ children }) => {
     }
   });
 
-  const [isAdmin, setIsAdmin] = useState(false);
   const [session, setSession] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [pendingAuthCallback, setPendingAuthCallback] = useState(null);
@@ -221,15 +220,35 @@ export const AppProvider = ({ children }) => {
     setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
   }, []);
 
-  const toggleUserMode = useCallback(async () => {
-    if (userMode === 'vendor') {
+  // Which view modes this signed-in account is actually allowed to switch into,
+  // derived from the DB-hydrated role (never from client-only state).
+  const availableViewModes = useMemo(() => {
+    if (!user?.isLoggedIn) return ['customer'];
+    if (user.role === 'admin') return ['admin', 'vendor', 'customer'];
+    if (user.role === 'vendor') return ['vendor', 'customer'];
+    return ['customer'];
+  }, [user?.isLoggedIn, user?.role]);
+
+  const switchViewMode = useCallback(async (targetMode) => {
+    if (targetMode === 'admin') {
+      if (user?.role !== 'admin') {
+        addToast('Admin access required.', 'error');
+        return;
+      }
+      setUserMode('admin');
+      setActiveTab('admin');
+      addToast('Switched to Master Admin view', 'success');
+      return;
+    }
+
+    if (targetMode === 'customer') {
       setUserMode('customer');
       setActiveTab('home');
       addToast('Switched to Student Customer Mode', 'info');
       return;
     }
 
-    // Switching to Vendor Mode -> Enforce Database Verification Check
+    // targetMode === 'vendor' -> Enforce Database Verification Check
     if (user?.role === 'admin') {
       setUserMode('vendor');
       setActiveTab('vendor');
@@ -289,11 +308,16 @@ export const AppProvider = ({ children }) => {
     setUserMode('vendor');
     setActiveTab('vendor');
     addToast('Verified Campus Stylist workspace activated!', 'success');
-  }, [userMode, user, setActiveTab, addToast]);
+  }, [user, setActiveTab, addToast]);
+
+  const toggleUserMode = useCallback(async () => {
+    await switchViewMode(userMode === 'vendor' ? 'customer' : 'vendor');
+  }, [userMode, switchViewMode]);
 
   // Supabase Backend Sync, Auth Listener & Realtime Subscription
   useEffect(() => {
     // Check for auth callback parameters in URL (Email Verification, Password Recovery, Auth Errors)
+    let justConfirmedEmail = false;
     if (typeof window !== 'undefined') {
       const hash = window.location.hash || '';
       const search = window.location.search || '';
@@ -306,8 +330,15 @@ export const AppProvider = ({ children }) => {
           window.history.replaceState(null, '', window.location.pathname);
         } catch { /* ignore */ }
       } else if (hash.includes('type=signup') || hash.includes('type=email_change')) {
-        addToast('🎉 Email verified successfully! Welcome to UniHair Shop!', 'success');
+        justConfirmedEmail = true;
+        addToast('🎉 Email verified successfully! Please sign in to continue.', 'success');
         window.history.replaceState(null, '', window.location.pathname);
+        // The confirmation link auto-establishes a session; sign back out so the
+        // user lands on the sign-in screen instead of being silently logged in.
+        if (isSupabaseConfigured && supabase) {
+          supabase.auth.signOut().catch(() => {});
+        }
+        setShowAuthModal(true);
       } else if (hash.includes('type=recovery')) {
         addToast('🔑 Password recovery session authenticated. You can update your password in Settings.', 'info');
         window.history.replaceState(null, '', window.location.pathname);
@@ -319,25 +350,25 @@ export const AppProvider = ({ children }) => {
       return;
     }
 
+    if (justConfirmedEmail) {
+      setAuthLoading(false);
+    } else {
     // Check initial session
     supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
       setSession(currentSession);
       if (currentSession?.user) {
-        const userEmail = (currentSession.user.email || '').toLowerCase();
-        const isMasterAdmin = userEmail === 'mapalolungu65@gmail.com';
-
         supabase
           .from('profiles')
           .select('*')
           .eq('id', currentSession.user.id)
           .single()
           .then(({ data: profile }) => {
-            if (profile || isMasterAdmin) {
-              const assignedRole = isMasterAdmin ? 'admin' : (profile?.role || 'customer');
-              const validPoints = typeof profile?.loyalty_points === 'number' ? profile.loyalty_points : (isMasterAdmin ? 1000 : 50);
+            if (profile) {
+              const assignedRole = profile.role || 'customer';
+              const validPoints = typeof profile?.loyalty_points === 'number' ? profile.loyalty_points : 50;
               const validCode = (profile?.referral_code && /^\d{7}$/.test(profile.referral_code))
                 ? profile.referral_code
-                : (isMasterAdmin ? '1000001' : generate7DigitReferralCode());
+                : generate7DigitReferralCode();
               const validCount = typeof profile?.referral_count === 'number' ? profile.referral_count : 0;
               const validHistory = Array.isArray(profile?.points_history) && profile.points_history.length > 0
                 ? profile.points_history
@@ -362,11 +393,11 @@ export const AppProvider = ({ children }) => {
               setUser({
                 id: profile?.id || currentSession.user.id,
                 isLoggedIn: true,
-                name: isMasterAdmin ? 'Mapalo Lungu' : (profile?.name || currentSession.user.email?.split('@')[0]),
+                name: profile?.name || currentSession.user.email?.split('@')[0],
                 email: currentSession.user.email,
                 phone: profile?.phone || '0971234567',
                 campus: profile?.campus || currentCampus,
-                hostel: profile?.hostel || 'Executive Campus Admin Suite',
+                hostel: profile?.hostel || 'Campus Hostel',
                 role: assignedRole,
                 loyaltyPoints: validPoints,
                 referralCode: validCode,
@@ -376,34 +407,34 @@ export const AppProvider = ({ children }) => {
                 favorites: []
               });
               if (assignedRole === 'admin') {
-                setIsAdmin(true);
+                setUserMode('admin');
               } else if (assignedRole === 'vendor') {
                 setUserMode('vendor');
+              } else {
+                setUserMode('customer');
               }
             }
           });
       }
       setAuthLoading(false);
     });
+    }
 
     // Listen for auth state changes
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
       setSession(currentSession);
       if (currentSession?.user) {
-        const userEmail = (currentSession.user.email || '').toLowerCase();
-        const isMasterAdmin = userEmail === 'mapalolungu65@gmail.com';
-
         const { data: profile } = await supabase
           .from('profiles')
           .select('*')
           .eq('id', currentSession.user.id)
           .single();
 
-        const assignedRole = isMasterAdmin ? 'admin' : (profile?.role || 'customer');
-        const validPoints = typeof profile?.loyalty_points === 'number' ? profile.loyalty_points : (isMasterAdmin ? 1000 : 50);
+        const assignedRole = profile?.role || 'customer';
+        const validPoints = typeof profile?.loyalty_points === 'number' ? profile.loyalty_points : 50;
         const validCode = (profile?.referral_code && /^\d{7}$/.test(profile.referral_code))
           ? profile.referral_code
-          : (isMasterAdmin ? '1000001' : generate7DigitReferralCode());
+          : generate7DigitReferralCode();
         const validCount = typeof profile?.referral_count === 'number' ? profile.referral_count : 0;
         const validHistory = Array.isArray(profile?.points_history) && profile.points_history.length > 0
           ? profile.points_history
@@ -419,7 +450,7 @@ export const AppProvider = ({ children }) => {
           ...prev,
           id: profile?.id || currentSession.user.id,
           isLoggedIn: true,
-          name: isMasterAdmin ? 'Mapalo Lungu' : (profile?.name || prev.name),
+          name: profile?.name || prev.name,
           email: currentSession.user.email,
           phone: profile?.phone || prev.phone,
           campus: profile?.campus || prev.campus,
@@ -433,13 +464,15 @@ export const AppProvider = ({ children }) => {
         }));
 
         if (assignedRole === 'admin') {
-          setIsAdmin(true);
+          setUserMode('admin');
         } else if (assignedRole === 'vendor') {
           setUserMode('vendor');
+        } else {
+          setUserMode('customer');
         }
       } else if (event === 'SIGNED_OUT') {
         setSession(null);
-        setIsAdmin(false);
+        setUserMode('customer');
       }
     });
 
@@ -772,29 +805,26 @@ export const AppProvider = ({ children }) => {
     // Insert into Supabase if configured
     if (isSupabaseConfigured && supabase) {
       try {
-        await supabase.from('bookings').insert([{
-          id: bookingId,
-          service_id: newBookingData.serviceId || 'srv-1',
-          service_name: newBookingData.serviceName || 'Campus Service',
-          category: newBookingData.category || 'Barbering',
-          staff_id: newBookingData.staffId || 'stf-1',
-          staff_name: newBookingData.staffName || 'Campus Stylist',
-          date: newBookingData.date || new Date().toISOString().split('T')[0],
-          time: newBookingData.time || '14:00',
-          campus: currentCampus,
-          hostel: newBookingData.hostel || 'Hostel Room',
-          service_type: newBookingData.serviceType || 'Travel to Dorm',
-          customer_name: user.name,
-          customer_phone: user.phone,
-          selected_add_ons: newBookingData.selectedAddOns || [],
-          price: newBookingData.price || 90,
-          total_price: totalPrice,
-          payment_method: newBookingData.paymentMethod || 'Cash / Mobile Money',
-          payment_status: newBooking.paymentStatus,
-          status: 'Confirmed'
-        }]);
+        const { data: remoteBooking, error } = await supabase.rpc('request_booking', {
+          p_service_id: newBookingData.serviceId || 'srv-1',
+          p_service_name: newBookingData.serviceName || 'Campus Service',
+          p_category: newBookingData.category || 'Barbering',
+          p_staff_id: newBookingData.staffId || 'stf-1',
+          p_date: newBookingData.date || new Date().toISOString().split('T')[0],
+          p_time: newBookingData.time || '14:00',
+          p_hostel: newBookingData.hostel || 'Hostel Room',
+          p_service_type: newBookingData.serviceType || 'Travel to Dorm',
+          p_price: Number(newBookingData.price || 90),
+          p_total_price: totalPrice,
+          p_add_ons: newBookingData.selectedAddOns || []
+        });
+        if (error) throw error;
+        if (remoteBooking) {
+          setBookings((prev) => [remoteBooking, ...prev.filter((booking) => booking.id !== bookingId)]);
+        }
       } catch (err) {
-        console.warn('[UniHairShop] Supabase booking insert fallback:', err.message);
+        setBookings((prev) => prev.filter((booking) => booking.id !== bookingId));
+        throw new Error(err.message || 'Unable to request this booking. Please choose another slot.');
       }
     }
 
@@ -806,7 +836,9 @@ export const AppProvider = ({ children }) => {
       totalEarned: prev.totalEarned + creditedAmount
     }));
 
-    const pointsEarned = Math.max(5, Math.floor(totalPrice / 10));
+    // In production, points are credited by the protected transition_booking
+    // function only after a stylist marks the appointment completed.
+    const pointsEarned = isSupabaseConfigured && supabase ? 0 : Math.max(5, Math.floor(totalPrice / 10));
     const newPtEntry = {
       id: `pt-bk-${Date.now()}`,
       type: 'booking',
@@ -815,6 +847,7 @@ export const AppProvider = ({ children }) => {
       date: new Date().toISOString()
     };
     setUser((prev) => {
+      if (pointsEarned === 0) return prev;
       const nextPoints = (prev.loyaltyPoints || 0) + pointsEarned;
       const nextHistory = [newPtEntry, ...(prev.pointsHistory || [])];
       if (isSupabaseConfigured && supabase && prev.id) {
@@ -1040,6 +1073,7 @@ export const AppProvider = ({ children }) => {
   }, [addToast]);
 
   const completeBooking = useCallback(async (bookingId) => {
+    const previousStatus = bookings.find((b) => b.id === bookingId)?.status;
     setBookings((prev) =>
       prev.map((b) => (b.id === bookingId ? { ...b, status: 'Completed' } : b))
     );
@@ -1048,10 +1082,34 @@ export const AppProvider = ({ children }) => {
       completedJobsCount: prev.completedJobsCount + 1
     }));
     if (isSupabaseConfigured && supabase) {
-      supabase.from('bookings').update({ status: 'Completed' }).eq('id', bookingId).then(null, () => {});
+      const { error } = await supabase.rpc('transition_booking', {
+        p_booking_id: bookingId,
+        p_status: 'Completed',
+        p_date: null,
+        p_time: null
+      });
+      if (error) {
+        setBookings((prev) =>
+          prev.map((b) => (b.id === bookingId ? { ...b, status: previousStatus || b.status } : b))
+        );
+        setVendorWallet((prev) => ({
+          ...prev,
+          completedJobsCount: Math.max(0, prev.completedJobsCount - 1)
+        }));
+        addToast(error.message || 'Unable to complete this booking.', 'error');
+        return;
+      }
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('loyalty_points, points_history')
+        .eq('id', user.id)
+        .single();
+      if (profile) {
+        setUser((prev) => ({ ...prev, loyaltyPoints: profile.loyalty_points || 0, pointsHistory: profile.points_history || [] }));
+      }
     }
     addToast(`Booking ${bookingId} marked as completed! Funds ready for payout.`, 'success');
-  }, [addToast]);
+  }, [addToast, bookings, user.id]);
 
   const requestVendorPayout = useCallback(async (amount, provider, accountNumber) => {
     if (amount <= 0 || amount > vendorWallet.availableBalance) {
@@ -1198,43 +1256,6 @@ export const AppProvider = ({ children }) => {
 
   // Authentication & RBAC Functions
   const signIn = useCallback(async (email, password) => {
-    const trimmedEmail = email.trim().toLowerCase();
-    const isMasterAdmin = trimmedEmail === 'mapalolungu65@gmail.com';
-
-    if (isMasterAdmin && (password === 'Th3coordin@t3' || password)) {
-      setUser({
-        isLoggedIn: true,
-        id: 'admin-mapalo',
-        name: 'Mapalo Lungu',
-        email: 'mapalolungu65@gmail.com',
-        phone: '0971234567',
-        campus: 'Lusaka Headquarters',
-        hostel: 'Executive Admin Portal',
-        role: 'admin',
-        loyaltyPoints: 1000,
-        referralCode: 'MASTER-ADMIN-01',
-        favorites: []
-      });
-      setIsAdmin(true);
-      addToast('Welcome, Master Administrator Mapalo Lungu!', 'success');
-
-      if (isSupabaseConfigured && supabase) {
-        supabase.auth.signInWithPassword({ email: trimmedEmail, password }).then(({ data, error }) => {
-          if (error) {
-            // Auto register master admin on remote auth if not existing
-            supabase.auth.signUp({
-              email: trimmedEmail,
-              password,
-              options: { data: { name: 'Mapalo Lungu', role: 'admin' } }
-            }).then(null, () => {});
-          } else if (data?.session) {
-            setSession(data.session);
-          }
-        }, () => {});
-      }
-      return { success: true };
-    }
-
     if (!isSupabaseConfigured || !supabase) {
       setUser((prev) => ({ ...prev, isLoggedIn: true, email }));
       addToast('Signed in successfully!', 'success');
@@ -1373,56 +1394,10 @@ export const AppProvider = ({ children }) => {
     if (data?.user) {
       const newUserId = data.user.id;
 
-      // Handle Referrer reward (+25 pts to the referrer and increment their referral count)
-      if (cleanReferralCode) {
-        try {
-          const { data: referrerData } = await supabase
-            .from('profiles')
-            .select('id, loyalty_points, referral_count, points_history')
-            .eq('referral_code', cleanReferralCode)
-            .single();
-
-          if (referrerData) {
-            const currentPoints = Number(referrerData.loyalty_points || 0);
-            const currentCount = Number(referrerData.referral_count || 0);
-            const currentHistory = Array.isArray(referrerData.points_history) ? referrerData.points_history : [];
-
-            await supabase.from('profiles').update({
-              loyalty_points: currentPoints + 25,
-              referral_count: currentCount + 1,
-              points_history: [
-                ...currentHistory,
-                {
-                  id: `pt-ref-reward-${Date.now()}`,
-                  type: 'friend_joined',
-                  points: 25,
-                  title: `Campus friend (${cleanName}) joined using your code! 🚀`,
-                  date: new Date().toISOString()
-                }
-              ]
-            }).eq('id', referrerData.id);
-          }
-        } catch { /* ignore referrer update fail */ }
-      }
-
-      // Upsert profile in Supabase profiles table
-      try {
-        await supabase.from('profiles').upsert([{
-          id: newUserId,
-          email: cleanEmail,
-          name: cleanName,
-          phone: cleanPhone,
-          campus: cleanCampus,
-          hostel: cleanHostel,
-          role: assignedRole,
-          loyalty_points: totalInitialPoints,
-          referral_code: userReferralCode,
-          referred_by: cleanReferralCode || null,
-          referral_count: 0,
-          points_history: initialPointsHistory
-        }]);
-      } catch { /* ignore */ }
-
+      // Note: the profiles row (including welcome points and referral bonus) is created
+      // server-side by the handle_new_user() DB trigger on auth.users insert — it doesn't
+      // need a client-side write here. vendor_profiles has no equivalent trigger, so that
+      // upsert below is still required for stylist signups.
       if (isStylist) {
         try {
           await supabase.from('vendor_profiles').upsert([{
@@ -1445,28 +1420,32 @@ export const AppProvider = ({ children }) => {
         } catch { /* ignore */ }
       }
 
-      setUser({
-        isLoggedIn: true,
-        id: newUserId,
-        name: cleanName,
-        email: cleanEmail,
-        phone: cleanPhone,
-        campus: cleanCampus,
-        hostel: cleanHostel,
-        role: assignedRole,
-        loyaltyPoints: totalInitialPoints,
-        referralCode: userReferralCode,
-        referredBy: cleanReferralCode || null,
-        referralCount: 0,
-        pointsHistory: initialPointsHistory,
-        favorites: []
-      });
-
-      if (isStylist) {
-        setUserMode('vendor');
-      }
-
+      // Only log the new account in locally if Supabase actually returned a live
+      // session (i.e. email confirmation is disabled). When confirmation is required,
+      // data.session is null and the user must confirm their email and sign in explicitly —
+      // otherwise the app would show them as logged in with no real Supabase session.
       if (data.session) {
+        setUser({
+          isLoggedIn: true,
+          id: newUserId,
+          name: cleanName,
+          email: cleanEmail,
+          phone: cleanPhone,
+          campus: cleanCampus,
+          hostel: cleanHostel,
+          role: assignedRole,
+          loyaltyPoints: totalInitialPoints,
+          referralCode: userReferralCode,
+          referredBy: cleanReferralCode || null,
+          referralCount: 0,
+          pointsHistory: initialPointsHistory,
+          favorites: []
+        });
+
+        if (isStylist) {
+          setUserMode('vendor');
+        }
+
         setSession(data.session);
       }
     }
@@ -1485,7 +1464,6 @@ export const AppProvider = ({ children }) => {
       await supabase.auth.signOut().catch(() => {});
     }
     setSession(null);
-    setIsAdmin(false);
     setUser(defaultGuestUser);
     setUserMode('customer');
     addToast('Signed out of UniHairShop', 'info');
@@ -1508,7 +1486,6 @@ export const AppProvider = ({ children }) => {
     } catch { /* ignore */ }
 
     setSession(null);
-    setIsAdmin(false);
     setUser(defaultGuestUser);
     setUserMode('customer');
     setIsGuestMode(false);
@@ -1650,20 +1627,6 @@ export const AppProvider = ({ children }) => {
     addToast(`Payout ${payoutId} settled successfully! Ref: ${txRef}`, 'success');
   }, [addToast]);
 
-  const toggleAdminMode = useCallback(() => {
-    setIsAdmin((prev) => {
-      const next = !prev;
-      if (next) {
-        setActiveTab('admin');
-        addToast('Master Admin mode enabled', 'info');
-      } else {
-        setActiveTab('home');
-        addToast('Switched to customer view', 'info');
-      }
-      return next;
-    });
-  }, [setActiveTab, addToast]);
-
   // Context value memoization
   const contextValue = useMemo(() => ({
     theme,
@@ -1671,6 +1634,8 @@ export const AppProvider = ({ children }) => {
     userMode,
     setUserMode,
     toggleUserMode,
+    switchViewMode,
+    availableViewModes,
     vendorTab,
     setVendorTab,
     vendorProfile,
@@ -1686,8 +1651,6 @@ export const AppProvider = ({ children }) => {
     currentCampus,
     setCurrentCampus,
     lusakaUniversities,
-    isAdmin,
-    setIsAdmin,
     session,
     authLoading,
     isGuestMode,
@@ -1751,7 +1714,6 @@ export const AppProvider = ({ children }) => {
     updateBookingStatus,
     verifyStylist,
     settleVendorPayout,
-    toggleAdminMode,
     filterCategory,
     setFilterCategory,
     serviceTypeFilter,
@@ -1766,12 +1728,12 @@ export const AppProvider = ({ children }) => {
     addToast,
     dismissToast
   }), [
-    theme, toggleTheme, userMode, toggleUserMode, vendorTab,
+    theme, toggleTheme, userMode, toggleUserMode, switchViewMode, availableViewModes, vendorTab,
     vendorProfile, updateVendorProfile, toggleVendorDormTravel, vendorWallet,
     requestVendorPayout, acceptBooking, completeBooking, addVendorPortfolioItem,
-    activeTab, currentCampus, isAdmin, session, authLoading, isGuestMode, continueAsGuest, exitGuestMode, user,
+    activeTab, currentCampus, session, authLoading, isGuestMode, continueAsGuest, exitGuestMode, user,
     signIn, signUp, signOut, terminateAllSessions, requireAuth, pendingAuthCallback, updateUserProfile, onboardAsStylist,
-    verifyStylist, settleVendorPayout, toggleAdminMode,
+    verifyStylist, settleVendorPayout,
     services, products, bundles, staffList, bookings, orders, cart,
     showAuthModal, isCartOpen, bookingService, selectedProduct, selectedStylist,
     showSafetyModal, lencoCheckoutState, conversations, activeChatStylistId,

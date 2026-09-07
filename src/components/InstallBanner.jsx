@@ -1,6 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { Download, X, Sparkles, Smartphone } from 'lucide-react';
 
+function safeGetItem(key) {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function safeSetItem(key, value) {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // Storage unavailable (e.g. Safari private mode) — fail silently, banner just won't persist dismissal.
+  }
+}
+
 export default function InstallBanner() {
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [showBanner, setShowBanner] = useState(false);
@@ -16,10 +32,10 @@ export default function InstallBanner() {
     if (isStandalone) return;
 
     // 2. Check if user already installed or dismissed within the last 7 days (localStorage)
-    const isInstalled = localStorage.getItem('unihair_pwa_installed') === 'true';
+    const isInstalled = safeGetItem('unihair_pwa_installed') === 'true';
     if (isInstalled) return;
 
-    const dismissedUntil = localStorage.getItem('unihair_install_dismissed_until');
+    const dismissedUntil = safeGetItem('unihair_install_dismissed_until');
     if (dismissedUntil && Date.now() < Number(dismissedUntil)) {
       return;
     }
@@ -32,7 +48,7 @@ export default function InstallBanner() {
     };
 
     const handleAppInstalled = () => {
-      localStorage.setItem('unihair_pwa_installed', 'true');
+      safeSetItem('unihair_pwa_installed', 'true');
       setShowBanner(false);
       setDeferredPrompt(null);
     };
@@ -59,7 +75,7 @@ export default function InstallBanner() {
       deferredPrompt.prompt();
       const { outcome } = await deferredPrompt.userChoice;
       if (outcome === 'accepted') {
-        localStorage.setItem('unihair_pwa_installed', 'true');
+        safeSetItem('unihair_pwa_installed', 'true');
         setShowBanner(false);
       }
       setDeferredPrompt(null);
@@ -67,7 +83,7 @@ export default function InstallBanner() {
       // Guide for iOS Safari and other browsers
       alert("To install UniHairShop on your phone:\n1. Tap the Share button in Safari / Chrome\n2. Scroll down and tap 'Add to Home Screen'");
       // Don't show again for 7 days
-      localStorage.setItem('unihair_install_dismissed_until', (Date.now() + 7 * 24 * 60 * 60 * 1000).toString());
+      safeSetItem('unihair_install_dismissed_until', (Date.now() + 7 * 24 * 60 * 60 * 1000).toString());
       setShowBanner(false);
     }
   };
@@ -75,7 +91,7 @@ export default function InstallBanner() {
   const handleDismiss = () => {
     setShowBanner(false);
     // Don't show again for 7 days when dismissed
-    localStorage.setItem('unihair_install_dismissed_until', (Date.now() + 7 * 24 * 60 * 60 * 1000).toString());
+    safeSetItem('unihair_install_dismissed_until', (Date.now() + 7 * 24 * 60 * 60 * 1000).toString());
   };
 
   if (!showBanner) return null;

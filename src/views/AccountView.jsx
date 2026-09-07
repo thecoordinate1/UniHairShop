@@ -40,7 +40,6 @@ import BookingDetailModal from '../components/BookingDetailModal';
 export default function AccountView() {
   const {
     user,
-    isAdmin,
     signOut,
     terminateAllSessions,
     updateUserProfile,
@@ -58,7 +57,8 @@ export default function AccountView() {
     toggleTheme,
     setShowSafetyModal,
     userMode,
-    toggleUserMode
+    toggleUserMode,
+    switchViewMode
   } = useApp();
 
   const [accountTab, setAccountTab] = useState('bookings');
@@ -166,6 +166,7 @@ export default function AccountView() {
   };
 
   const favoriteServices = services.filter((s) => user?.favorites?.includes(s.id));
+  const pointsValue = (Number(user?.loyaltyPoints) || 0) * 0.15;
 
   return (
     <div className="w-full max-w-3xl mx-auto flex flex-col gap-6">
@@ -189,7 +190,7 @@ export default function AccountView() {
         </div>
 
         {/* Action Controls: Edit Profile & Sign Out / In */}
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-end gap-2 min-w-0">
           {user.isLoggedIn ? (
             <>
               <button
@@ -238,7 +239,7 @@ export default function AccountView() {
           <button
             type="button"
             onClick={() => setAccountTab('rewards')}
-            className="bg-amber-400/15 hover:bg-amber-400/25 border border-amber-400/30 p-2.5 rounded-2xl flex items-center gap-2.5 backdrop-blur-md shadow-sm transition-all cursor-pointer text-left"
+            className="bg-amber-400/15 hover:bg-amber-400/25 border border-amber-400/30 p-2.5 rounded-2xl flex items-center gap-2.5 backdrop-blur-md shadow-sm transition-all cursor-pointer text-left shrink-0"
             title="View Loyalty Rewards & Referral Earnings"
           >
             <Award size={20} className="text-amber-400 shrink-0" aria-hidden="true" />
@@ -253,7 +254,7 @@ export default function AccountView() {
       {/* EDIT PROFILE MODAL */}
       {showEditModal && (
         <div className="modal-overlay" onClick={() => setShowEditModal(false)}>
-          <div className="modal-card max-w-sm" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-card max-w-sm pb-24 sm:pb-7" onClick={(e) => e.stopPropagation()}>
             <button className="modal-close" onClick={() => setShowEditModal(false)}>
               <X size={18} />
             </button>
@@ -294,7 +295,7 @@ export default function AccountView() {
                 />
               </div>
 
-              <button type="submit" className="apple-btn-primary w-full text-xs py-2.5 mt-2">
+              <button type="submit" className="apple-btn-primary w-full text-xs py-2.5 mt-2 mb-3">
                 <span>Save Profile Changes</span>
                 <CheckCircle2 size={14} />
               </button>
@@ -327,7 +328,7 @@ export default function AccountView() {
       )}
 
       {/* Master Admin Command Hub Banner */}
-      {(isAdmin || user?.role === 'admin') && (
+      {user?.role === 'admin' && (
         <div className="card p-5 bg-gradient-to-r from-amber-500/20 via-amber-400/15 to-transparent border border-amber-400/40 flex flex-wrap items-center justify-between gap-4 shadow-sm">
           <div className="flex items-center gap-3.5 min-w-0">
             <div className="bg-amber-400 text-slate-950 w-11 h-11 rounded-2xl flex items-center justify-center font-extrabold shadow-md shrink-0">
@@ -345,7 +346,7 @@ export default function AccountView() {
           </div>
 
           <button
-            onClick={() => setActiveTab('admin')}
+            onClick={() => switchViewMode('admin')}
             className="apple-btn-primary text-xs px-4 py-2 shrink-0 flex items-center gap-1.5"
           >
             <ShieldCheck size={14} />
@@ -815,7 +816,7 @@ export default function AccountView() {
                   <Gift size={13} className="text-emerald-400" />
                   <span>Discount Value</span>
                 </div>
-                <div className="text-lg font-extrabold text-emerald-400">K{Math.floor((user.loyaltyPoints || 0) / 5)} Off</div>
+                <div className="text-lg font-extrabold text-emerald-400">K{pointsValue.toFixed(2)} Off</div>
               </div>
             </div>
 

@@ -130,6 +130,15 @@ export default function App() {
   }
 
   const renderCurrentView = () => {
+    // If in admin mode and activeTab is home/admin, show AdminDashboardView guarded
+    if (userMode === 'admin' && (activeTab === 'home' || activeTab === 'admin')) {
+      return (
+        <AuthGuard requiredRole="admin">
+          <AdminDashboardView />
+        </AuthGuard>
+      );
+    }
+
     // If in vendor mode and activeTab is home/vendor, show VendorStudioView guarded
     if (userMode === 'vendor' && (activeTab === 'home' || activeTab === 'vendor')) {
       return (
@@ -161,8 +170,19 @@ export default function App() {
       case 'about':
         return <AboutView />;
       case 'admin':
-        return <AdminDashboardView />;
+        return (
+          <AuthGuard requiredRole="admin">
+            <AdminDashboardView />
+          </AuthGuard>
+        );
       default:
+        if (userMode === 'admin') {
+          return (
+            <AuthGuard requiredRole="admin">
+              <AdminDashboardView />
+            </AuthGuard>
+          );
+        }
         return userMode === 'vendor' ? (
           <AuthGuard requiredRole="vendor">
             <VendorStudioView />

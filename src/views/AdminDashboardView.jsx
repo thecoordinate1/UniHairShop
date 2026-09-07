@@ -112,6 +112,25 @@ export default function AdminDashboardView() {
     };
   }, [showAddServiceModal, showAddProductModal, showAddVendorModal, selectedStylistToVerify]);
 
+  // Defense in depth: don't trust the router alone to keep non-admins out.
+  if (user?.role !== 'admin') {
+    return (
+      <div className="w-full max-w-md mx-auto py-12 px-4">
+        <div className="apple-card p-6 text-center border-red-400/30">
+          <div className="w-14 h-14 rounded-3xl bg-red-400/15 text-red-500 flex items-center justify-center mx-auto mb-4 shadow-sm">
+            <ShieldCheck size={26} />
+          </div>
+          <h2 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight mb-1.5">
+            Access Denied
+          </h2>
+          <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+            This area is restricted to UniHairShop administrators.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   // Executive Calculations
   const grossBookingGMV = bookings.reduce((sum, b) => (b.status !== 'Cancelled' ? sum + (Number(b.price) || Number(b.totalPrice) || 0) : sum), 0);
   const grossRetailGMV = orders.reduce((sum, o) => sum + (Number(o.totalAmount) || 0), 0);

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Home, Calendar, ShoppingBag, MessageCircle, User, Store, Clock, Scissors, Image, Wallet } from 'lucide-react';
+import { Home, Calendar, ShoppingBag, MessageCircle, User, Store, Clock, Scissors, Image, Wallet, ShieldCheck } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 
 export default function BottomNav() {
@@ -66,7 +66,60 @@ export default function BottomNav() {
         />
       </div>
 
-      {userMode === 'customer' ? (
+      {userMode === 'admin' ? (
+        <>
+          {/* Admin 1. Dashboard */}
+          <button
+            className={`nav-item ${activeTab === 'admin' ? 'active' : ''}`}
+            onClick={() => handleTabClick('admin')}
+            aria-label="Master Admin Dashboard"
+            aria-current={activeTab === 'admin' ? 'page' : undefined}
+          >
+            <ShieldCheck size={18} className="text-amber-500" aria-hidden="true" />
+            <span>Admin</span>
+          </button>
+
+          {/* Admin 2. Messages */}
+          <button
+            className={`nav-item ${activeTab === 'messages' ? 'active' : ''}`}
+            onClick={() => handleTabClick('messages')}
+            aria-label="Messages"
+            aria-current={activeTab === 'messages' ? 'page' : undefined}
+          >
+            <div className="relative">
+              <MessageCircle size={18} aria-hidden="true" />
+              {totalUnreadMessages > 0 && (
+                <span className="badge-count bg-[#007AFF] shadow-blue-500/40" style={{ top: -6, right: -10 }} aria-hidden="true">
+                  {totalUnreadMessages}
+                </span>
+              )}
+            </div>
+            <span>Chat</span>
+          </button>
+
+          {/* Admin 3. Shop */}
+          <button
+            className={`nav-item ${activeTab === 'shop' ? 'active' : ''}`}
+            onClick={() => handleTabClick('shop')}
+            aria-label="Campus Shop"
+            aria-current={activeTab === 'shop' ? 'page' : undefined}
+          >
+            <ShoppingBag size={18} aria-hidden="true" />
+            <span>Shop</span>
+          </button>
+
+          {/* Admin 4. Profile (also hosts the role switcher) */}
+          <button
+            className={`nav-item ${activeTab === 'account' ? 'active' : ''}`}
+            onClick={() => handleTabClick('account')}
+            aria-label="Profile Settings and Role Switcher"
+            aria-current={activeTab === 'account' ? 'page' : undefined}
+          >
+            <User size={18} aria-hidden="true" />
+            <span>Profile</span>
+          </button>
+        </>
+      ) : userMode === 'customer' ? (
         <>
           {/* 1. Explore */}
           <button
