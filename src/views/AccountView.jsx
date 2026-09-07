@@ -962,6 +962,21 @@ export default function AccountView() {
         </div>
       )}
 
+      {/* Legal Footer Links */}
+      <div className="flex items-center justify-center gap-3 text-[11px] text-slate-400 pt-2">
+        <button onClick={() => setActiveTab('legal')} className="bg-transparent border-0 cursor-pointer p-0 hover:text-slate-600 dark:hover:text-slate-200 underline">
+          Terms of Service
+        </button>
+        <span>·</span>
+        <button onClick={() => setActiveTab('legal')} className="bg-transparent border-0 cursor-pointer p-0 hover:text-slate-600 dark:hover:text-slate-200 underline">
+          Privacy Policy
+        </button>
+        <span>·</span>
+        <button onClick={() => setActiveTab('legal')} className="bg-transparent border-0 cursor-pointer p-0 hover:text-slate-600 dark:hover:text-slate-200 underline">
+          Refund Policy
+        </button>
+      </div>
+
       {/* BOOKING DETAILS MODAL */}
       {selectedBookingDetail && (
         <BookingDetailModal

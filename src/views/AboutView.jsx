@@ -15,53 +15,63 @@ export default function AboutView() {
         </div>
         <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">UniHairShop Campus Network</h1>
         <p className="text-slate-400 text-xs sm:text-sm mt-1 leading-relaxed">
-          On-campus grooming, hair dressing, nail tech, and e-commerce for university students across Lusaka, Zambia.
+          On-campus grooming, hair dressing, nail tech, and e-commerce for university students in Lusaka, Zambia.
+          Live now at UNILUS Silverest, with more campuses opening as we onboard verified stylists there.
         </p>
       </div>
 
-      {/* Lusaka Universities List with UNILUS Silverest at Top */}
+      {/* Lusaka Universities List — UNILUS Silverest is live; others are expansion targets, not yet staffed */}
       <div className="card p-5 sm:p-6 border border-amber-400/30">
         <div className="flex items-center gap-3 mb-4">
           <GraduationCap size={26} className="text-amber-400 shrink-0" aria-hidden="true" />
           <div>
-            <h2 className="text-base font-bold text-white tracking-tight">Supported Lusaka Universities & Campuses</h2>
-            <p className="text-xs text-slate-400">Fast hostel delivery & bookable salon branches</p>
+            <h2 className="text-base font-bold text-white tracking-tight">Lusaka Universities & Campuses</h2>
+            <p className="text-xs text-slate-400">One campus live today — the rest are coming as we grow</p>
           </div>
         </div>
 
         <div className="flex flex-col gap-2.5" role="list">
-          {lusakaUniversities.map((uni, idx) => (
-            <div
-              key={uni.id}
-              role="listitem"
-              className={`p-3.5 rounded-2xl border flex items-center justify-between transition-all duration-200 ${
-                currentCampus === uni.name
-                  ? 'bg-amber-400/15 border-amber-400/60 shadow-sm'
-                  : 'bg-slate-900/60 border-white/10 hover:border-white/20'
-              }`}
-            >
-              <div className="min-w-0 pr-3">
-                <div className="flex items-center gap-2">
-                  <h3 className={`text-sm font-bold truncate ${currentCampus === uni.name ? 'text-amber-300' : 'text-white'}`}>{uni.name}</h3>
-                  {idx === 0 && (
-                    <span className="badge badge-low-stock text-[10px] py-0.5 px-2">Primary Hub</span>
-                  )}
-                </div>
-                <p className="text-xs text-slate-400 mt-0.5">Area: {uni.area}</p>
-              </div>
-
-              <button
-                className={currentCampus === uni.name ? 'apple-btn-primary text-xs px-4 py-1.5' : 'apple-btn-secondary text-xs px-4 py-1.5'}
-                onClick={() => {
-                  setCurrentCampus(uni.name);
-                  addToast(`Active campus set to ${uni.name}!`, 'success');
-                }}
-                aria-label={`Select ${uni.name} as active campus`}
+          {lusakaUniversities.map((uni, idx) => {
+            const isLive = idx === 0;
+            return (
+              <div
+                key={uni.id}
+                role="listitem"
+                className={`p-3.5 rounded-2xl border flex items-center justify-between transition-all duration-200 ${
+                  currentCampus === uni.name
+                    ? 'bg-amber-400/15 border-amber-400/60 shadow-sm'
+                    : 'bg-slate-900/60 border-white/10 hover:border-white/20'
+                } ${!isLive ? 'opacity-70' : ''}`}
               >
-                {currentCampus === uni.name ? 'Active' : 'Select'}
-              </button>
-            </div>
-          ))}
+                <div className="min-w-0 pr-3">
+                  <div className="flex items-center gap-2">
+                    <h3 className={`text-sm font-bold truncate ${currentCampus === uni.name ? 'text-amber-300' : 'text-white'}`}>{uni.name}</h3>
+                    {isLive ? (
+                      <span className="badge badge-in-stock text-[10px] py-0.5 px-2">Live Now</span>
+                    ) : (
+                      <span className="badge badge-out-of-stock text-[10px] py-0.5 px-2">Coming Soon</span>
+                    )}
+                  </div>
+                  <p className="text-xs text-slate-400 mt-0.5">Area: {uni.area}</p>
+                </div>
+
+                {isLive ? (
+                  <button
+                    className={currentCampus === uni.name ? 'apple-btn-primary text-xs px-4 py-1.5' : 'apple-btn-secondary text-xs px-4 py-1.5'}
+                    onClick={() => {
+                      setCurrentCampus(uni.name);
+                      addToast(`Active campus set to ${uni.name}!`, 'success');
+                    }}
+                    aria-label={`Select ${uni.name} as active campus`}
+                  >
+                    {currentCampus === uni.name ? 'Active' : 'Select'}
+                  </button>
+                ) : (
+                  <span className="text-[11px] text-slate-500 font-semibold shrink-0">Not staffed yet</span>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
 

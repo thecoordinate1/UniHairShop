@@ -52,8 +52,8 @@ export default function SafetyModal() {
           <div className="flex items-start gap-3 p-3 rounded-2xl bg-black/[0.02] dark:bg-white/[0.04] border border-black/5 dark:border-white/10">
             <UserCheck size={20} className="text-amber-500 shrink-0 mt-0.5" />
             <div>
-              <h4 className="text-sm font-bold text-slate-900 dark:text-white mb-0.5">1. Verified Student Stylists</h4>
-              <p className="m-0 text-slate-500 dark:text-slate-400">All campus barbers and braiders are authenticated university students with registered student IDs and verified dorm rooms.</p>
+              <h4 className="text-sm font-bold text-slate-900 dark:text-white mb-0.5">1. Verified Badge = Admin-Reviewed ID</h4>
+              <p className="m-0 text-slate-500 dark:text-slate-400">A stylist only gets the "Verified" badge after our team reviews a student ID document they submit — it's never automatic. Look for the badge before booking, and message us if a "verified" stylist seems off.</p>
             </div>
           </div>
 

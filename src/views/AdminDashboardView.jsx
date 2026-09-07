@@ -31,6 +31,7 @@ import {
   ArrowUpRight
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { supabase, isSupabaseConfigured } from '../lib/supabaseClient';
 
 export default function AdminDashboardView() {
   const {
@@ -58,6 +59,8 @@ export default function AdminDashboardView() {
   const [vendorVerifyFilter, setVendorVerifyFilter] = useState('All'); // 'All' | 'Verified' | 'Pending'
   const [trafficCampusFilter, setTrafficCampusFilter] = useState('All');
   const [trafficStatusFilter, setTrafficStatusFilter] = useState('All');
+  const [analyticsSummary, setAnalyticsSummary] = useState(null);
+  const [loadingAnalytics, setLoadingAnalytics] = useState(false);
 
   // Modals
   const [showAddServiceModal, setShowAddServiceModal] = useState(false);
@@ -111,6 +114,28 @@ export default function AdminDashboardView() {
       window.removeEventListener('keydown', handleKeyDown);
     };
   }, [showAddServiceModal, showAddProductModal, showAddVendorModal, selectedStylistToVerify]);
+
+  // Lazy-fetch analytics only when the tab is opened — this table isn't part
+  // of the app-wide bulk fetch since only admins ever need it.
+  useEffect(() => {
+    if (adminTab !== 'analytics' || !isSupabaseConfigured || !supabase) return;
+    setLoadingAnalytics(true);
+    supabase
+      .from('analytics_events')
+      .select('event_name, created_at')
+      .order('created_at', { ascending: false })
+      .limit(2000)
+      .then(({ data }) => {
+        if (data) {
+          const counts = {};
+          data.forEach((e) => {
+            counts[e.event_name] = (counts[e.event_name] || 0) + 1;
+          });
+          setAnalyticsSummary({ counts, total: data.length });
+        }
+        setLoadingAnalytics(false);
+      });
+  }, [adminTab]);
 
   // Defense in depth: don't trust the router alone to keep non-admins out.
   if (user?.role !== 'admin') {
@@ -273,8 +298,9 @@ export default function AdminDashboardView() {
           { id: 'overview', label: '📊 Platform Financials & Traffic', count: null },
           { id: 'vendors', label: '✂️ All Campus Vendors', count: staffList.length },
           { id: 'traffic', label: '📅 Live Booking Stream', count: bookings.length },
-          { id: 'payouts', label: '📱 Mobile Money Payouts', count: 2 },
-          { id: 'catalog', label: '🛍️ Services & Inventory', count: services.length + products.length }
+          { id: 'payouts', label: '📱 Mobile Money Payouts', count: null },
+          { id: 'catalog', label: '🛍️ Services & Inventory', count: services.length + products.length },
+          { id: 'analytics', label: '📈 Funnel Analytics', count: null }
         ].map((tab) => (
           <button
             key={tab.id}
@@ -474,6 +500,10 @@ export default function AdminDashboardView() {
                       <div className="flex items-center gap-1.5">
                         <Phone size={12} className="text-slate-400 shrink-0" />
                         <span>{vendor.phone || '0971234567'} • {vendor.payoutProvider || 'Airtel Money'}</span>
+                      </div>
+                      <div className={`flex items-center gap-1.5 ${(vendor.idDocumentUrl || vendor.id_document_url) ? 'text-emerald-500' : 'text-rose-500'}`}>
+                        <ShieldCheck size={12} className="shrink-0" />
+                        <span>{(vendor.idDocumentUrl || vendor.id_document_url) ? 'ID document submitted' : 'No ID document yet'}</span>
                       </div>
                     </div>
                   </div>
@@ -704,6 +734,42 @@ export default function AdminDashboardView() {
               ))}
             </div>
           </div>
+        </div>
+      )}
+
+      {/* 6. FUNNEL ANALYTICS — the only way to actually know if this thing has product-market fit */}
+      {adminTab === 'analytics' && (
+        <div className="space-y-4">
+          <div className="card p-5">
+            <h3 className="text-base font-bold text-slate-900 dark:text-white m-0 mb-1">Funnel Analytics</h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 m-0">
+              Real counts of what's actually happening on the platform (last 2,000 events). No third-party analytics tool is wired up — this reads directly from the events UniHairShop logs itself.
+            </p>
+          </div>
+
+          {loadingAnalytics ? (
+            <div className="card p-8 text-center text-slate-400 text-xs">Loading analytics…</div>
+          ) : !analyticsSummary || analyticsSummary.total === 0 ? (
+            <div className="card p-8 text-center text-slate-400">
+              <TrendingUp size={32} className="mx-auto mb-2 opacity-50" />
+              <p className="text-sm font-bold text-slate-900 dark:text-white m-0">No events recorded yet</p>
+              <p className="text-xs text-slate-400 mt-1">Signups, bookings, and orders will show up here as real usage happens.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {[
+                { key: 'signup_completed', label: 'Signups' },
+                { key: 'booking_created', label: 'Bookings Created' },
+                { key: 'booking_completed', label: 'Bookings Completed' },
+                { key: 'order_placed', label: 'Orders Placed' }
+              ].map((row) => (
+                <div key={row.key} className="card p-4">
+                  <span className="text-[11px] text-slate-500 dark:text-slate-300 font-semibold uppercase tracking-wider block">{row.label}</span>
+                  <h2 className="text-2xl font-extrabold text-slate-900 dark:text-white my-1 font-heading">{analyticsSummary.counts[row.key] || 0}</h2>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -950,24 +1016,28 @@ export default function AdminDashboardView() {
               </div>
             </div>
 
-            {/* Verification Checklist */}
-            <div className="space-y-2 text-xs text-slate-600 dark:text-slate-300 mb-5">
-              <div className="flex items-center gap-2 p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-semibold">
-                <CheckCircle2 size={15} className="shrink-0" />
-                <span>Enrolled Student Identity Verified at {selectedStylistToVerify.campus}</span>
-              </div>
-              <div className="flex items-center gap-2 p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-semibold">
-                <CheckCircle2 size={15} className="shrink-0" />
-                <span>Hostel Room Studio Location Confirmed</span>
-              </div>
-              <div className="flex items-center gap-2 p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-semibold">
-                <CheckCircle2 size={15} className="shrink-0" />
-                <span>Airtel / MTN Mobile Money Settlement Account Validated</span>
-              </div>
-              <div className="flex items-center gap-2 p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-semibold">
-                <CheckCircle2 size={15} className="shrink-0" />
-                <span>Campus Safety, Hygiene & Anti-Impersonation Charter Signed</span>
-              </div>
+            {/* Real ID Document Review — this is the actual thing to check before verifying */}
+            <div className="mb-5">
+              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-2">Submitted Verification Document:</span>
+              {(selectedStylistToVerify.idDocumentUrl || selectedStylistToVerify.id_document_url) ? (
+                <a
+                  href={selectedStylistToVerify.idDocumentUrl || selectedStylistToVerify.id_document_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block rounded-2xl overflow-hidden border border-black/10 dark:border-white/10 hover:border-amber-400/50 transition-colors"
+                >
+                  <img
+                    src={selectedStylistToVerify.idDocumentUrl || selectedStylistToVerify.id_document_url}
+                    alt="Submitted ID document"
+                    className="w-full max-h-56 object-contain bg-black/5 dark:bg-white/5"
+                  />
+                </a>
+              ) : (
+                <div className="flex items-center gap-2 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 font-semibold text-xs">
+                  <AlertCircle size={15} className="shrink-0" />
+                  <span>No ID document submitted yet — do not verify without one.</span>
+                </div>
+              )}
             </div>
 
             {/* Action Buttons */}

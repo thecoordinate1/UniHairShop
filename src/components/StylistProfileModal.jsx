@@ -7,6 +7,7 @@ export default function StylistProfileModal() {
     selectedStylist,
     setSelectedStylist,
     services,
+    reviews,
     setBookingService,
     setActiveTab,
     setActiveChatStylistId,
@@ -34,6 +35,9 @@ export default function StylistProfileModal() {
   if (!selectedStylist) return null;
 
   const stylistServices = services.filter((s) => (s.staffIds || s.staff_ids || []).includes(selectedStylist.id));
+  const stylistReviews = reviews.filter((r) => (r.vendorId || r.vendor_id) === selectedStylist.id);
+  const stylistRating = selectedStylist.rating ?? 0;
+  const stylistReviewsCount = selectedStylist.reviewsCount ?? selectedStylist.reviews_count ?? stylistReviews.length;
   const bioHandle = selectedStylist.handle || selectedStylist.id;
   const shareUrl = `${window.location.origin}/?stylist=${bioHandle}`;
 
@@ -168,9 +172,15 @@ export default function StylistProfileModal() {
                 <span>Replies in {selectedStylist.responseTime}</span>
               </div>
               <div className="flex items-center gap-1">
-                <Star size={13} fill="#F5A623" className="text-amber-500" />
-                <span className="font-bold text-slate-900 dark:text-white">{selectedStylist.rating}</span>
-                <span>({selectedStylist.reviewsCount} reviews)</span>
+                {stylistRating > 0 ? (
+                  <>
+                    <Star size={13} fill="#F5A623" className="text-amber-500" />
+                    <span className="font-bold text-slate-900 dark:text-white">{stylistRating.toFixed(1)}</span>
+                    <span>({stylistReviewsCount} reviews)</span>
+                  </>
+                ) : (
+                  <span className="text-slate-400">No ratings yet</span>
+                )}
               </div>
             </div>
 
@@ -201,7 +211,7 @@ export default function StylistProfileModal() {
             {[
               { id: 'portfolio', label: `Portfolio (${selectedStylist.portfolio?.length || 0})` },
               { id: 'services', label: `Service Menu (${stylistServices.length})` },
-              { id: 'reviews', label: `Student Reviews (${selectedStylist.reviews?.length || 0})` }
+              { id: 'reviews', label: `Student Reviews (${stylistReviews.length})` }
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -262,32 +272,40 @@ export default function StylistProfileModal() {
             </div>
           )}
 
-          {/* 3. Verified Reviews */}
+          {/* 3. Real Reviews — written only after a completed, verified booking */}
           {activeTab === 'reviews' && (
             <div className="flex flex-col gap-3">
-              {selectedStylist.reviews?.map((rev) => (
-                <div key={rev.id} className="p-3.5 rounded-2xl border border-black/10 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.04]">
-                  <div className="flex justify-between items-center mb-1.5">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold text-slate-900 dark:text-white">{rev.student}</span>
-                      {rev.verifiedDorm && (
-                        <span className="badge badge-verified text-[9px] py-0.2 px-1.5">Verified Dorm Appointment</span>
-                      )}
-                    </div>
-                    <span className="text-[10px] text-slate-400">{rev.date}</span>
-                  </div>
-
-                  <div className="flex items-center gap-1 mb-1.5">
-                    {[...Array(rev.rating)].map((_, i) => (
-                      <Star key={i} size={12} fill="#F5A623" className="text-amber-400" />
-                    ))}
-                  </div>
-
-                  <p className="text-xs text-slate-600 dark:text-slate-300 m-0 leading-relaxed">
-                    "{rev.text}"
-                  </p>
+              {stylistReviews.length === 0 ? (
+                <div className="text-center py-8 text-slate-400">
+                  <Star size={28} className="mx-auto mb-2 opacity-40" />
+                  <p className="text-sm font-bold text-slate-900 dark:text-white m-0">No reviews yet</p>
+                  <p className="text-xs text-slate-400 mt-1">Reviews appear here once real students complete a booking and rate it.</p>
                 </div>
-              ))}
+              ) : (
+                stylistReviews.map((rev) => (
+                  <div key={rev.id} className="p-3.5 rounded-2xl border border-black/10 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.04]">
+                    <div className="flex justify-between items-center mb-1.5">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-slate-900 dark:text-white">{rev.customerName || rev.customer_name || 'Campus Student'}</span>
+                        <span className="badge badge-verified text-[9px] py-0.2 px-1.5">Verified Booking</span>
+                      </div>
+                      <span className="text-[10px] text-slate-400">{new Date(rev.createdAt || rev.created_at).toLocaleDateString()}</span>
+                    </div>
+
+                    <div className="flex items-center gap-1 mb-1.5">
+                      {[...Array(rev.rating)].map((_, i) => (
+                        <Star key={i} size={12} fill="#F5A623" className="text-amber-400" />
+                      ))}
+                    </div>
+
+                    {rev.comment && (
+                      <p className="text-xs text-slate-600 dark:text-slate-300 m-0 leading-relaxed">
+                        "{rev.comment}"
+                      </p>
+                    )}
+                  </div>
+                ))
+              )}
             </div>
           )}
         </div>

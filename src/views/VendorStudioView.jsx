@@ -151,7 +151,9 @@ export default function VendorStudioView() {
   const [editBio, setEditBio] = useState(vendorProfile.bio || '');
   const [editPhone, setEditPhone] = useState(vendorProfile.phone || '');
   const [editAvatar, setEditAvatar] = useState(vendorProfile.avatar || '');
+  const [editIdDocument, setEditIdDocument] = useState(vendorProfile.idDocumentUrl || vendorProfile.id_document_url || '');
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [uploadingIdDocument, setUploadingIdDocument] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
 
   // My Shop (Vendor Product Listings) State
@@ -309,6 +311,22 @@ export default function VendorStudioView() {
     }
   };
 
+  const handleIdDocumentPicker = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingIdDocument(true);
+    try {
+      const url = await uploadImage(file, { userId: user?.id, folder: 'id-documents' });
+      if (url) {
+        setEditIdDocument(url);
+      } else {
+        addToast('Could not upload document. Please try again.', 'error');
+      }
+    } finally {
+      setUploadingIdDocument(false);
+    }
+  };
+
   const handleSaveProfile = async () => {
     if (!editName.trim()) {
       addToast('Please enter your name or stylist brand name', 'error');
@@ -320,7 +338,8 @@ export default function VendorStudioView() {
         name: editName.trim(),
         bio: editBio.trim(),
         phone: editPhone.trim(),
-        avatar: editAvatar || vendorProfile.avatar
+        avatar: editAvatar || vendorProfile.avatar,
+        idDocumentUrl: editIdDocument || null
       });
       setShowEditProfileModal(false);
     } finally {
@@ -410,6 +429,7 @@ export default function VendorStudioView() {
               setEditBio(vendorProfile.bio || '');
               setEditPhone(vendorProfile.phone || '');
               setEditAvatar(vendorProfile.avatar || '');
+              setEditIdDocument(vendorProfile.idDocumentUrl || vendorProfile.id_document_url || '');
               setShowEditProfileModal(true);
             }}
             className="apple-btn-secondary text-xs px-3.5 py-2 flex items-center gap-2"
@@ -1310,11 +1330,45 @@ export default function VendorStudioView() {
               />
             </div>
 
+            <div className="form-group">
+              <label className="form-label">
+                Student ID / Verification Document
+                {vendorProfile.isVerified ? (
+                  <span className="ml-2 badge badge-verified text-[10px]">Verified</span>
+                ) : (
+                  <span className="ml-2 badge badge-out-of-stock text-[10px]">Pending Review</span>
+                )}
+              </label>
+              <p className="text-[11px] text-slate-400 mb-2 m-0">
+                Upload a photo of your student ID so an admin can verify you're a real campus stylist. This is what earns your "Verified" badge — it isn't automatic.
+              </p>
+              <div className="flex items-center gap-4 bg-black/[0.02] dark:bg-white/[0.02] p-3.5 rounded-2xl border border-black/10 dark:border-white/10">
+                <div className="w-16 h-16 rounded-2xl overflow-hidden border-2 border-amber-400 shadow-sm shrink-0 bg-slate-800 flex items-center justify-center">
+                  {editIdDocument ? (
+                    <img src={editIdDocument} alt="ID document preview" className="w-full h-full object-cover" />
+                  ) : (
+                    <ShieldCheck size={20} className="text-slate-500" />
+                  )}
+                </div>
+                <label className={`apple-btn-secondary text-xs px-3 py-1.5 inline-flex items-center gap-1.5 cursor-pointer ${uploadingIdDocument ? 'opacity-60 pointer-events-none' : ''}`}>
+                  <UploadCloud size={13} />
+                  <span>{uploadingIdDocument ? 'Uploading…' : editIdDocument ? 'Replace Document' : 'Upload Document'}</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    disabled={uploadingIdDocument}
+                    onChange={handleIdDocumentPicker}
+                  />
+                </label>
+              </div>
+            </div>
+
             <div className="flex gap-2 mt-4">
               <button className="apple-btn-secondary text-xs flex-1" onClick={() => setShowEditProfileModal(false)}>
                 Cancel
               </button>
-              <button className="apple-btn-primary text-xs flex-1" disabled={uploadingAvatar || savingProfile} onClick={handleSaveProfile}>
+              <button className="apple-btn-primary text-xs flex-1" disabled={uploadingAvatar || uploadingIdDocument || savingProfile} onClick={handleSaveProfile}>
                 {savingProfile ? 'Saving…' : 'Save Profile'}
               </button>
             </div>

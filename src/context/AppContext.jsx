@@ -126,7 +126,8 @@ export const AppProvider = ({ children }) => {
     phone: '',
     payoutProvider: 'Airtel Money',
     payoutNumber: '',
-    bio: ''
+    bio: '',
+    idDocumentUrl: null
   }));
 
   const [vendorWallet, setVendorWallet] = useState(() => safeGetItem('unihair_vendor_wallet', {
@@ -146,6 +147,7 @@ export const AppProvider = ({ children }) => {
   const [orders, setOrders] = useState(() => safeGetItem('unihair_orders', initialOrders));
   const [cart, setCart] = useState(() => safeGetItem('unihair_cart', []));
   const [conversations, setConversations] = useState(() => safeGetItem('unihair_conversations', initialConversations));
+  const [reviews, setReviews] = useState(() => safeGetItem('unihair_reviews', []));
   const [activeChatStylistId, setActiveChatStylistId] = useState(null);
 
   // 4. Modals & Filters
@@ -175,6 +177,20 @@ export const AppProvider = ({ children }) => {
   const dismissToast = useCallback((id) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
+
+  // Lightweight self-hosted funnel tracking — no third-party analytics vendor
+  // is wired up, so this is the only way to ever learn whether a real funnel
+  // step (signup, booking, order, referral) is actually happening. Fire-and-
+  // forget: analytics must never block or break the feature it's measuring.
+  const trackEvent = useCallback((eventName, metadata = {}) => {
+    if (!isSupabaseConfigured || !supabase) return;
+    supabase.from('analytics_events').insert([{
+      event_name: eventName,
+      user_id: user?.id || null,
+      campus: currentCampus || null,
+      metadata
+    }]).then(null, () => {});
+  }, [user?.id, currentCampus]);
 
   // Theme Synchronizer
   useEffect(() => {
@@ -499,6 +515,11 @@ export const AppProvider = ({ children }) => {
             };
           });
           setConversations(mapped);
+        }
+
+        const { data: reviewData } = await supabase.from('reviews').select('*').order('created_at', { ascending: false });
+        if (reviewData) {
+          setReviews(reviewData);
         }
       } catch (err) {
         console.info('[UniHairShop] Supabase live fetch notice:', err.message);
@@ -837,8 +858,9 @@ export const AppProvider = ({ children }) => {
     });
 
     addToast(`Booking ${bookingId} confirmed at ${currentCampus}! +${pointsEarned} loyalty points earned 💎`, 'success');
+    trackEvent('booking_created', { bookingId, serviceName: newBookingData.serviceName, totalPrice });
     return newBooking;
-  }, [currentCampus, user.name, user.phone, addToast]);
+  }, [currentCampus, user.name, user.phone, addToast, trackEvent]);
 
   const updateVendorSchedule = useCallback((stylistId, newScheduleConfig) => {
     setStaffList((prev) =>
@@ -1015,14 +1037,20 @@ export const AppProvider = ({ children }) => {
     clearCart();
     setIsCartOpen(false);
     addToast(`Order ${orderId} placed for ${currentCampus}! +${pointsEarned} points earned 💎`, 'success');
+    trackEvent('order_placed', { orderId, totalAmount: orderData.totalAmount, itemCount: currentCart.length });
     return newOrder;
-  }, [cart, currentCampus, user.name, user.phone, clearCart, addToast]);
+  }, [cart, currentCampus, user.name, user.phone, clearCart, addToast, trackEvent]);
 
   // Vendor Specific Actions
   const updateVendorProfile = useCallback(async (profileData) => {
     setVendorProfile((prev) => ({ ...prev, ...profileData }));
     if (isSupabaseConfigured && supabase) {
-      supabase.from('vendor_profiles').upsert([{ id: vendorProfile.id, ...profileData }]).then(null, () => {});
+      const dbPayload = { id: vendorProfile.id, ...profileData };
+      if ('idDocumentUrl' in dbPayload) {
+        dbPayload.id_document_url = dbPayload.idDocumentUrl;
+        delete dbPayload.idDocumentUrl;
+      }
+      supabase.from('vendor_profiles').upsert([dbPayload]).then(null, () => {});
     }
     addToast('Vendor Studio profile updated!', 'success');
   }, [vendorProfile.id, addToast]);
@@ -1082,7 +1110,41 @@ export const AppProvider = ({ children }) => {
       }
     }
     addToast(`Booking ${bookingId} marked as completed! Funds ready for payout.`, 'success');
-  }, [addToast, bookings, user.id]);
+    trackEvent('booking_completed', { bookingId });
+  }, [addToast, bookings, user.id, trackEvent]);
+
+  // Real customer reviews, written server-side only via submit_review() so a
+  // vendor's rating/reviews_count can never be forged by the client.
+  const submitReview = useCallback(async (bookingId, rating, comment) => {
+    if (!isSupabaseConfigured || !supabase) {
+      addToast('Reviews require a live connection — please try again once online.', 'error');
+      return false;
+    }
+    const { data, error } = await supabase.rpc('submit_review', {
+      p_booking_id: bookingId,
+      p_rating: rating,
+      p_comment: comment || null
+    });
+    if (error) {
+      addToast(error.message || 'Unable to submit your review.', 'error');
+      return false;
+    }
+    if (data) {
+      setReviews((prev) => [data, ...prev]);
+    }
+    const { data: vendorRow } = await supabase
+      .from('vendor_profiles')
+      .select('rating, reviews_count')
+      .eq('id', data?.vendor_id)
+      .single();
+    if (vendorRow) {
+      setStaffList((prev) =>
+        prev.map((s) => (s.id === data.vendor_id ? { ...s, rating: vendorRow.rating, reviewsCount: vendorRow.reviews_count, reviews_count: vendorRow.reviews_count } : s))
+      );
+    }
+    addToast('Thanks for your review!', 'success');
+    return true;
+  }, [addToast]);
 
   const requestVendorPayout = useCallback(async (amount, provider, accountNumber) => {
     if (amount <= 0 || amount > vendorWallet.availableBalance) {
@@ -1349,6 +1411,7 @@ export const AppProvider = ({ children }) => {
           : `Welcome to UniHair Shop, ${cleanName}! 🎓 +${baseWelcomePoints} welcome reward points added!`,
         'success'
       );
+      trackEvent('signup_completed', { role: assignedRole, campus: cleanCampus, referred: Boolean(cleanReferralCode) });
       return { success: true };
     }
 
@@ -1441,8 +1504,9 @@ export const AppProvider = ({ children }) => {
         : `Account created successfully! Welcome, ${cleanName}! 🎓 +${baseWelcomePoints} welcome points added!`,
       'success'
     );
+    trackEvent('signup_completed', { role: assignedRole, campus: cleanCampus, referred: Boolean(cleanReferralCode) });
     return { success: true, data };
-  }, [currentCampus, addToast]);
+  }, [currentCampus, addToast, trackEvent]);
 
   const signOut = useCallback(async () => {
     if (isSupabaseConfigured && supabase) {
@@ -1518,6 +1582,9 @@ export const AppProvider = ({ children }) => {
 
   const onboardAsStylist = useCallback(async (stylistData) => {
     setUser((prev) => ({ ...prev, role: 'vendor' }));
+    // Not verified yet — an admin has to review this stylist (and, ideally, an
+    // ID document) before the "Verified" badge is real. The DB trigger already
+    // enforces this server-side; this local state just needs to match reality.
     const newVendor = {
       id: user.id || `stf-${Date.now().toString(36)}`,
       name: stylistData.name || user.name,
@@ -1525,13 +1592,13 @@ export const AppProvider = ({ children }) => {
       campus: stylistData.campus || currentCampus,
       dormLocation: stylistData.hostel || user.hostel || 'Hostel Studio',
       avatar: '/images/barber_service.jpg',
-      isVerified: true,
-      badge: 'Verified Campus Stylist',
+      isVerified: false,
+      badge: 'Campus Stylist (Pending Verification)',
       travelsToDorm: true,
       travelFee: 20,
       hasStudio: true,
       phone: stylistData.phone || user.phone,
-      bio: stylistData.bio || `Verified campus stylist at ${currentCampus}.`,
+      bio: stylistData.bio || `Campus stylist at ${currentCampus}.`,
       payoutProvider: 'Airtel Money',
       payoutNumber: stylistData.phone || user.phone
     };
@@ -1549,7 +1616,7 @@ export const AppProvider = ({ children }) => {
           campus: newVendor.campus,
           dorm_location: newVendor.dormLocation,
           avatar: newVendor.avatar,
-          is_verified: true,
+          is_verified: false,
           badge: newVendor.badge,
           travels_to_dorm: true,
           travel_fee: 20,
@@ -1562,7 +1629,7 @@ export const AppProvider = ({ children }) => {
       } catch { /* ignore */ }
     }
 
-    addToast('Welcome to Vendor Studio! Your stylist workspace is ready.', 'success');
+    addToast('Welcome to Vendor Studio! Your profile is pending verification — an admin will review it shortly.', 'success');
   }, [user, currentCampus, addToast]);
 
   // Master Admin Specific Operations
@@ -1681,6 +1748,9 @@ export const AppProvider = ({ children }) => {
     lencoCheckoutState,
     setLencoCheckoutState,
     conversations,
+    reviews,
+    submitReview,
+    trackEvent,
     activeChatStylistId,
     setActiveChatStylistId,
     sendMessage,
@@ -1723,7 +1793,7 @@ export const AppProvider = ({ children }) => {
     verifyStylist, settleVendorPayout,
     services, products, bundles, staffList, bookings, orders, cart,
     showAuthModal, isCartOpen, bookingService, selectedProduct, selectedStylist,
-    showSafetyModal, lencoCheckoutState, conversations, activeChatStylistId,
+    showSafetyModal, lencoCheckoutState, conversations, reviews, submitReview, trackEvent, activeChatStylistId,
     filterCategory, serviceTypeFilter, priceFilter, ratingFilter, availabilityFilter,
     toasts,
     addToCart, addBundleToCart, updateCartQuantity, removeFromCart, clearCart,

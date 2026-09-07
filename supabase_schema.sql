@@ -40,8 +40,8 @@ CREATE TABLE IF NOT EXISTS public.vendor_profiles (
   campus TEXT NOT NULL,
   dorm_location TEXT,
   avatar TEXT,
-  is_verified BOOLEAN DEFAULT true,
-  badge TEXT DEFAULT 'Verified Campus Stylist',
+  is_verified BOOLEAN DEFAULT false,
+  badge TEXT DEFAULT 'Campus Stylist (Pending Verification)',
   travels_to_dorm BOOLEAN DEFAULT true,
   travel_fee NUMERIC DEFAULT 20,
   has_studio BOOLEAN DEFAULT true,
@@ -52,12 +52,17 @@ CREATE TABLE IF NOT EXISTS public.vendor_profiles (
   portfolio JSONB DEFAULT '[]'::jsonb,
   payout_provider TEXT DEFAULT 'Airtel Money',
   payout_number TEXT,
+  id_document_url TEXT,
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- Existing tables created before this fix still have the old fake default —
--- correct it so newly-inserted rows never get a fabricated rating.
+-- Existing tables created before this fix still have the old fake defaults —
+-- correct them so newly-inserted rows never get a fabricated rating or
+-- instant unreviewed verification.
 ALTER TABLE public.vendor_profiles ALTER COLUMN rating SET DEFAULT 0;
+ALTER TABLE public.vendor_profiles ALTER COLUMN is_verified SET DEFAULT false;
+ALTER TABLE public.vendor_profiles ALTER COLUMN badge SET DEFAULT 'Campus Stylist (Pending Verification)';
+ALTER TABLE public.vendor_profiles ADD COLUMN IF NOT EXISTS id_document_url TEXT;
 
 -- 3. SERVICES (Hairstyles & Grooming)
 CREATE TABLE IF NOT EXISTS public.services (
@@ -229,6 +234,32 @@ CREATE TABLE IF NOT EXISTS public.audit_log (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- 11. REVIEWS — one real review per completed booking, written only via
+-- submit_review() below so the vendor's rating/reviews_count can never be
+-- client-forged. This is what makes vendor_profiles.rating a real number.
+CREATE TABLE IF NOT EXISTS public.reviews (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  booking_id TEXT NOT NULL UNIQUE REFERENCES public.bookings(id) ON DELETE CASCADE,
+  vendor_id TEXT NOT NULL REFERENCES public.vendor_profiles(id) ON DELETE CASCADE,
+  customer_id UUID NOT NULL REFERENCES auth.users(id),
+  customer_name TEXT,
+  rating INT NOT NULL CHECK (rating BETWEEN 1 AND 5),
+  comment TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- 12. ANALYTICS EVENTS — lightweight self-hosted funnel tracking (signup,
+-- booking created/completed, order placed, referral used). Write-open so
+-- pre-signup/guest events can be logged too; read is admin-only.
+CREATE TABLE IF NOT EXISTS public.analytics_events (
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  event_name TEXT NOT NULL CHECK (char_length(event_name) <= 100),
+  user_id UUID REFERENCES auth.users(id),
+  campus TEXT,
+  metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 -- ==============================================================================
 -- Row Level Security (RLS)
 -- ==============================================================================
@@ -246,6 +277,8 @@ ALTER TABLE public.vendor_payouts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.points_ledger ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.payment_transactions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.audit_log ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.reviews ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.analytics_events ENABLE ROW LEVEL SECURITY;
 
 -- ==============================================================================
 -- Server-side functions (SECURITY DEFINER) — trusted business logic clients
@@ -378,6 +411,29 @@ BEGIN
 END;
 $$;
 
+CREATE OR REPLACE FUNCTION public.submit_review(p_booking_id TEXT, p_rating INT, p_comment TEXT DEFAULT NULL)
+RETURNS public.reviews LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE v_booking public.bookings; v_review public.reviews; v_avg NUMERIC; v_count INT;
+BEGIN
+  IF auth.uid() IS NULL THEN RAISE EXCEPTION 'Authentication required'; END IF;
+  IF p_rating < 1 OR p_rating > 5 THEN RAISE EXCEPTION 'Rating must be between 1 and 5'; END IF;
+  SELECT * INTO v_booking FROM public.bookings WHERE id = p_booking_id;
+  IF v_booking.id IS NULL THEN RAISE EXCEPTION 'Booking not found'; END IF;
+  IF v_booking.customer_id IS NULL OR v_booking.customer_id != auth.uid() THEN RAISE EXCEPTION 'Not allowed'; END IF;
+  IF v_booking.status != 'Completed' THEN RAISE EXCEPTION 'Booking must be completed before you can review it'; END IF;
+  IF EXISTS (SELECT 1 FROM public.reviews WHERE booking_id = p_booking_id) THEN RAISE EXCEPTION 'This booking has already been reviewed'; END IF;
+  INSERT INTO public.reviews (booking_id, vendor_id, customer_id, customer_name, rating, comment)
+  VALUES (p_booking_id, v_booking.staff_id, auth.uid(), v_booking.customer_name, p_rating, p_comment)
+  RETURNING * INTO v_review;
+  SELECT avg(rating), count(*) INTO v_avg, v_count FROM public.reviews WHERE vendor_id = v_booking.staff_id;
+  UPDATE public.vendor_profiles SET rating = round(v_avg, 2), reviews_count = v_count WHERE id = v_booking.staff_id;
+  RETURN v_review;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.submit_review(TEXT, INT, TEXT) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.submit_review(TEXT, INT, TEXT) TO authenticated;
+
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created AFTER INSERT ON auth.users FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
@@ -426,6 +482,15 @@ CREATE POLICY wallets_owner_read ON public.vendor_wallets FOR SELECT TO authenti
 CREATE POLICY payouts_owner_read ON public.vendor_payouts FOR SELECT TO authenticated USING (vendor_id = auth.uid()::text OR public.is_admin());
 CREATE POLICY ledger_owner_read ON public.points_ledger FOR SELECT TO authenticated USING (profile_id = auth.uid() OR public.is_admin());
 CREATE POLICY payments_participant_read ON public.payment_transactions FOR SELECT TO authenticated USING (EXISTS (SELECT 1 FROM public.bookings b WHERE b.id = payment_transactions.booking_id AND (b.customer_id = auth.uid() OR b.staff_id = auth.uid()::text OR public.is_admin())));
+
+-- Reviews are always public (that's the point — real social proof), but only
+-- ever written through submit_review() above, never a direct client insert.
+CREATE POLICY reviews_public_read ON public.reviews FOR SELECT TO anon, authenticated USING (true);
+
+-- Analytics: open write (including anonymous/pre-signup funnel events) so the
+-- product can finally measure activation and retention; read is admin-only.
+CREATE POLICY analytics_insert ON public.analytics_events FOR INSERT TO anon, authenticated WITH CHECK (true);
+CREATE POLICY analytics_admin_read ON public.analytics_events FOR SELECT TO authenticated USING (public.is_admin());
 
 -- Service-role functions/Edge Functions write financial and booking state. Clients
 -- have read-only access to those records, preventing balance/refund manipulation.

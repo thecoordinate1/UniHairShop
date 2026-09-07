@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   X,
   Calendar,
@@ -17,12 +17,18 @@ import {
   RefreshCw,
   XCircle,
   Tag,
-  ShieldAlert
+  ShieldAlert,
+  Star
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 
 export default function BookingDetailModal({ booking, onClose, onReschedule, onCancel }) {
-  const { exportToCalendar, staffList, claimNoShowRefund, claimClientNoShow, userMode } = useApp();
+  const { exportToCalendar, staffList, claimNoShowRefund, claimClientNoShow, userMode, reviews, submitReview } = useApp();
+
+  const [ratingValue, setRatingValue] = useState(0);
+  const [hoverRating, setHoverRating] = useState(0);
+  const [reviewComment, setReviewComment] = useState('');
+  const [submittingReview, setSubmittingReview] = useState(false);
 
   useEffect(() => {
     if (!booking) return;
@@ -59,6 +65,18 @@ export default function BookingDetailModal({ booking, onClose, onReschedule, onC
   const basePrice = Number(booking.price) || 80;
   const totalPrice = Number(booking.totalPrice) || basePrice;
   const addOns = booking.addOns || [];
+
+  const existingReview = reviews.find((r) => (r.bookingId || r.booking_id) === booking.id);
+
+  const handleSubmitReview = async () => {
+    if (ratingValue < 1) return;
+    setSubmittingReview(true);
+    try {
+      await submitReview(booking.id, ratingValue, reviewComment.trim());
+    } finally {
+      setSubmittingReview(false);
+    }
+  };
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -207,6 +225,59 @@ export default function BookingDetailModal({ booking, onClose, onReschedule, onC
               <span className="font-mono font-bold text-amber-500">SEC-{(booking.id || '4912').slice(-4)}</span>
             </div>
           </div>
+
+          {/* Rate Your Stylist — real reviews, only after a completed booking */}
+          {isCompleted && userMode === 'customer' && (
+            <div className="card p-4 border border-amber-400/25 bg-amber-400/5">
+              {existingReview ? (
+                <div>
+                  <h4 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider mb-2">Your Review</h4>
+                  <div className="flex items-center gap-1 mb-1.5">
+                    {[...Array(existingReview.rating)].map((_, i) => (
+                      <Star key={i} size={14} fill="#F5A623" className="text-amber-400" />
+                    ))}
+                  </div>
+                  {existingReview.comment && (
+                    <p className="text-xs text-slate-600 dark:text-slate-300 m-0 italic">"{existingReview.comment}"</p>
+                  )}
+                </div>
+              ) : (
+                <div>
+                  <h4 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider mb-2">Rate Your Stylist</h4>
+                  <div className="flex items-center gap-1 mb-2.5" role="radiogroup" aria-label="Star rating">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <button
+                        key={star}
+                        type="button"
+                        onClick={() => setRatingValue(star)}
+                        onMouseEnter={() => setHoverRating(star)}
+                        onMouseLeave={() => setHoverRating(0)}
+                        className="bg-transparent border-0 cursor-pointer p-0.5"
+                        aria-label={`${star} star${star > 1 ? 's' : ''}`}
+                      >
+                        <Star size={22} fill={(hoverRating || ratingValue) >= star ? '#F5A623' : 'none'} className={(hoverRating || ratingValue) >= star ? 'text-amber-400' : 'text-slate-400'} />
+                      </button>
+                    ))}
+                  </div>
+                  <textarea
+                    rows={2}
+                    className="form-input text-xs mb-2.5"
+                    placeholder="Optional: tell other students how it went"
+                    value={reviewComment}
+                    onChange={(e) => setReviewComment(e.target.value)}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleSubmitReview}
+                    disabled={ratingValue < 1 || submittingReview}
+                    className="apple-btn-primary text-xs px-4 py-2 w-full"
+                  >
+                    {submittingReview ? 'Submitting…' : 'Submit Review'}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Action Controls */}

@@ -45,6 +45,7 @@ const AccountView = lazyWithRetry(() => import('./views/AccountView'));
 const MessagesView = lazyWithRetry(() => import('./views/MessagesView'));
 const VendorStudioView = lazyWithRetry(() => import('./views/VendorStudioView'));
 const AboutView = lazyWithRetry(() => import('./views/AboutView'));
+const LegalView = lazyWithRetry(() => import('./views/LegalView'));
 const AdminDashboardView = lazyWithRetry(() => import('./views/AdminDashboardView'));
 
 function ViewSkeleton() {
@@ -169,6 +170,8 @@ export default function App() {
         return <AccountView />;
       case 'about':
         return <AboutView />;
+      case 'legal':
+        return <LegalView />;
       case 'admin':
         return (
           <AuthGuard requiredRole="admin">
