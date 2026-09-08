@@ -63,6 +63,7 @@ export default function AdminDashboardView() {
   const [trafficStatusFilter, setTrafficStatusFilter] = useState('All');
   const [analyticsSummary, setAnalyticsSummary] = useState(null);
   const [loadingAnalytics, setLoadingAnalytics] = useState(false);
+  const [totalUsersCount, setTotalUsersCount] = useState(null);
 
   // Modals
   const [showAddServiceModal, setShowAddServiceModal] = useState(false);
@@ -121,6 +122,15 @@ export default function AdminDashboardView() {
     };
   }, [showAddServiceModal, showAddProductModal, showAddVendorModal, selectedStylistToVerify]);
 
+  // Total signed-up users (every role, not just vendors) — profiles isn't
+  // part of the app-wide bulk fetch, so this is a lightweight admin-only count.
+  useEffect(() => {
+    if (!isSupabaseConfigured || !supabase) return;
+    supabase.from('profiles').select('id', { count: 'exact', head: true }).then(({ count }) => {
+      if (typeof count === 'number') setTotalUsersCount(count);
+    });
+  }, []);
+
   // Lazy-fetch analytics only when the tab is opened — this table isn't part
   // of the app-wide bulk fetch since only admins ever need it.
   useEffect(() => {
@@ -166,6 +176,7 @@ export default function AdminDashboardView() {
   const grossBookingGMV = bookings.reduce((sum, b) => (b.status !== 'Cancelled' ? sum + (Number(b.price) || Number(b.totalPrice) || 0) : sum), 0);
   const grossRetailGMV = orders.reduce((sum, o) => sum + (Number(o.totalAmount) || 0), 0);
   const totalPlatformGMV = grossBookingGMV + grossRetailGMV;
+  const pendingVendorsCount = staffList.filter((s) => !(s.isVerified || s.is_verified)).length;
 
   // Platform 10% take rate + K5 platform safety fee per confirmed booking
   const confirmedBookingsCount = bookings.filter((b) => b.status === 'Confirmed' || b.status === 'Completed').length;
@@ -393,6 +404,22 @@ export default function AdminDashboardView() {
               <h2 className="text-2xl sm:text-3xl font-extrabold text-purple-400 my-1">{staffList.length}</h2>
               <p className="text-[11px] text-slate-400 m-0">Across {lusakaUniversities.length} Lusaka Campuses</p>
             </div>
+
+            <div className="card p-5 bg-gradient-to-br from-sky-500/15 via-slate-900 to-slate-950 border border-sky-500/30">
+              <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider block">Total Registered Users</span>
+              <h2 className="text-2xl sm:text-3xl font-extrabold text-sky-400 my-1">{totalUsersCount === null ? '—' : totalUsersCount}</h2>
+              <p className="text-[11px] text-slate-400 m-0">Students, stylists & admins combined</p>
+            </div>
+
+            <div
+              className="card p-5 bg-gradient-to-br from-rose-500/15 via-slate-900 to-slate-950 border border-rose-500/30 cursor-pointer hover:border-rose-400/50 transition-colors"
+              onClick={() => { setAdminTab('vendors'); setVendorVerifyFilter('Pending'); }}
+              title="Jump to pending vendor approvals"
+            >
+              <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider block">Pending Vendor Approvals</span>
+              <h2 className="text-2xl sm:text-3xl font-extrabold text-rose-400 my-1">{pendingVendorsCount}</h2>
+              <p className="text-[11px] text-slate-400 m-0">{pendingVendorsCount > 0 ? 'Tap to review & approve →' : 'All caught up'}</p>
+            </div>
           </div>
 
           {/* Campus Traffic Volume Breakdown */}
@@ -444,7 +471,7 @@ export default function AdminDashboardView() {
           <div className="flex gap-1.5 overflow-x-auto pb-1">
             {[
               { id: 'All', label: 'All Stylists', count: staffList.length },
-              { id: 'Pending', label: 'Needs Verification', count: staffList.filter((s) => !(s.isVerified || s.is_verified)).length },
+              { id: 'Pending', label: 'Needs Verification', count: pendingVendorsCount },
               { id: 'Verified', label: 'Verified Stylists', count: staffList.filter((s) => s.isVerified || s.is_verified).length }
             ].map((f) => (
               <button
