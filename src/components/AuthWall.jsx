@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Scissors,
   Lock,
@@ -56,6 +56,17 @@ export default function AuthWall() {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [resetSent, setResetSent] = useState(false);
+  const errorRef = useRef(null);
+
+  // The error banner renders above a long, scrollable form — without this, a
+  // validation error (e.g. "passwords do not match") could fire while the
+  // user is scrolled down near the submit button, off-screen, looking like
+  // nothing happened at all.
+  useEffect(() => {
+    if (errorMsg && errorRef.current) {
+      errorRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [errorMsg]);
 
   // Submit Login
   const handleLogin = async (e) => {
@@ -180,7 +191,7 @@ export default function AuthWall() {
 
           {/* Error Alert Box */}
           {errorMsg && (
-            <div className="p-3 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2 mb-4 animate-shake">
+            <div ref={errorRef} className="p-3 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2 mb-4 animate-shake">
               <AlertCircle size={16} className="shrink-0 text-rose-400" />
               <span>{errorMsg}</span>
             </div>

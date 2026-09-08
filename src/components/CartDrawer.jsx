@@ -146,7 +146,8 @@ export default function CartDrawer() {
                   Add hair growth oils, silk bonnets, edge controls, or styling kits to your bag!
                 </p>
 
-                {/* Quick Bundle Add in Empty State */}
+                {/* Quick Bundle Add in Empty State — only when a real one exists */}
+                {bundles.length > 0 && (
                 <div className="mt-2 text-left">
                   <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block mb-2">Campus Favorites:</span>
                   {bundles.slice(0, 1).map((b) => (
@@ -165,6 +166,7 @@ export default function CartDrawer() {
                     </div>
                   ))}
                 </div>
+                )}
               </div>
             ) : (
               cart.map((item) => (

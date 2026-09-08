@@ -388,7 +388,8 @@ export default function HomeView() {
         )}
       </section>
 
-      {/* Frequently Bought Together Bundles Section */}
+      {/* Frequently Bought Together Bundles Section — only when a real one exists */}
+      {bundles.length > 0 && (
       <section className="w-full bg-gradient-to-br from-amber-500/10 via-transparent to-amber-500/5 rounded-[32px] p-6 sm:p-8 border border-amber-400/25 shadow-apple-glass">
         <div className="flex justify-between items-end mb-6">
           <div>
@@ -450,6 +451,7 @@ export default function HomeView() {
           ))}
         </div>
       </section>
+      )}
 
     </div>
   );
