@@ -367,7 +367,7 @@
   .airtel { @apply bg-red-600; }
   .mtn { @apply bg-amber-400 text-black; }
   .zamtel { @apply bg-sky-600; }
-  .lenco-pay { @apply bg-gradient-to-r from-cyan-600 to-emerald-600 text-white; }
+  .pawapay-brand { @apply bg-gradient-to-r from-cyan-600 to-emerald-600 text-white; }
 
   /* Empty State */
   .empty-state {

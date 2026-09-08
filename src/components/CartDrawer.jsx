@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, ShoppingBag, Plus, Minus, Trash2, ArrowRight, Truck, Tag, Sparkles, CheckCircle2, Info, Eye, ExternalLink } from 'lucide-react';
 import { useApp } from '../context/AppContext';
-import LencoCheckoutWizard from './LencoCheckoutWizard';
+import PawaPayCheckoutWizard from './PawaPayCheckoutWizard';
 
 export default function CartDrawer() {
   const {
@@ -23,7 +23,9 @@ export default function CartDrawer() {
   const [hostelDetails, setHostelDetails] = useState(user.hostel || 'UNILUS Silverest Hostel, Block C, Room 14');
   const [promoCode, setPromoCode] = useState('');
   const [discountPercent, setDiscountPercent] = useState(0);
-  const [showLencoModal, setShowLencoModal] = useState(false);
+  const [showPaymentWizard, setShowPaymentWizard] = useState(false);
+  const [pendingOrder, setPendingOrder] = useState(null);
+  const [placingOrder, setPlacingOrder] = useState(false);
 
   const FREE_DELIVERY_THRESHOLD = 200; // ZMW
 
@@ -66,19 +68,28 @@ export default function CartDrawer() {
     }
   };
 
-  const handleLencoSuccess = async (lencoResult) => {
-    setShowLencoModal(false);
+  const handleCheckout = async () => {
+    setPlacingOrder(true);
     try {
-      await createOrder({
+      const newOrder = await createOrder({
         totalAmount,
         deliveryType,
         hostelDetails,
-        paymentMethod: lencoResult.paymentMethod,
-        lencoRef: lencoResult.lencoReference
+        paymentMethod: 'Pending Mobile Money Payment'
       });
+      setPendingOrder(newOrder);
+      setShowPaymentWizard(true);
     } catch {
       // createOrder already shows a toast explaining what went wrong
+    } finally {
+      setPlacingOrder(false);
     }
+  };
+
+  const handlePaymentSuccess = () => {
+    setShowPaymentWizard(false);
+    setPendingOrder(null);
+    setIsCartOpen(false);
   };
 
   return (
@@ -323,9 +334,10 @@ export default function CartDrawer() {
 
               <button
                 className="apple-btn-primary w-full text-xs py-3"
-                onClick={() => setShowLencoModal(true)}
+                onClick={handleCheckout}
+                disabled={placingOrder}
               >
-                <span>Checkout (K {totalAmount})</span>
+                <span>{placingOrder ? 'Placing order…' : `Checkout (K ${totalAmount})`}</span>
                 <ArrowRight size={15} />
               </button>
             </div>
@@ -333,12 +345,14 @@ export default function CartDrawer() {
         </div>
       </div>
 
-      {showLencoModal && (
-        <LencoCheckoutWizard
+      {showPaymentWizard && pendingOrder && (
+        <PawaPayCheckoutWizard
+          type="order"
+          recordId={pendingOrder.id}
           amount={totalAmount}
-          title={`Campus Order (${cart.length} items)`}
-          onSuccess={handleLencoSuccess}
-          onClose={() => setShowLencoModal(false)}
+          title={`Campus Order (${pendingOrder.items?.length || 1} items)`}
+          onSuccess={handlePaymentSuccess}
+          onClose={() => setShowPaymentWizard(false)}
           allowPayOnArrival={true}
         />
       )}

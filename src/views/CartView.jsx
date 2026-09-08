@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ShoppingCart, Trash2, Plus, Minus, ArrowRight, Tag, Truck, Store, CheckCircle, Info, Eye, Sparkles } from 'lucide-react';
 import { useApp } from '../context/AppContext';
-import LencoCheckoutWizard from '../components/LencoCheckoutWizard';
+import PawaPayCheckoutWizard from '../components/PawaPayCheckoutWizard';
 
 export default function CartView() {
   const {
@@ -20,7 +20,9 @@ export default function CartView() {
   const [hostelDetails, setHostelDetails] = useState(user?.hostel || '');
   const [promoCode, setPromoCode] = useState('');
   const [discountPercent, setDiscountPercent] = useState(0);
-  const [showLencoModal, setShowLencoModal] = useState(false);
+  const [showPaymentWizard, setShowPaymentWizard] = useState(false);
+  const [pendingOrder, setPendingOrder] = useState(null);
+  const [placingOrder, setPlacingOrder] = useState(false);
   const [placedOrder, setPlacedOrder] = useState(null);
 
   const subtotal = cart.reduce((acc, item) => acc + item.price * item.quantity, 0);
@@ -42,20 +44,27 @@ export default function CartView() {
     }
   };
 
-  const handleLencoSuccess = async (lencoResult) => {
-    setShowLencoModal(false);
+  const handleCheckout = async () => {
+    setPlacingOrder(true);
     try {
       const newOrder = await createOrder({
         totalAmount,
         deliveryType,
         hostelDetails,
-        paymentMethod: lencoResult.paymentMethod,
-        lencoRef: lencoResult.lencoReference
+        paymentMethod: 'Pending Mobile Money Payment'
       });
-      setPlacedOrder(newOrder);
+      setPendingOrder(newOrder);
+      setShowPaymentWizard(true);
     } catch {
       // createOrder already shows a toast explaining what went wrong
+    } finally {
+      setPlacingOrder(false);
     }
+  };
+
+  const handlePaymentSuccess = (paymentResult) => {
+    setShowPaymentWizard(false);
+    setPlacedOrder({ ...pendingOrder, paymentMethod: paymentResult.paymentMethod });
   };
 
   if (placedOrder) {
@@ -102,7 +111,7 @@ export default function CartView() {
     );
   }
 
-  if (!cart.length) {
+  if (!cart.length && !pendingOrder) {
     return (
       <div className="empty-state">
         <div className="empty-state-icon bg-amber-400/15">
@@ -292,19 +301,22 @@ export default function CartView() {
 
         <button
           className="btn-success w-full mt-4"
-          onClick={() => setShowLencoModal(true)}
+          onClick={handleCheckout}
+          disabled={placingOrder}
         >
-          <span>Checkout via Lenco Pay (K {totalAmount})</span>
+          <span>{placingOrder ? 'Placing order…' : `Checkout via Mobile Money (K ${totalAmount})`}</span>
           <ArrowRight size={16} aria-hidden="true" />
         </button>
       </div>
 
-      {showLencoModal && (
-        <LencoCheckoutWizard
+      {showPaymentWizard && pendingOrder && (
+        <PawaPayCheckoutWizard
+          type="order"
+          recordId={pendingOrder.id}
           amount={totalAmount}
-          title={`Shop Order (${cart.length} items)`}
-          onSuccess={handleLencoSuccess}
-          onClose={() => setShowLencoModal(false)}
+          title={`Shop Order (${pendingOrder.items?.length || 1} items)`}
+          onSuccess={handlePaymentSuccess}
+          onClose={() => setShowPaymentWizard(false)}
           allowPayOnArrival={true}
         />
       )}

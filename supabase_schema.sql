@@ -146,6 +146,12 @@ CREATE TABLE IF NOT EXISTS public.bookings (
 );
 
 ALTER TABLE public.bookings ADD COLUMN IF NOT EXISTS customer_id UUID REFERENCES auth.users(id);
+-- How much of total_price was actually paid up front through the platform
+-- (0 for Pay-on-Arrival, 25 for a deposit, total_price for pay-in-full) — the
+-- vendor UI reads this instead of assuming every booking was paid in full.
+ALTER TABLE public.bookings ADD COLUMN IF NOT EXISTS deposit_amount NUMERIC DEFAULT 0;
+ALTER TABLE public.bookings DROP COLUMN IF EXISTS balance_due;
+ALTER TABLE public.bookings ADD COLUMN balance_due NUMERIC GENERATED ALWAYS AS (total_price - deposit_amount) STORED;
 
 -- 7. ORDERS (Retail Shop Orders)
 CREATE TABLE IF NOT EXISTS public.orders (
@@ -307,6 +313,20 @@ CREATE TABLE IF NOT EXISTS public.push_subscriptions (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- 15. PLATFORM FEES — one row per commission deduction, written only by
+-- transition_booking() and confirm_paid_order() below, so there's a real,
+-- auditable record of every cut the platform actually took (never client-forgeable).
+CREATE TABLE IF NOT EXISTS public.platform_fees (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  source_type TEXT NOT NULL CHECK (source_type IN ('booking', 'product_sale')),
+  source_id TEXT NOT NULL,
+  vendor_id TEXT NOT NULL REFERENCES public.vendor_profiles(id) ON DELETE CASCADE,
+  gross_amount NUMERIC NOT NULL,
+  fee_amount NUMERIC NOT NULL,
+  net_amount NUMERIC NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 -- ==============================================================================
 -- Row Level Security (RLS)
 -- ==============================================================================
@@ -328,6 +348,7 @@ ALTER TABLE public.reviews ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.analytics_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.product_sales ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.push_subscriptions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.platform_fees ENABLE ROW LEVEL SECURITY;
 
 -- ==============================================================================
 -- Server-side functions (SECURITY DEFINER) — trusted business logic clients
@@ -432,7 +453,8 @@ $$;
 
 CREATE OR REPLACE FUNCTION public.request_booking(
   p_service_id TEXT, p_service_name TEXT, p_category TEXT, p_staff_id TEXT, p_date TEXT, p_time TEXT,
-  p_hostel TEXT, p_service_type TEXT, p_price NUMERIC, p_total_price NUMERIC, p_add_ons JSONB DEFAULT '[]'::jsonb
+  p_hostel TEXT, p_service_type TEXT, p_price NUMERIC, p_total_price NUMERIC, p_add_ons JSONB DEFAULT '[]'::jsonb,
+  p_deposit_amount NUMERIC DEFAULT 0
 ) RETURNS public.bookings LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE v_profile public.profiles; v_booking public.bookings; v_vendor public.vendor_profiles;
 BEGIN
@@ -441,9 +463,10 @@ BEGIN
   SELECT * INTO v_vendor FROM public.vendor_profiles WHERE id = p_staff_id AND is_verified = true;
   IF v_profile.id IS NULL OR v_vendor.id IS NULL THEN RAISE EXCEPTION 'Choose a verified stylist'; END IF;
   IF p_total_price < 0 OR p_price < 0 THEN RAISE EXCEPTION 'Invalid price'; END IF;
+  IF p_deposit_amount < 0 OR p_deposit_amount > p_total_price THEN RAISE EXCEPTION 'Invalid deposit amount'; END IF;
   IF EXISTS (SELECT 1 FROM public.bookings WHERE staff_id = p_staff_id AND date = p_date AND time = p_time AND status IN ('Requested','Confirmed','In Progress')) THEN RAISE EXCEPTION 'That time is no longer available'; END IF;
-  INSERT INTO public.bookings (id, customer_id, service_id, service_name, category, staff_id, staff_name, date, time, campus, hostel, service_type, customer_name, customer_phone, selected_add_ons, price, total_price, payment_method, payment_status, status)
-  VALUES ('UHS-' || replace(gen_random_uuid()::text, '-', ''), auth.uid(), p_service_id, p_service_name, p_category, p_staff_id, v_vendor.name, p_date, p_time, v_profile.campus, p_hostel, p_service_type, v_profile.name, v_profile.phone, p_add_ons, p_price, p_total_price, 'Payment pending', 'Pending payment setup', 'Requested')
+  INSERT INTO public.bookings (id, customer_id, service_id, service_name, category, staff_id, staff_name, date, time, campus, hostel, service_type, customer_name, customer_phone, selected_add_ons, price, total_price, deposit_amount, payment_method, payment_status, status)
+  VALUES ('UHS-' || replace(gen_random_uuid()::text, '-', ''), auth.uid(), p_service_id, p_service_name, p_category, p_staff_id, v_vendor.name, p_date, p_time, v_profile.campus, p_hostel, p_service_type, v_profile.name, v_profile.phone, p_add_ons, p_price, p_total_price, p_deposit_amount, 'Payment pending', 'Pending', 'Requested')
   RETURNING * INTO v_booking;
   INSERT INTO public.audit_log (actor_id, action, entity_type, entity_id) VALUES (auth.uid(), 'booking_requested', 'booking', v_booking.id);
   PERFORM public.notify_push(v_vendor.id::uuid, 'New Booking Request', v_profile.name || ' requested ' || p_service_name, '/?tab=vendor');
@@ -453,7 +476,7 @@ $$;
 
 CREATE OR REPLACE FUNCTION public.transition_booking(p_booking_id TEXT, p_status TEXT, p_date TEXT DEFAULT NULL, p_time TEXT DEFAULT NULL)
 RETURNS public.bookings LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
-DECLARE v_booking public.bookings; v_points INTEGER;
+DECLARE v_booking public.bookings; v_points INTEGER; v_collected NUMERIC; v_fee NUMERIC; v_net NUMERIC;
 BEGIN
   SELECT * INTO v_booking FROM public.bookings WHERE id = p_booking_id FOR UPDATE;
   IF v_booking.id IS NULL THEN RAISE EXCEPTION 'Booking not found'; END IF;
@@ -465,16 +488,32 @@ BEGIN
   IF p_status = 'Completed' AND NOT EXISTS (SELECT 1 FROM public.points_ledger WHERE booking_id = p_booking_id AND reason = 'Completed booking reward') THEN
     v_points := GREATEST(5, floor(v_booking.total_price / 10));
     PERFORM public.apply_points(v_booking.customer_id, v_points, 'Completed booking reward', p_booking_id);
-    -- This is the only place a vendor's real earnings are ever credited — a
-    -- completed job pays out its total_price into their wallet, once per booking.
+    -- The job count always increments on completion, but the wallet is only
+    -- ever credited with money that was actually collected through the
+    -- platform (payment_transactions) — a Pay-on-Arrival booking is 100%
+    -- cash the vendor already has in hand, and crediting the wallet on top
+    -- of that would be double-counting money the platform never touched.
     IF v_booking.staff_id IS NOT NULL THEN
-      INSERT INTO public.vendor_wallets (id, vendor_id, available_balance, total_earned, completed_jobs_count, updated_at)
-      VALUES (v_booking.staff_id, v_booking.staff_id, v_booking.total_price, v_booking.total_price, 1, now())
-      ON CONFLICT (vendor_id) DO UPDATE SET
-        available_balance = public.vendor_wallets.available_balance + v_booking.total_price,
-        total_earned = public.vendor_wallets.total_earned + v_booking.total_price,
-        completed_jobs_count = public.vendor_wallets.completed_jobs_count + 1,
-        updated_at = now();
+      SELECT COALESCE(SUM(amount), 0) INTO v_collected FROM public.payment_transactions WHERE booking_id = p_booking_id AND status = 'paid';
+      IF v_collected > 0 THEN
+        v_fee := round(v_collected * 0.10 + 5, 2);
+        v_net := v_collected - v_fee;
+        INSERT INTO public.vendor_wallets (id, vendor_id, available_balance, total_earned, completed_jobs_count, updated_at)
+        VALUES (v_booking.staff_id, v_booking.staff_id, v_net, v_net, 1, now())
+        ON CONFLICT (vendor_id) DO UPDATE SET
+          available_balance = public.vendor_wallets.available_balance + v_net,
+          total_earned = public.vendor_wallets.total_earned + v_net,
+          completed_jobs_count = public.vendor_wallets.completed_jobs_count + 1,
+          updated_at = now();
+        INSERT INTO public.platform_fees (source_type, source_id, vendor_id, gross_amount, fee_amount, net_amount)
+        VALUES ('booking', p_booking_id, v_booking.staff_id, v_collected, v_fee, v_net);
+      ELSE
+        INSERT INTO public.vendor_wallets (id, vendor_id, completed_jobs_count, updated_at)
+        VALUES (v_booking.staff_id, v_booking.staff_id, 1, now())
+        ON CONFLICT (vendor_id) DO UPDATE SET
+          completed_jobs_count = public.vendor_wallets.completed_jobs_count + 1,
+          updated_at = now();
+      END IF;
     END IF;
   END IF;
   INSERT INTO public.audit_log (actor_id, action, entity_type, entity_id, metadata) VALUES (auth.uid(), lower(replace(p_status, ' ', '_')), 'booking', p_booking_id, jsonb_build_object('status', p_status));
@@ -582,11 +621,15 @@ REVOKE ALL ON FUNCTION public.request_vendor_payout(NUMERIC, TEXT, TEXT) FROM PU
 GRANT EXECUTE ON FUNCTION public.request_vendor_payout(NUMERIC, TEXT, TEXT) TO authenticated;
 
 -- Places an order and, for every line item that matches a real inventory row,
--- decrements stock and credits the listing vendor's wallet server-side — the
--- client can never claim stock it doesn't have or forge a sale for a product
--- it doesn't own. A line item with no matching product row (a curated bundle
--- SKU, not real inventory) falls back to whatever the client sent for that
--- line, same as before this function existed.
+-- decrements stock and records the sale server-side — the client can never
+-- claim stock it doesn't have or forge a sale for a product it doesn't own.
+-- A line item with no matching product row (a curated bundle SKU, not real
+-- inventory) falls back to whatever the client sent for that line, same as
+-- before this function existed. The order is created here in Pending state
+-- BEFORE any real payment happens — wallet crediting now happens separately,
+-- in confirm_paid_order() below, only once PawaPay actually confirms payment,
+-- so a Pay-on-Delivery order (cash the vendor collects directly) never
+-- credits the wallet at all.
 CREATE OR REPLACE FUNCTION public.place_order(
   p_items JSONB, p_campus TEXT, p_delivery_type TEXT, p_hostel_details TEXT, p_payment_method TEXT
 ) RETURNS public.orders LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
@@ -622,13 +665,6 @@ BEGIN
       IF v_product.vendor_id IS NOT NULL THEN
         INSERT INTO public.product_sales (order_id, product_id, vendor_id, product_name, quantity, unit_price, total_amount, customer_name)
         VALUES (v_order_id, v_product.id, v_product.vendor_id, v_product.name, v_qty, v_product.price, v_line_total, v_profile.name);
-
-        INSERT INTO public.vendor_wallets (id, vendor_id, available_balance, total_earned, completed_jobs_count, updated_at)
-        VALUES (v_product.vendor_id, v_product.vendor_id, v_line_total, v_line_total, 0, now())
-        ON CONFLICT (vendor_id) DO UPDATE SET
-          available_balance = public.vendor_wallets.available_balance + v_line_total,
-          total_earned = public.vendor_wallets.total_earned + v_line_total,
-          updated_at = now();
       END IF;
     ELSE
       v_line_total := COALESCE((v_item->>'price')::numeric, 0) * v_qty;
@@ -641,8 +677,7 @@ BEGIN
   VALUES (
     v_order_id, v_final_items, COALESCE(p_campus, v_profile.campus), v_total, v_profile.name, v_profile.phone,
     p_delivery_type, p_hostel_details, p_payment_method,
-    CASE WHEN p_payment_method = 'Pay on Delivery / Pickup' THEN 'Pending' ELSE 'Paid' END,
-    'Pending', auth.uid()
+    'Pending', 'Pending', auth.uid()
   ) RETURNING * INTO v_order;
 
   INSERT INTO public.audit_log (actor_id, action, entity_type, entity_id, metadata) VALUES (auth.uid(), 'order_placed', 'order', v_order_id, jsonb_build_object('total_amount', v_total));
@@ -653,6 +688,34 @@ $$;
 
 REVOKE ALL ON FUNCTION public.place_order(JSONB, TEXT, TEXT, TEXT, TEXT) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.place_order(JSONB, TEXT, TEXT, TEXT, TEXT) TO authenticated;
+
+-- Called only by the payment-webhook Edge Function once PawaPay confirms an
+-- order's payment actually succeeded — credits each line item's vendor net
+-- of the platform commission, using the product_sales rows place_order()
+-- already recorded. Never called for Pay-on-Delivery orders (no webhook
+-- fires for those), so COD orders never touch the wallet at all.
+CREATE OR REPLACE FUNCTION public.confirm_paid_order(p_order_id TEXT)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE v_sale RECORD; v_fee NUMERIC; v_net NUMERIC;
+BEGIN
+  FOR v_sale IN SELECT * FROM public.product_sales WHERE order_id = p_order_id LOOP
+    v_fee := round(v_sale.total_amount * 0.10 + 5, 2);
+    v_net := v_sale.total_amount - v_fee;
+    INSERT INTO public.vendor_wallets (id, vendor_id, available_balance, total_earned, completed_jobs_count, updated_at)
+    VALUES (v_sale.vendor_id, v_sale.vendor_id, v_net, v_net, 0, now())
+    ON CONFLICT (vendor_id) DO UPDATE SET
+      available_balance = public.vendor_wallets.available_balance + v_net,
+      total_earned = public.vendor_wallets.total_earned + v_net,
+      updated_at = now();
+    INSERT INTO public.platform_fees (source_type, source_id, vendor_id, gross_amount, fee_amount, net_amount)
+    VALUES ('product_sale', v_sale.id::text, v_sale.vendor_id, v_sale.total_amount, v_fee, v_net);
+  END LOOP;
+  UPDATE public.orders SET payment_status = 'Paid' WHERE id = p_order_id;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.confirm_paid_order(TEXT) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.confirm_paid_order(TEXT) TO service_role;
 
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created AFTER INSERT ON auth.users FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
@@ -727,6 +790,10 @@ CREATE POLICY product_sales_vendor_read ON public.product_sales FOR SELECT TO au
 
 -- Each user manages only their own device push subscriptions.
 CREATE POLICY push_subscriptions_owner_all ON public.push_subscriptions FOR ALL TO authenticated USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid());
+
+-- Platform fee deductions are only ever written by transition_booking()/
+-- confirm_paid_order() below — a vendor can see their own fee history, never write to it.
+CREATE POLICY platform_fees_vendor_read ON public.platform_fees FOR SELECT TO authenticated USING (vendor_id = auth.uid()::text OR public.is_admin());
 
 -- Service-role functions/Edge Functions write financial and booking state. Clients
 -- have read-only access to those records, preventing balance/refund manipulation.

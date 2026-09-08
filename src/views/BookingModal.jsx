@@ -22,7 +22,7 @@ import {
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { campusHostels } from '../data/mockData';
-import LencoCheckoutWizard from '../components/LencoCheckoutWizard';
+import PawaPayCheckoutWizard from '../components/PawaPayCheckoutWizard';
 
 export default function BookingModal() {
   const {
@@ -58,7 +58,8 @@ export default function BookingModal() {
   const [isRoommateBooking, setIsRoommateBooking] = useState(false);
   const [paymentMode, setPaymentMode] = useState('deposit'); // 'deposit' (K25) | 'full' | 'arrival'
 
-  const [showLencoWizard, setShowLencoWizard] = useState(false);
+  const [showPaymentWizard, setShowPaymentWizard] = useState(false);
+  const [pendingBooking, setPendingBooking] = useState(null);
   const [confirmedBooking, setConfirmedBooking] = useState(null);
   const [errors, setErrors] = useState({});
 
@@ -175,11 +176,8 @@ export default function BookingModal() {
       return;
     }
 
-    setShowLencoWizard(true);
-  };
-
-  const handleLencoSuccess = async (lencoResult) => {
-    setShowLencoWizard(false);
+    // Create the real booking first (Pending payment) so there's an actual
+    // id to charge PawaPay against, then open the wizard on it.
     try {
       const newBooking = await createBooking({
         serviceId: bookingService.id,
@@ -200,18 +198,28 @@ export default function BookingModal() {
         time: selectedTime,
         campus: selectedCampus,
         hostel: serviceType === 'travel' ? `${selectedHostelHall} (${roomNumber})` : 'Campus Studio / Student Centre',
-        paymentMethod: lencoResult.paymentMethod,
-        lencoRef: lencoResult.lencoReference
+        paymentMethod: 'Pending Mobile Money Payment'
       });
-      setConfirmedBooking(newBooking);
+      setPendingBooking(newBooking);
+      setShowPaymentWizard(true);
     } catch {
       // createBooking already shows a toast explaining what went wrong
     }
   };
 
+  const handlePaymentSuccess = (paymentResult) => {
+    setShowPaymentWizard(false);
+    setConfirmedBooking({
+      ...pendingBooking,
+      paymentMethod: paymentResult.paymentMethod,
+      paymentReference: paymentResult.providerReference
+    });
+  };
+
   const handleClose = () => {
     setBookingService(null);
     setConfirmedBooking(null);
+    setPendingBooking(null);
     setSelectedAddOns([]);
     setErrors({});
   };
@@ -536,7 +544,7 @@ export default function BookingModal() {
                   >
                     <div>
                       <div className="text-[11px] font-bold text-[#007AFF]">Pay Full Now</div>
-                      <div className="text-[9px] text-slate-500 mt-0.5 leading-tight">Airtel / MTN / Card via Lenco</div>
+                      <div className="text-[9px] text-slate-500 mt-0.5 leading-tight">Airtel / MTN / Zamtel via PawaPay</div>
                     </div>
                     <span className="badge badge-verified text-[9px] mt-1.5 py-0 px-1 w-max">100% Escrow</span>
                   </button>
@@ -703,12 +711,14 @@ export default function BookingModal() {
         </div>
       </div>
 
-      {showLencoWizard && (
-        <LencoCheckoutWizard
+      {showPaymentWizard && pendingBooking && (
+        <PawaPayCheckoutWizard
+          type="booking"
+          recordId={pendingBooking.id}
           amount={payableNowAmount}
           title={paymentMode === 'deposit' ? `K25 Deposit: ${bookingService.name}` : `Booking: ${bookingService.name}`}
-          onSuccess={handleLencoSuccess}
-          onClose={() => setShowLencoWizard(false)}
+          onSuccess={handlePaymentSuccess}
+          onClose={() => setShowPaymentWizard(false)}
           allowPayOnArrival={false}
         />
       )}

@@ -176,7 +176,6 @@ export const AppProvider = ({ children }) => {
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [selectedStylist, setSelectedStylist] = useState(null);
   const [showSafetyModal, setShowSafetyModal] = useState(false);
-  const [lencoCheckoutState, setLencoCheckoutState] = useState(null);
   const [filterCategory, setFilterCategory] = useState('All');
   const [serviceTypeFilter, setServiceTypeFilter] = useState('All');
   const [priceFilter, setPriceFilter] = useState('All');
@@ -867,7 +866,7 @@ export const AppProvider = ({ children }) => {
       paymentMode,
       depositAmount,
       balanceDue,
-      paymentStatus: paymentMode === 'arrival' ? 'Pending (Pay on Arrival)' : (paymentMode === 'deposit' ? 'Deposit Paid (K25)' : 'Paid in Full'),
+      paymentStatus: paymentMode === 'arrival' ? 'Pending (Pay on Arrival)' : 'Pending',
       status: 'Confirmed',
       createdAt: new Date().toISOString().split('T')[0]
     };
@@ -882,6 +881,7 @@ export const AppProvider = ({ children }) => {
           p_service_name: newBookingData.serviceName || 'Campus Service',
           p_category: newBookingData.category || 'Barbering',
           p_staff_id: newBookingData.staffId || 'stf-1',
+          p_deposit_amount: depositAmount,
           p_date: newBookingData.date || new Date().toISOString().split('T')[0],
           p_time: newBookingData.time || '14:00',
           p_hostel: newBookingData.hostel || 'Hostel Room',
@@ -1098,9 +1098,12 @@ export const AppProvider = ({ children }) => {
         return { ...prev, loyaltyPoints: nextPoints, pointsHistory: nextHistory };
       });
 
+      // Cart is cleared here (the order now owns these items), but the cart
+      // drawer/page itself stays open — the caller is about to show a
+      // payment wizard against this order and closes it only once payment
+      // actually succeeds.
       clearCart();
-      setIsCartOpen(false);
-      addToast(`Order ${newOrder.id} placed for ${currentCampus}! +${pointsEarned} points earned 💎`, 'success');
+      addToast(`Order ${newOrder.id} placed for ${currentCampus}! +${pointsEarned} points earned 💎 — complete payment to confirm.`, 'success');
       trackEvent('order_placed', { orderId: newOrder.id, totalAmount: newOrder.totalAmount, itemCount: currentCart.length });
       return newOrder;
     }
@@ -1146,8 +1149,7 @@ export const AppProvider = ({ children }) => {
     }));
 
     clearCart();
-    setIsCartOpen(false);
-    addToast(`Order ${orderId} placed for ${currentCampus}! +${pointsEarned} points earned 💎`, 'success');
+    addToast(`Order ${orderId} placed for ${currentCampus}! +${pointsEarned} points earned 💎 — complete payment to confirm.`, 'success');
     trackEvent('order_placed', { orderId, totalAmount: orderData.totalAmount, itemCount: currentCart.length });
     return newOrder;
   }, [cart, currentCampus, user.name, user.phone, clearCart, addToast, trackEvent]);
@@ -1980,8 +1982,6 @@ export const AppProvider = ({ children }) => {
     setSelectedStylist,
     showSafetyModal,
     setShowSafetyModal,
-    lencoCheckoutState,
-    setLencoCheckoutState,
     conversations,
     reviews,
     submitReview,
@@ -2029,7 +2029,7 @@ export const AppProvider = ({ children }) => {
     verifyStylist, settleVendorPayout,
     services, products, bundles, staffList, bookings, orders, cart,
     showAuthModal, isCartOpen, bookingService, selectedProduct, selectedStylist,
-    showSafetyModal, lencoCheckoutState, conversations, reviews, submitReview, trackEvent, activeChatStylistId,
+    showSafetyModal, conversations, reviews, submitReview, trackEvent, activeChatStylistId,
     filterCategory, serviceTypeFilter, priceFilter, ratingFilter, availabilityFilter,
     toasts,
     addToCart, addBundleToCart, updateCartQuantity, removeFromCart, clearCart,

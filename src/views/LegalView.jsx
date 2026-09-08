@@ -71,12 +71,12 @@ export default function LegalView() {
 
             <section>
               <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-1">4. Payments</h3>
-              <p className="m-0">Live payment collection is not yet enabled on this platform. Where payment is described in the app, it currently reflects a planned feature, not an active one, until this section is updated to state otherwise.</p>
+              <p className="m-0">Mobile money payments (Airtel Money, MTN Mobile Money, Zamtel Kwacha) are collected through our payment processor, PawaPay. You may also choose to pay a stylist directly in cash at the appointment ("Pay on Arrival") or a vendor directly for Pay-on-Delivery/Pickup shop orders — those payments are between you and the stylist/vendor and are never processed by UniHairShop.</p>
             </section>
 
             <section>
               <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-1">5. Vendor / Stylist Terms</h3>
-              <p className="m-0">Stylists list their own services and pricing and are solely responsible for the quality and safety of the services they provide. UniHairShop charges a platform commission on completed bookings (currently 10% plus a small per-booking fee), disclosed in the Vendor Studio.</p>
+              <p className="m-0">Stylists list their own services and pricing and are solely responsible for the quality and safety of the services they provide. UniHairShop deducts a platform commission of 10% plus a flat K5 fee from any amount actually collected through the platform via PawaPay before crediting a vendor's wallet — this applies only to money that passes through UniHairShop; it is never charged on cash paid directly to a stylist ("Pay on Arrival") or a vendor (Pay on Delivery/Pickup).</p>
             </section>
 
             <section>
