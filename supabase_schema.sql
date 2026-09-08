@@ -57,6 +57,9 @@ CREATE TABLE IF NOT EXISTS public.vendor_profiles (
   payout_provider TEXT DEFAULT 'Airtel Money',
   payout_number TEXT,
   id_document_url TEXT,
+  specialties JSONB DEFAULT '[]'::jsonb,
+  payout_accounts JSONB DEFAULT '[]'::jsonb,
+  social_link TEXT,
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
@@ -67,6 +70,11 @@ ALTER TABLE public.vendor_profiles ALTER COLUMN rating SET DEFAULT 0;
 ALTER TABLE public.vendor_profiles ALTER COLUMN is_verified SET DEFAULT false;
 ALTER TABLE public.vendor_profiles ALTER COLUMN badge SET DEFAULT 'Campus Stylist (Pending Verification)';
 ALTER TABLE public.vendor_profiles ADD COLUMN IF NOT EXISTS id_document_url TEXT;
+-- Multiple specialty skills, multiple saved mobile money payout accounts,
+-- and a social media link — all optional, additive vendor profile fields.
+ALTER TABLE public.vendor_profiles ADD COLUMN IF NOT EXISTS specialties JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE public.vendor_profiles ADD COLUMN IF NOT EXISTS payout_accounts JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE public.vendor_profiles ADD COLUMN IF NOT EXISTS social_link TEXT;
 
 -- 3. SERVICES (Hairstyles & Grooming)
 CREATE TABLE IF NOT EXISTS public.services (
@@ -208,11 +216,17 @@ CREATE TABLE IF NOT EXISTS public.points_ledger (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   profile_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
   points INTEGER NOT NULL CHECK (points <> 0),
-  value_zmw NUMERIC(12,2) GENERATED ALWAYS AS (points * 0.15) STORED,
+  value_zmw NUMERIC(12,2) GENERATED ALWAYS AS (points * 0.10) STORED,
   reason TEXT NOT NULL,
   booking_id TEXT REFERENCES public.bookings(id),
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- Loyalty points are now worth K0.10 each (was K0.15) — a generated column's
+-- expression can't be altered in place pre-PG18, so drop and recreate it.
+-- Safe to re-run: this only recomputes from the points already stored.
+ALTER TABLE public.points_ledger DROP COLUMN IF EXISTS value_zmw;
+ALTER TABLE public.points_ledger ADD COLUMN value_zmw NUMERIC(12,2) GENERATED ALWAYS AS (points * 0.10) STORED;
 
 CREATE TABLE IF NOT EXISTS public.payment_transactions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

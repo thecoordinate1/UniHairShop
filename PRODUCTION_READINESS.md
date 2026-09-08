@@ -15,4 +15,4 @@ The interface is a prototype until this checklist is completed. Do not enable li
 - A booking starts as `Requested`; only the assigned verified stylist can accept it.
 - Payment status changes only after a verified provider webhook.
 - Refunds and payouts are requests until a server-side provider result confirms them.
-- One loyalty point equals exactly K0.15. Ledger entries—not a client-side balance—are the source of truth.
+- One loyalty point equals exactly K0.10. Ledger entries—not a client-side balance—are the source of truth.

@@ -142,7 +142,10 @@ export const AppProvider = ({ children }) => {
     payoutProvider: 'Airtel Money',
     payoutNumber: '',
     bio: '',
-    idDocumentUrl: null
+    idDocumentUrl: null,
+    specialties: [],
+    payoutAccounts: [],
+    socialLink: ''
   }));
 
   const [vendorWallet, setVendorWallet] = useState(() => safeGetItem('unihair_vendor_wallet', {
@@ -263,7 +266,7 @@ export const AppProvider = ({ children }) => {
         try {
           const { data: vendorData } = await supabase
             .from('vendor_profiles')
-            .select('id, name, is_verified, role, dorm_location, avatar, phone, bio')
+            .select('id, name, is_verified, role, dorm_location, avatar, phone, bio, specialties, payout_accounts, social_link')
             .eq('id', user.id)
             .maybeSingle();
           if (vendorData) {
@@ -276,7 +279,10 @@ export const AppProvider = ({ children }) => {
               dormLocation: vendorData.dorm_location || prev.dormLocation,
               avatar: vendorData.avatar || prev.avatar,
               phone: vendorData.phone || prev.phone,
-              bio: vendorData.bio || prev.bio
+              bio: vendorData.bio || prev.bio,
+              specialties: vendorData.specialties || prev.specialties,
+              payoutAccounts: vendorData.payout_accounts || prev.payoutAccounts,
+              socialLink: vendorData.social_link || prev.socialLink
             }));
           } else {
             setVendorProfile((prev) => ({
@@ -310,7 +316,7 @@ export const AppProvider = ({ children }) => {
       try {
         const { data: vendorData } = await supabase
           .from('vendor_profiles')
-          .select('id, name, is_verified, role, dorm_location, avatar, phone, bio')
+          .select('id, name, is_verified, role, dorm_location, avatar, phone, bio, specialties, payout_accounts, social_link')
           .eq('id', user.id)
           .single();
 
@@ -338,7 +344,10 @@ export const AppProvider = ({ children }) => {
             dormLocation: vendorData.dorm_location || prev.dormLocation,
             avatar: vendorData.avatar || prev.avatar,
             phone: vendorData.phone || prev.phone,
-            bio: vendorData.bio || prev.bio
+            bio: vendorData.bio || prev.bio,
+            specialties: vendorData.specialties || prev.specialties,
+            payoutAccounts: vendorData.payout_accounts || prev.payoutAccounts,
+            socialLink: vendorData.social_link || prev.socialLink
           }));
         }
       } catch (err) {
@@ -1152,6 +1161,14 @@ export const AppProvider = ({ children }) => {
         dbPayload.id_document_url = dbPayload.idDocumentUrl;
         delete dbPayload.idDocumentUrl;
       }
+      if ('payoutAccounts' in dbPayload) {
+        dbPayload.payout_accounts = dbPayload.payoutAccounts;
+        delete dbPayload.payoutAccounts;
+      }
+      if ('socialLink' in dbPayload) {
+        dbPayload.social_link = dbPayload.socialLink;
+        delete dbPayload.socialLink;
+      }
       supabase.from('vendor_profiles').upsert([dbPayload]).then(null, () => {});
     }
     addToast('Vendor Studio profile updated!', 'success');
@@ -1809,7 +1826,10 @@ export const AppProvider = ({ children }) => {
       phone: stylistData.phone || user.phone,
       bio: stylistData.bio || `Campus stylist at ${currentCampus}.`,
       payoutProvider: 'Airtel Money',
-      payoutNumber: stylistData.phone || user.phone
+      payoutNumber: stylistData.phone || user.phone,
+      specialties: stylistData.specialty ? [stylistData.specialty] : [],
+      payoutAccounts: [],
+      socialLink: ''
     };
 
     setVendorProfile(newVendor);
@@ -1833,7 +1853,8 @@ export const AppProvider = ({ children }) => {
           phone: newVendor.phone,
           bio: newVendor.bio,
           payout_provider: newVendor.payoutProvider,
-          payout_number: newVendor.payoutNumber
+          payout_number: newVendor.payoutNumber,
+          specialties: newVendor.specialties
         }]);
       } catch { /* ignore */ }
     }

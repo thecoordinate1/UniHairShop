@@ -175,7 +175,7 @@ export default function AccountView() {
   };
 
   const favoriteServices = services.filter((s) => user?.favorites?.includes(s.id));
-  const pointsValue = (Number(user?.loyaltyPoints) || 0) * 0.15;
+  const pointsValue = (Number(user?.loyaltyPoints) || 0) * 0.10;
 
   return (
     <div className="w-full max-w-3xl mx-auto flex flex-col gap-6">

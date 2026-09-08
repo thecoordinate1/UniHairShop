@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Star, ShieldCheck, Clock, MapPin, MessageCircle, Calendar, CheckCircle2, ChevronRight, Sparkles, Heart, Share2, Copy, Check } from 'lucide-react';
+import { X, Star, ShieldCheck, Clock, MapPin, MessageCircle, Calendar, CheckCircle2, ChevronRight, Sparkles, Heart, Share2, Copy, Check, Link2 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 
 export default function StylistProfileModal() {
@@ -165,7 +165,28 @@ export default function StylistProfileModal() {
             <div className="flex items-center gap-2 mt-0.5 mb-2">
               <span className="text-xs text-amber-500 font-semibold">{selectedStylist.role}</span>
               <span className="text-[11px] font-mono text-slate-400">@{bioHandle}</span>
+              {(selectedStylist.socialLink || selectedStylist.social_link) && (
+                <a
+                  href={selectedStylist.socialLink || selectedStylist.social_link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-[11px] text-[#007AFF] font-semibold"
+                >
+                  <Link2 size={12} />
+                  <span>Social</span>
+                </a>
+              )}
             </div>
+
+            {(selectedStylist.specialties?.length > 0) && (
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                {selectedStylist.specialties.map((specialty) => (
+                  <span key={specialty} className="text-[10px] bg-amber-400/15 text-amber-600 dark:text-amber-300 px-2 py-0.5 rounded-md font-semibold">
+                    {specialty}
+                  </span>
+                ))}
+              </div>
+            )}
 
             <div className="flex flex-wrap gap-y-1 gap-x-4 text-xs text-slate-500 dark:text-slate-400 mb-3">
               <div className="flex items-center gap-1">

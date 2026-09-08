@@ -153,9 +153,38 @@ export default function VendorStudioView() {
   const [editPhone, setEditPhone] = useState(vendorProfile.phone || '');
   const [editAvatar, setEditAvatar] = useState(vendorProfile.avatar || '');
   const [editIdDocument, setEditIdDocument] = useState(vendorProfile.idDocumentUrl || vendorProfile.id_document_url || '');
+  const [editSpecialties, setEditSpecialties] = useState(vendorProfile.specialties || []);
+  const [editSocialLink, setEditSocialLink] = useState(vendorProfile.socialLink || vendorProfile.social_link || '');
+  const [editPayoutAccounts, setEditPayoutAccounts] = useState(vendorProfile.payoutAccounts || vendorProfile.payout_accounts || []);
+  const [newAccountProvider, setNewAccountProvider] = useState('Airtel Money');
+  const [newAccountNumber, setNewAccountNumber] = useState('');
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [uploadingIdDocument, setUploadingIdDocument] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
+
+  const SPECIALTY_OPTIONS = ['Barbering', 'Braids & Natural Hair', 'Wigs & Weaves', 'Locs', 'Nails & Lashes'];
+
+  const toggleEditSpecialty = (specialty) => {
+    setEditSpecialties((prev) =>
+      prev.includes(specialty) ? prev.filter((s) => s !== specialty) : [...prev, specialty]
+    );
+  };
+
+  const handleAddPayoutAccount = () => {
+    if (!newAccountNumber.trim()) {
+      addToast('Enter a mobile money number first', 'error');
+      return;
+    }
+    setEditPayoutAccounts((prev) => [
+      ...prev,
+      { id: `pay-acc-${Date.now()}`, provider: newAccountProvider, number: newAccountNumber.trim() }
+    ]);
+    setNewAccountNumber('');
+  };
+
+  const handleRemovePayoutAccount = (id) => {
+    setEditPayoutAccounts((prev) => prev.filter((a) => a.id !== id));
+  };
 
   // My Shop (Vendor Product Listings) State
   const [showAddProductModal, setShowAddProductModal] = useState(false);
@@ -167,10 +196,11 @@ export default function VendorStudioView() {
   const [newPrdImage, setNewPrdImage] = useState(null);
   const [uploadingProductPhoto, setUploadingProductPhoto] = useState(false);
 
-  // Payout Form State
+  // Payout Form State — prefer the first saved mobile money account, if any
+  const savedPayoutAccounts = vendorProfile.payoutAccounts || vendorProfile.payout_accounts || [];
   const [payoutAmount, setPayoutAmount] = useState('');
-  const [payoutProvider, setPayoutProvider] = useState(vendorProfile.payoutProvider || 'Airtel Money');
-  const [payoutNumber, setPayoutNumber] = useState(vendorProfile.payoutNumber || '0971234567');
+  const [payoutProvider, setPayoutProvider] = useState(savedPayoutAccounts[0]?.provider || vendorProfile.payoutProvider || 'Airtel Money');
+  const [payoutNumber, setPayoutNumber] = useState(savedPayoutAccounts[0]?.number || vendorProfile.payoutNumber || '0971234567');
 
   const myStylistObj = staffList.find((s) => s.id === vendorProfile.id) || {};
   const currentSchedule = myStylistObj.scheduleConfig || vendorProfile.scheduleConfig || {
@@ -342,7 +372,10 @@ export default function VendorStudioView() {
         bio: editBio.trim(),
         phone: editPhone.trim(),
         avatar: editAvatar || vendorProfile.avatar,
-        idDocumentUrl: editIdDocument || null
+        idDocumentUrl: editIdDocument || null,
+        specialties: editSpecialties,
+        socialLink: editSocialLink.trim(),
+        payoutAccounts: editPayoutAccounts
       });
       setShowEditProfileModal(false);
     } finally {
@@ -437,6 +470,9 @@ export default function VendorStudioView() {
               setEditPhone(vendorProfile.phone || '');
               setEditAvatar(vendorProfile.avatar || '');
               setEditIdDocument(vendorProfile.idDocumentUrl || vendorProfile.id_document_url || '');
+              setEditSpecialties(vendorProfile.specialties || []);
+              setEditSocialLink(vendorProfile.socialLink || vendorProfile.social_link || '');
+              setEditPayoutAccounts(vendorProfile.payoutAccounts || vendorProfile.payout_accounts || []);
               setShowEditProfileModal(true);
             }}
             className="apple-btn-secondary text-xs px-3.5 py-2 flex items-center gap-2"
@@ -1113,30 +1149,56 @@ export default function VendorStudioView() {
                   />
                 </div>
 
-                <div className="form-group mb-2">
-                  <label className="form-label" htmlFor="payout-provider">Mobile Money Provider:</label>
-                  <select
-                    id="payout-provider"
-                    className="form-select text-xs"
-                    value={payoutProvider}
-                    onChange={(e) => setPayoutProvider(e.target.value)}
-                  >
-                    <option value="Airtel Money">Airtel Money</option>
-                    <option value="MTN Mobile Money">MTN Mobile Money</option>
-                    <option value="Zamtel Kwacha">Zamtel Kwacha</option>
-                  </select>
-                </div>
+                {savedPayoutAccounts.length > 0 ? (
+                  <div className="form-group mb-3">
+                    <label className="form-label" htmlFor="payout-account">Pay Out To:</label>
+                    <select
+                      id="payout-account"
+                      className="form-select text-xs"
+                      value={`${payoutProvider}|${payoutNumber}`}
+                      onChange={(e) => {
+                        const [prov, num] = e.target.value.split('|');
+                        setPayoutProvider(prov);
+                        setPayoutNumber(num);
+                      }}
+                    >
+                      {savedPayoutAccounts.map((acc) => (
+                        <option key={acc.id} value={`${acc.provider}|${acc.number}`}>
+                          {acc.provider} — {acc.number}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-[11px] text-slate-400 mt-1 m-0">Manage saved accounts from Edit Profile.</p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="form-group mb-2">
+                      <label className="form-label" htmlFor="payout-provider">Mobile Money Provider:</label>
+                      <select
+                        id="payout-provider"
+                        className="form-select text-xs"
+                        value={payoutProvider}
+                        onChange={(e) => setPayoutProvider(e.target.value)}
+                      >
+                        <option value="Airtel Money">Airtel Money</option>
+                        <option value="MTN Mobile Money">MTN Mobile Money</option>
+                        <option value="Zamtel Kwacha">Zamtel Kwacha</option>
+                      </select>
+                    </div>
 
-                <div className="form-group mb-3">
-                  <label className="form-label" htmlFor="payout-phone">Registered Mobile Number:</label>
-                  <input
-                    id="payout-phone"
-                    type="tel"
-                    className="form-input text-xs"
-                    value={payoutNumber}
-                    onChange={(e) => setPayoutNumber(e.target.value)}
-                  />
-                </div>
+                    <div className="form-group mb-3">
+                      <label className="form-label" htmlFor="payout-phone">Registered Mobile Number:</label>
+                      <input
+                        id="payout-phone"
+                        type="tel"
+                        className="form-input text-xs"
+                        value={payoutNumber}
+                        onChange={(e) => setPayoutNumber(e.target.value)}
+                      />
+                      <p className="text-[11px] text-slate-400 mt-1 m-0">Save this in Edit Profile to add more providers.</p>
+                    </div>
+                  </>
+                )}
 
                 <button
                   type="submit"
@@ -1389,6 +1451,81 @@ export default function VendorStudioView() {
                 value={editBio}
                 onChange={(e) => setEditBio(e.target.value)}
               />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Specialty Skills (select all that apply):</label>
+              <div className="flex flex-wrap gap-1.5">
+                {SPECIALTY_OPTIONS.map((specialty) => (
+                  <button
+                    key={specialty}
+                    type="button"
+                    onClick={() => toggleEditSpecialty(specialty)}
+                    className={`px-3 py-1.5 rounded-xl text-[11px] font-semibold border cursor-pointer transition-all ${
+                      editSpecialties.includes(specialty)
+                        ? 'bg-amber-400 border-amber-400 text-slate-950'
+                        : 'bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 text-slate-500 dark:text-slate-400'
+                    }`}
+                  >
+                    {specialty}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Social Media Link (Instagram, TikTok, etc.):</label>
+              <input
+                type="url"
+                placeholder="https://instagram.com/yourhandle"
+                className="form-input text-xs"
+                value={editSocialLink}
+                onChange={(e) => setEditSocialLink(e.target.value)}
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Mobile Money Payout Accounts:</label>
+              <p className="text-[11px] text-slate-400 mb-2 m-0">
+                Add every provider you use so you can pick the right one when requesting a payout.
+              </p>
+              {editPayoutAccounts.length > 0 && (
+                <div className="flex flex-col gap-1.5 mb-2">
+                  {editPayoutAccounts.map((acc) => (
+                    <div key={acc.id} className="flex items-center justify-between gap-2 bg-black/[0.02] dark:bg-white/[0.03] px-3 py-2 rounded-xl border border-black/5 dark:border-white/5 text-xs">
+                      <span className="font-semibold text-slate-700 dark:text-slate-200">{acc.provider} — {acc.number}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleRemovePayoutAccount(acc.id)}
+                        className="text-red-500 hover:text-red-600 bg-transparent border-0 cursor-pointer text-[11px] font-semibold"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="flex gap-2">
+                <select
+                  className="form-select text-xs w-auto"
+                  value={newAccountProvider}
+                  onChange={(e) => setNewAccountProvider(e.target.value)}
+                >
+                  <option value="Airtel Money">Airtel Money</option>
+                  <option value="MTN Mobile Money">MTN Mobile Money</option>
+                  <option value="Zamtel Kwacha">Zamtel Kwacha</option>
+                </select>
+                <input
+                  type="tel"
+                  placeholder="0971234567"
+                  className="form-input text-xs flex-1"
+                  value={newAccountNumber}
+                  onChange={(e) => setNewAccountNumber(e.target.value)}
+                />
+                <button type="button" className="apple-btn-secondary text-xs px-3" onClick={handleAddPayoutAccount}>
+                  Add
+                </button>
+              </div>
             </div>
 
             <div className="form-group">
