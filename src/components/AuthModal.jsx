@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Sparkles, Lock, Mail, Phone, MapPin, User, Building, Store, Scissors, ArrowRight, CheckCircle2, AlertCircle, KeyRound, HelpCircle } from 'lucide-react';
+import { X, Sparkles, Lock, Mail, Phone, MapPin, User, Building, Store, Scissors, ArrowRight, CheckCircle2, AlertCircle, KeyRound, HelpCircle, Eye, EyeOff } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient';
 
@@ -35,6 +35,7 @@ export default function AuthModal() {
   // Form Fields
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [campus, setCampus] = useState(currentCampus);
@@ -395,14 +396,23 @@ export default function AuthModal() {
               <div className="relative">
                 <input
                   id="auth-password"
-                  type="password"
+                  type={showPassword ? 'text' : 'password'}
                   required
                   placeholder="••••••••"
-                  className="form-input pl-10 text-xs"
+                  className="form-input pl-10 pr-10 text-xs"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                 />
                 <Lock size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 bg-transparent border-0 cursor-pointer p-0"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  tabIndex={-1}
+                >
+                  {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                </button>
               </div>
             </div>
 
@@ -536,15 +546,26 @@ export default function AuthModal() {
 
             <div className="form-group">
               <label className="form-label" htmlFor="signup-password">Create Password:</label>
-              <input
-                id="signup-password"
-                type="password"
-                required
-                placeholder="Min 6 characters"
-                className="form-input text-xs"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
+              <div className="relative">
+                <input
+                  id="signup-password"
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  placeholder="Min 6 characters"
+                  className="form-input pr-10 text-xs"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 bg-transparent border-0 cursor-pointer p-0"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  tabIndex={-1}
+                >
+                  {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                </button>
+              </div>
             </div>
 
             {/* Referral Code with Bonus Tag */}

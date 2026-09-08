@@ -83,6 +83,15 @@ export const AppProvider = ({ children }) => {
     }
   });
 
+  // Which view a signed-in account is allowed to be in, by role. Used to
+  // decide whether to keep a manually-chosen mode (e.g. a vendor browsing as
+  // a customer) across session refreshes, rather than snapping it back.
+  const validModesForRole = (role) => {
+    if (role === 'admin') return ['admin', 'vendor', 'customer'];
+    if (role === 'vendor') return ['vendor', 'customer'];
+    return ['customer'];
+  };
+
   const [vendorTab, setVendorTab] = useState('overview');
   const [activeTab, setActiveTab] = useState('home');
 
@@ -443,13 +452,10 @@ export const AppProvider = ({ children }) => {
                 pointsHistory: validHistory,
                 favorites: []
               });
-              if (assignedRole === 'admin') {
-                setUserMode('admin');
-              } else if (assignedRole === 'vendor') {
-                setUserMode('vendor');
-              } else {
-                setUserMode('customer');
-              }
+              setUserMode((prevMode) => {
+                const validModes = validModesForRole(assignedRole);
+                return validModes.includes(prevMode) ? prevMode : validModes[0];
+              });
             }
           });
       }
@@ -500,13 +506,10 @@ export const AppProvider = ({ children }) => {
           pointsHistory: validHistory
         }));
 
-        if (assignedRole === 'admin') {
-          setUserMode('admin');
-        } else if (assignedRole === 'vendor') {
-          setUserMode('vendor');
-        } else {
-          setUserMode('customer');
-        }
+        setUserMode((prevMode) => {
+          const validModes = validModesForRole(assignedRole);
+          return validModes.includes(prevMode) ? prevMode : validModes[0];
+        });
       } else if (event === 'SIGNED_OUT') {
         setSession(null);
         setUserMode('customer');
@@ -630,6 +633,10 @@ export const AppProvider = ({ children }) => {
   useEffect(() => {
     try { localStorage.setItem('unihair_campus', currentCampus); } catch { /* ignore */ }
   }, [currentCampus]);
+
+  useEffect(() => {
+    try { localStorage.setItem('unihair_user_mode', userMode); } catch { /* ignore */ }
+  }, [userMode]);
 
   useEffect(() => { debouncedPersist('unihair_user', user); }, [user, debouncedPersist]);
   useEffect(() => { debouncedPersist('unihair_vendor_profile', vendorProfile); }, [vendorProfile, debouncedPersist]);
