@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { X, Sparkles, Lock, Mail, Phone, MapPin, User, Building, Store, Scissors, ArrowRight, CheckCircle2, AlertCircle, KeyRound, HelpCircle } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient';
-import OAuthButtons from './OAuthButtons';
 
 // Deep-link into the webmail inbox for common providers; fall back to mailto:
 // (opens the device's default mail app) for anything else.
@@ -268,18 +267,6 @@ export default function AuthModal() {
             >
               Create Account
             </button>
-          </div>
-        )}
-
-        {/* OAuth Quick Sign-In */}
-        {(authMode === 'signin' || authMode === 'signup') && (
-          <div className="mb-4">
-            <OAuthButtons theme="light" isSignup={authMode === 'signup'} />
-            <div className="flex items-center gap-3 mt-3.5 mb-0.5">
-              <div className="flex-1 h-px bg-black/10 dark:bg-white/10" />
-              <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">or use email</span>
-              <div className="flex-1 h-px bg-black/10 dark:bg-white/10" />
-            </div>
           </div>
         )}
 

@@ -362,9 +362,6 @@ BEGIN
   INSERT INTO public.profiles (id, email, name, phone, campus, hostel, role, loyalty_points, referral_code, referred_by, referral_count, points_history)
   VALUES (NEW.id, NEW.email, COALESCE(NEW.raw_user_meta_data->>'name', split_part(NEW.email, '@', 1)), NEW.raw_user_meta_data->>'phone', COALESCE(NEW.raw_user_meta_data->>'campus', 'UNILUS Silverest Campus'), NEW.raw_user_meta_data->>'hostel', v_role, 0, v_referral_code, NULLIF(v_referred_by, ''), 0, '[]'::jsonb);
   PERFORM public.apply_points(NEW.id, 50, 'Welcome reward');
-  IF NEW.raw_app_meta_data->>'provider' = 'google' THEN
-    PERFORM public.apply_points(NEW.id, 35, 'Signed up with Google bonus');
-  END IF;
   SELECT id INTO v_referrer FROM public.profiles WHERE referral_code = v_referred_by;
   IF v_referrer IS NOT NULL THEN
     PERFORM public.apply_points(NEW.id, 25, 'Referral signup bonus');

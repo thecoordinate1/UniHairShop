@@ -245,6 +245,45 @@ export const AppProvider = ({ children }) => {
 
     // targetMode === 'vendor' -> Enforce Database Verification Check
     if (user?.role === 'admin') {
+      // An admin previewing Vendor Studio has no vendor_profiles row of their
+      // own most of the time — without this, whatever vendorProfile happened
+      // to already be cached (e.g. stale test data) kept showing instead of
+      // the signed-in admin's real details.
+      if (isSupabaseConfigured && supabase && user?.id) {
+        try {
+          const { data: vendorData } = await supabase
+            .from('vendor_profiles')
+            .select('id, name, is_verified, role, dorm_location, avatar, phone, bio')
+            .eq('id', user.id)
+            .maybeSingle();
+          if (vendorData) {
+            setVendorProfile((prev) => ({
+              ...prev,
+              id: vendorData.id,
+              name: vendorData.name || prev.name,
+              role: vendorData.role || prev.role,
+              isVerified: vendorData.is_verified ?? false,
+              dormLocation: vendorData.dorm_location || prev.dormLocation,
+              avatar: vendorData.avatar || prev.avatar,
+              phone: vendorData.phone || prev.phone,
+              bio: vendorData.bio || prev.bio
+            }));
+          } else {
+            setVendorProfile((prev) => ({
+              ...prev,
+              id: user.id,
+              name: user.name || 'Master Admin',
+              phone: user.phone || prev.phone,
+              isVerified: false,
+              badge: 'Master Admin Preview'
+            }));
+          }
+        } catch (err) {
+          console.warn('Database admin vendor profile check:', err);
+        }
+      } else {
+        setVendorProfile((prev) => ({ ...prev, id: user?.id || prev.id, name: user?.name || prev.name }));
+      }
       setUserMode('vendor');
       setActiveTab('vendor');
       addToast('Master Admin access granted to Vendor Studio', 'success');
@@ -261,7 +300,7 @@ export const AppProvider = ({ children }) => {
       try {
         const { data: vendorData } = await supabase
           .from('vendor_profiles')
-          .select('id, name, is_verified, role, dorm_location')
+          .select('id, name, is_verified, role, dorm_location, avatar, phone, bio')
           .eq('id', user.id)
           .single();
 
@@ -285,8 +324,11 @@ export const AppProvider = ({ children }) => {
             id: vendorData.id,
             name: vendorData.name || prev.name,
             role: vendorData.role || prev.role,
-            isVerified: vendorData.is_verified ?? true,
-            dormLocation: vendorData.dorm_location || prev.dormLocation
+            isVerified: vendorData.is_verified ?? false,
+            dormLocation: vendorData.dorm_location || prev.dormLocation,
+            avatar: vendorData.avatar || prev.avatar,
+            phone: vendorData.phone || prev.phone,
+            bio: vendorData.bio || prev.bio
           }));
         }
       } catch (err) {
@@ -780,9 +822,9 @@ export const AppProvider = ({ children }) => {
 
   // Smart Booking Creation with Escrow & No-Show Deposit Support
   const createBooking = useCallback(async (newBookingData) => {
-    // Google sign-in doesn't collect a phone number, and bookings require
-    // one (the stylist needs a way to reach you). Fail clearly here instead of
-    // letting it hit a raw database constraint error.
+    // Bookings require a phone number (the stylist needs a way to reach you).
+    // Fail clearly here instead of letting it hit a raw database constraint
+    // error, in case an account somehow lacks one.
     if (!user.phone || !user.phone.trim()) {
       addToast('Please add a phone number to your profile before booking (Account → Edit Profile).', 'error');
       throw new Error('Missing phone number');
@@ -1425,27 +1467,6 @@ export const AppProvider = ({ children }) => {
     return { success: true, data };
   }, [addToast]);
 
-  // OAuth is a redirect flow: this call navigates the browser away to the
-  // provider and back, so there's no local state to set here — the existing
-  // onAuthStateChange listener picks up the session on return.
-  // Requires the provider to actually be enabled in the Supabase dashboard first.
-  const signInWithOAuth = useCallback(async (provider) => {
-    if (!isSupabaseConfigured || !supabase) {
-      addToast('Sign in with Google requires a live connection.', 'error');
-      return;
-    }
-    const redirectUrl = typeof window !== 'undefined' && window.location.origin
-      ? `${window.location.origin}/`
-      : 'https://www.unihair.shop/';
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider,
-      options: { redirectTo: redirectUrl }
-    });
-    if (error) {
-      addToast(error.message || 'Unable to sign in with Google.', 'error');
-    }
-  }, [addToast]);
-
   const signUp = useCallback(async (userData) => {
     const isStylist = userData.role === 'vendor';
     const cleanEmail = userData.email.trim();
@@ -1843,7 +1864,6 @@ export const AppProvider = ({ children }) => {
     user,
     setUser,
     signIn,
-    signInWithOAuth,
     signUp,
     signOut,
     terminateAllSessions,
@@ -1921,7 +1941,7 @@ export const AppProvider = ({ children }) => {
     vendorProfile, updateVendorProfile, toggleVendorDormTravel, vendorWallet, vendorSales,
     requestVendorPayout, acceptBooking, completeBooking, addVendorPortfolioItem,
     activeTab, currentCampus, session, authLoading, isGuestMode, continueAsGuest, exitGuestMode, user,
-    signIn, signInWithOAuth, signUp, signOut, terminateAllSessions, requireAuth, pendingAuthCallback, updateUserProfile, onboardAsStylist,
+    signIn, signUp, signOut, terminateAllSessions, requireAuth, pendingAuthCallback, updateUserProfile, onboardAsStylist,
     verifyStylist, settleVendorPayout,
     services, products, bundles, staffList, bookings, orders, cart,
     showAuthModal, isCartOpen, bookingService, selectedProduct, selectedStylist,
