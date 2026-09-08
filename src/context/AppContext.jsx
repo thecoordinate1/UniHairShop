@@ -13,6 +13,11 @@ import {
 
 const AppContext = createContext();
 
+// Unified placeholder shown for any person (stylist/vendor) without a real
+// uploaded profile photo — never a stock/AI-generated photo standing in for
+// someone's actual picture.
+export const DEFAULT_AVATAR = '/images/avatar_placeholder.svg';
+
 // Safe localStorage helpers
 function safeGetItem(key, fallback) {
   try {
@@ -117,7 +122,7 @@ export const AppProvider = ({ children }) => {
     role: '',
     campus: '',
     dormLocation: '',
-    avatar: '/images/barber_service.jpg',
+    avatar: DEFAULT_AVATAR,
     isVerified: false,
     badge: 'Campus Stylist (Pending Verification)',
     travelsToDorm: true,
@@ -137,6 +142,7 @@ export const AppProvider = ({ children }) => {
     completedJobsCount: 0,
     payouts: []
   }));
+  const [vendorSales, setVendorSales] = useState([]);
 
   // 3. Platform Data & Chat
   const [services, setServices] = useState(() => safeGetItem('unihair_services', initialServices));
@@ -506,7 +512,7 @@ export const AppProvider = ({ children }) => {
               id: c.id,
               stylistId: c.stylist_id,
               stylistName: c.stylist_name,
-              avatar: c.avatar || '/images/barber_service.jpg',
+              avatar: c.avatar || DEFAULT_AVATAR,
               stylistRole: c.stylist_role || 'Campus Stylist',
               lastMessage: c.last_message || (matchingMsgs.length > 0 ? matchingMsgs[matchingMsgs.length - 1].text : 'Hello!'),
               lastTimestamp: c.last_timestamp || 'Active',
@@ -690,13 +696,13 @@ export const AppProvider = ({ children }) => {
         const targetStaff = staffList.find((s) => s.id === stylistId) || {
           name: 'Campus Stylist',
           role: 'Hair Specialist',
-          avatar: '/images/barber_service.jpg'
+          avatar: DEFAULT_AVATAR
         };
         const newConv = {
           id: `conv-${stylistId}`,
           stylistId,
           stylistName: targetStaff.name,
-          avatar: targetStaff.avatar || '/images/barber_service.jpg',
+          avatar: targetStaff.avatar || DEFAULT_AVATAR,
           stylistRole: targetStaff.role || 'Campus Stylist',
           lastMessage: text.trim(),
           lastTimestamp: 'Just now',
@@ -961,10 +967,80 @@ export const AppProvider = ({ children }) => {
     addToast('Calendar (.ics) invite downloaded! Sync with Apple / Google Calendar.', 'success');
   }, [addToast]);
 
-  // Order Management
+  // Order Management — places the order server-side via place_order() so real
+  // inventory (vendor-listed products) is decremented and sold-out items can
+  // never be oversold, and so a vendor's product sales/wallet credit can't be
+  // forged by the client. Local/no-Supabase mode keeps a simple simulation
+  // since there's no server to be authoritative there.
   const createOrder = useCallback(async (orderData) => {
-    const orderId = generateId('UHS-ORD');
     const currentCart = cart;
+
+    if (isSupabaseConfigured && supabase) {
+      let remoteOrder;
+      try {
+        const { data, error } = await supabase.rpc('place_order', {
+          p_items: currentCart.map((item) => ({
+            id: item.id, name: item.name, price: item.price, quantity: item.quantity, image: item.image
+          })),
+          p_campus: currentCampus,
+          p_delivery_type: orderData.deliveryType,
+          p_hostel_details: orderData.hostelDetails,
+          p_payment_method: orderData.paymentMethod
+        });
+        if (error) throw error;
+        remoteOrder = data;
+      } catch (err) {
+        addToast(err.message || 'Unable to place this order. Please try again.', 'error');
+        throw err;
+      }
+
+      const newOrder = {
+        id: remoteOrder.id,
+        items: remoteOrder.items,
+        campus: remoteOrder.campus,
+        totalAmount: Number(remoteOrder.total_amount),
+        customerName: remoteOrder.customer_name,
+        customerPhone: remoteOrder.customer_phone,
+        deliveryType: remoteOrder.delivery_type,
+        hostelDetails: remoteOrder.hostel_details,
+        paymentMethod: remoteOrder.payment_method,
+        paymentStatus: remoteOrder.payment_status,
+        status: remoteOrder.status,
+        createdAt: remoteOrder.created_at
+      };
+      setOrders((prev) => [newOrder, ...prev]);
+
+      const { data: freshProducts } = await supabase.from('products').select('*');
+      if (freshProducts) setProducts(freshProducts);
+
+      const pointsEarned = Math.max(5, Math.floor(newOrder.totalAmount / 10));
+      const newOrderPtEntry = {
+        id: `pt-ord-${Date.now()}`,
+        type: 'order',
+        points: pointsEarned,
+        title: `Hostel Beauty Order (${currentCart.length || 1} items) 🛍️`,
+        date: new Date().toISOString()
+      };
+      setUser((prev) => {
+        const nextPoints = (prev.loyaltyPoints || 0) + pointsEarned;
+        const nextHistory = [newOrderPtEntry, ...(prev.pointsHistory || [])];
+        if (prev.id) {
+          supabase.from('profiles').update({
+            loyalty_points: nextPoints,
+            points_history: nextHistory
+          }).eq('id', prev.id).then(null, () => {});
+        }
+        return { ...prev, loyaltyPoints: nextPoints, pointsHistory: nextHistory };
+      });
+
+      clearCart();
+      setIsCartOpen(false);
+      addToast(`Order ${newOrder.id} placed for ${currentCampus}! +${pointsEarned} points earned 💎`, 'success');
+      trackEvent('order_placed', { orderId: newOrder.id, totalAmount: newOrder.totalAmount, itemCount: currentCart.length });
+      return newOrder;
+    }
+
+    const orderId = generateId('UHS-ORD');
     const newOrder = {
       id: orderId,
       items: currentCart,
@@ -979,35 +1055,12 @@ export const AppProvider = ({ children }) => {
       status: 'Pending',
       createdAt: new Date().toISOString().split('T')[0]
     };
-
     setOrders((prev) => [newOrder, ...prev]);
-
-    if (isSupabaseConfigured && supabase) {
-      try {
-        await supabase.from('orders').insert([{
-          id: orderId,
-          items: currentCart,
-          campus: currentCampus,
-          total_amount: orderData.totalAmount,
-          customer_name: user.name,
-          customer_phone: user.phone,
-          delivery_type: orderData.deliveryType,
-          hostel_details: orderData.hostelDetails,
-          payment_method: orderData.paymentMethod,
-          payment_status: newOrder.paymentStatus,
-          status: 'Pending'
-        }]);
-      } catch (err) {
-        console.warn('[UniHairShop] Supabase order insert fallback:', err.message);
-      }
-    }
-
     setProducts((prevProducts) =>
       prevProducts.map((p) => {
         const cartItem = currentCart.find((item) => item.id === p.id);
         if (cartItem) {
-          const newStock = Math.max(0, p.stock - cartItem.quantity);
-          return { ...p, stock: newStock };
+          return { ...p, stock: Math.max(0, p.stock - cartItem.quantity) };
         }
         return p;
       })
@@ -1018,24 +1071,14 @@ export const AppProvider = ({ children }) => {
       id: `pt-ord-${Date.now()}`,
       type: 'order',
       points: pointsEarned,
-      title: `Hostel Beauty Order (${orderData.items?.length || 1} items) 🛍️`,
+      title: `Hostel Beauty Order (${currentCart.length || 1} items) 🛍️`,
       date: new Date().toISOString()
     };
-    setUser((prev) => {
-      const nextPoints = (prev.loyaltyPoints || 0) + pointsEarned;
-      const nextHistory = [newOrderPtEntry, ...(prev.pointsHistory || [])];
-      if (isSupabaseConfigured && supabase && prev.id) {
-        supabase.from('profiles').update({
-          loyalty_points: nextPoints,
-          points_history: nextHistory
-        }).eq('id', prev.id).then(null, () => {});
-      }
-      return {
-        ...prev,
-        loyaltyPoints: nextPoints,
-        pointsHistory: nextHistory
-      };
-    });
+    setUser((prev) => ({
+      ...prev,
+      loyaltyPoints: (prev.loyaltyPoints || 0) + pointsEarned,
+      pointsHistory: [newOrderPtEntry, ...(prev.pointsHistory || [])]
+    }));
 
     clearCart();
     setIsCartOpen(false);
@@ -1077,9 +1120,9 @@ export const AppProvider = ({ children }) => {
   }, [addToast]);
 
   // The wallet shown in Vendor Studio is server-authoritative: transition_booking
-  // is the only thing that credits it (on completion) and request_vendor_payout
-  // the only thing that debits it, so we always pull real numbers here rather
-  // than trust a locally-mutated balance.
+  // and place_order are the only things that credit it (on a completed job or a
+  // product sale) and request_vendor_payout the only thing that debits it, so
+  // we always pull real numbers here rather than trust a locally-mutated balance.
   const refreshVendorWallet = useCallback(async (vendorId) => {
     if (!isSupabaseConfigured || !supabase || !vendorId) return;
     const { data: walletRow } = await supabase
@@ -1109,10 +1152,33 @@ export const AppProvider = ({ children }) => {
     });
   }, []);
 
+  // Real per-product sales history for the "My Shop" tab — written only by
+  // place_order(), never client-forgeable.
+  const refreshVendorSales = useCallback(async (vendorId) => {
+    if (!isSupabaseConfigured || !supabase || !vendorId) return;
+    const { data: saleRows } = await supabase
+      .from('product_sales')
+      .select('*')
+      .eq('vendor_id', vendorId)
+      .order('created_at', { ascending: false });
+    setVendorSales((saleRows || []).map((s) => ({
+      id: s.id,
+      orderId: s.order_id,
+      productId: s.product_id,
+      productName: s.product_name,
+      quantity: s.quantity,
+      unitPrice: Number(s.unit_price),
+      totalAmount: Number(s.total_amount),
+      customerName: s.customer_name,
+      createdAt: s.created_at
+    })));
+  }, []);
+
   useEffect(() => {
     if (userMode !== 'vendor' || !vendorProfile.id) return;
     refreshVendorWallet(vendorProfile.id);
-  }, [userMode, vendorProfile.id, refreshVendorWallet]);
+    refreshVendorSales(vendorProfile.id);
+  }, [userMode, vendorProfile.id, refreshVendorWallet, refreshVendorSales]);
 
   const completeBooking = useCallback(async (bookingId) => {
     const targetBooking = bookings.find((b) => b.id === bookingId);
@@ -1457,7 +1523,7 @@ export const AppProvider = ({ children }) => {
             role: 'Hair Specialist',
             campus: cleanCampus,
             dormLocation: cleanHostel,
-            avatar: '/images/barber_service.jpg',
+            avatar: DEFAULT_AVATAR,
             isVerified: false,
             badge: 'Campus Stylist',
             travelsToDorm: true,
@@ -1518,7 +1584,7 @@ export const AppProvider = ({ children }) => {
             role: 'Hair Specialist',
             campus: cleanCampus,
             dorm_location: cleanHostel,
-            avatar: '/images/barber_service.jpg',
+            avatar: DEFAULT_AVATAR,
             is_verified: false,
             badge: 'Campus Stylist (Pending Verification)',
             travels_to_dorm: true,
@@ -1655,7 +1721,7 @@ export const AppProvider = ({ children }) => {
       role: stylistData.specialty || 'Barbering',
       campus: stylistData.campus || currentCampus,
       dormLocation: stylistData.hostel || user.hostel || 'Hostel Studio',
-      avatar: '/images/barber_service.jpg',
+      avatar: DEFAULT_AVATAR,
       isVerified: false,
       badge: 'Campus Stylist (Pending Verification)',
       travelsToDorm: true,
@@ -1758,6 +1824,7 @@ export const AppProvider = ({ children }) => {
     updateVendorProfile,
     toggleVendorDormTravel,
     vendorWallet,
+    vendorSales,
     requestVendorPayout,
     acceptBooking,
     completeBooking,
@@ -1851,7 +1918,7 @@ export const AppProvider = ({ children }) => {
     dismissToast
   }), [
     theme, toggleTheme, userMode, toggleUserMode, switchViewMode, availableViewModes, vendorTab,
-    vendorProfile, updateVendorProfile, toggleVendorDormTravel, vendorWallet,
+    vendorProfile, updateVendorProfile, toggleVendorDormTravel, vendorWallet, vendorSales,
     requestVendorPayout, acceptBooking, completeBooking, addVendorPortfolioItem,
     activeTab, currentCampus, session, authLoading, isGuestMode, continueAsGuest, exitGuestMode, user,
     signIn, signInWithOAuth, signUp, signOut, terminateAllSessions, requireAuth, pendingAuthCallback, updateUserProfile, onboardAsStylist,

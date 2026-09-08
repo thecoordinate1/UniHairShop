@@ -182,7 +182,7 @@ export default function AuthWall() {
           {/* OAuth Quick Sign-In */}
           {authMode !== 'forgot' && (
             <div className="mb-5">
-              <OAuthButtons theme="dark" />
+              <OAuthButtons theme="dark" isSignup={authMode === 'signup'} />
               <div className="flex items-center gap-3 mt-4 mb-1">
                 <div className="flex-1 h-px bg-white/10" />
                 <span className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">or use email</span>

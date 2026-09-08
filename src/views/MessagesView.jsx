@@ -22,7 +22,7 @@ import {
   ShieldAlert,
   Building
 } from 'lucide-react';
-import { useApp } from '../context/AppContext';
+import { useApp, DEFAULT_AVATAR } from '../context/AppContext';
 
 export default function MessagesView() {
   const {
@@ -60,7 +60,7 @@ export default function MessagesView() {
         stylistId: stylistObj.id,
         stylistName: stylistObj.name,
         stylistRole: stylistObj.role || 'Campus Stylist',
-        avatar: stylistObj.avatar || '/images/barber_service.jpg',
+        avatar: stylistObj.avatar || DEFAULT_AVATAR,
         lastMessage: 'Start a conversation...',
         lastTimestamp: 'New',
         unreadCount: 0,
@@ -76,7 +76,7 @@ export default function MessagesView() {
       phone: '0971234567',
       dormLocation: 'Hostel Studio',
       campus: currentCampus,
-      avatar: activeConversation.avatar || '/images/barber_service.jpg'
+      avatar: activeConversation.avatar || DEFAULT_AVATAR
     };
   }
 

@@ -66,15 +66,19 @@ export default function CartDrawer() {
     }
   };
 
-  const handleLencoSuccess = (lencoResult) => {
+  const handleLencoSuccess = async (lencoResult) => {
     setShowLencoModal(false);
-    createOrder({
-      totalAmount,
-      deliveryType,
-      hostelDetails,
-      paymentMethod: lencoResult.paymentMethod,
-      lencoRef: lencoResult.lencoReference
-    });
+    try {
+      await createOrder({
+        totalAmount,
+        deliveryType,
+        hostelDetails,
+        paymentMethod: lencoResult.paymentMethod,
+        lencoRef: lencoResult.lencoReference
+      });
+    } catch {
+      // createOrder already shows a toast explaining what went wrong
+    }
   };
 
   return (

@@ -20,7 +20,7 @@ import {
   ShieldAlert,
   Star
 } from 'lucide-react';
-import { useApp } from '../context/AppContext';
+import { useApp, DEFAULT_AVATAR } from '../context/AppContext';
 
 export default function BookingDetailModal({ booking, onClose, onReschedule, onCancel }) {
   const { exportToCalendar, staffList, claimNoShowRefund, claimClientNoShow, userMode, reviews, submitReview } = useApp();
@@ -54,7 +54,7 @@ export default function BookingDetailModal({ booking, onClose, onReschedule, onC
     name: booking.staffName || 'Campus Stylist',
     role: 'Hair & Beauty Specialist',
     phone: booking.staffPhone || '0971234567',
-    avatar: '/images/barber_service.jpg',
+    avatar: DEFAULT_AVATAR,
     dormLocation: booking.hostel || 'Hostel Studio'
   };
 
@@ -121,7 +121,7 @@ export default function BookingDetailModal({ booking, onClose, onReschedule, onC
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-3">
                 <img
-                  src={stylist.avatar || '/images/barber_service.jpg'}
+                  src={stylist.avatar || DEFAULT_AVATAR}
                   alt={stylist.name}
                   className="w-12 h-12 rounded-2xl object-cover border border-black/10 dark:border-white/10 shrink-0"
                 />

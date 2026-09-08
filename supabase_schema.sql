@@ -260,6 +260,22 @@ CREATE TABLE IF NOT EXISTS public.analytics_events (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- 13. PRODUCT SALES — one row per product line item per order, written only
+-- by place_order() below, so a vendor has a real, tamper-proof sales history
+-- for the products they list in My Shop.
+CREATE TABLE IF NOT EXISTS public.product_sales (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  order_id TEXT NOT NULL REFERENCES public.orders(id) ON DELETE CASCADE,
+  product_id TEXT NOT NULL REFERENCES public.products(id) ON DELETE CASCADE,
+  vendor_id TEXT NOT NULL REFERENCES public.vendor_profiles(id) ON DELETE CASCADE,
+  product_name TEXT NOT NULL,
+  quantity INT NOT NULL CHECK (quantity > 0),
+  unit_price NUMERIC NOT NULL,
+  total_amount NUMERIC NOT NULL,
+  customer_name TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 -- ==============================================================================
 -- Row Level Security (RLS)
 -- ==============================================================================
@@ -279,6 +295,7 @@ ALTER TABLE public.payment_transactions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.audit_log ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.reviews ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.analytics_events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.product_sales ENABLE ROW LEVEL SECURITY;
 
 -- ==============================================================================
 -- Server-side functions (SECURITY DEFINER) — trusted business logic clients
@@ -345,6 +362,9 @@ BEGIN
   INSERT INTO public.profiles (id, email, name, phone, campus, hostel, role, loyalty_points, referral_code, referred_by, referral_count, points_history)
   VALUES (NEW.id, NEW.email, COALESCE(NEW.raw_user_meta_data->>'name', split_part(NEW.email, '@', 1)), NEW.raw_user_meta_data->>'phone', COALESCE(NEW.raw_user_meta_data->>'campus', 'UNILUS Silverest Campus'), NEW.raw_user_meta_data->>'hostel', v_role, 0, v_referral_code, NULLIF(v_referred_by, ''), 0, '[]'::jsonb);
   PERFORM public.apply_points(NEW.id, 50, 'Welcome reward');
+  IF NEW.raw_app_meta_data->>'provider' = 'google' THEN
+    PERFORM public.apply_points(NEW.id, 35, 'Signed up with Google bonus');
+  END IF;
   SELECT id INTO v_referrer FROM public.profiles WHERE referral_code = v_referred_by;
   IF v_referrer IS NOT NULL THEN
     PERFORM public.apply_points(NEW.id, 25, 'Referral signup bonus');
@@ -478,6 +498,79 @@ $$;
 REVOKE ALL ON FUNCTION public.request_vendor_payout(NUMERIC, TEXT, TEXT) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.request_vendor_payout(NUMERIC, TEXT, TEXT) TO authenticated;
 
+-- Places an order and, for every line item that matches a real inventory row,
+-- decrements stock and credits the listing vendor's wallet server-side — the
+-- client can never claim stock it doesn't have or forge a sale for a product
+-- it doesn't own. A line item with no matching product row (a curated bundle
+-- SKU, not real inventory) falls back to whatever the client sent for that
+-- line, same as before this function existed.
+CREATE OR REPLACE FUNCTION public.place_order(
+  p_items JSONB, p_campus TEXT, p_delivery_type TEXT, p_hostel_details TEXT, p_payment_method TEXT
+) RETURNS public.orders LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE
+  v_profile public.profiles;
+  v_order public.orders;
+  v_item JSONB;
+  v_product public.products;
+  v_total NUMERIC := 0;
+  v_order_id TEXT;
+  v_qty INT;
+  v_line_total NUMERIC;
+  v_final_items JSONB := '[]'::jsonb;
+BEGIN
+  IF auth.uid() IS NULL THEN RAISE EXCEPTION 'Authentication required'; END IF;
+  SELECT * INTO v_profile FROM public.profiles WHERE id = auth.uid();
+  IF v_profile.id IS NULL THEN RAISE EXCEPTION 'Profile not found'; END IF;
+  IF p_items IS NULL OR jsonb_array_length(p_items) = 0 THEN RAISE EXCEPTION 'Cart is empty'; END IF;
+
+  v_order_id := 'UHS-ORD-' || replace(gen_random_uuid()::text, '-', '');
+
+  FOR v_item IN SELECT * FROM jsonb_array_elements(p_items) LOOP
+    v_qty := GREATEST(1, COALESCE((v_item->>'quantity')::int, 1));
+    SELECT * INTO v_product FROM public.products WHERE id = (v_item->>'id') FOR UPDATE;
+
+    IF v_product.id IS NOT NULL THEN
+      IF v_product.stock < v_qty THEN RAISE EXCEPTION 'Not enough stock for %', v_product.name; END IF;
+      v_line_total := v_product.price * v_qty;
+      v_total := v_total + v_line_total;
+      UPDATE public.products SET stock = stock - v_qty WHERE id = v_product.id;
+      v_final_items := v_final_items || jsonb_build_object('id', v_product.id, 'name', v_product.name, 'price', v_product.price, 'quantity', v_qty, 'image', v_product.image);
+
+      IF v_product.vendor_id IS NOT NULL THEN
+        INSERT INTO public.product_sales (order_id, product_id, vendor_id, product_name, quantity, unit_price, total_amount, customer_name)
+        VALUES (v_order_id, v_product.id, v_product.vendor_id, v_product.name, v_qty, v_product.price, v_line_total, v_profile.name);
+
+        INSERT INTO public.vendor_wallets (id, vendor_id, available_balance, total_earned, completed_jobs_count, updated_at)
+        VALUES (v_product.vendor_id, v_product.vendor_id, v_line_total, v_line_total, 0, now())
+        ON CONFLICT (vendor_id) DO UPDATE SET
+          available_balance = public.vendor_wallets.available_balance + v_line_total,
+          total_earned = public.vendor_wallets.total_earned + v_line_total,
+          updated_at = now();
+      END IF;
+    ELSE
+      v_line_total := COALESCE((v_item->>'price')::numeric, 0) * v_qty;
+      v_total := v_total + v_line_total;
+      v_final_items := v_final_items || jsonb_build_object('id', v_item->>'id', 'name', v_item->>'name', 'price', v_item->>'price', 'quantity', v_qty, 'image', v_item->>'image');
+    END IF;
+  END LOOP;
+
+  INSERT INTO public.orders (id, items, campus, total_amount, customer_name, customer_phone, delivery_type, hostel_details, payment_method, payment_status, status, customer_id)
+  VALUES (
+    v_order_id, v_final_items, COALESCE(p_campus, v_profile.campus), v_total, v_profile.name, v_profile.phone,
+    p_delivery_type, p_hostel_details, p_payment_method,
+    CASE WHEN p_payment_method = 'Pay on Delivery / Pickup' THEN 'Pending' ELSE 'Paid' END,
+    'Pending', auth.uid()
+  ) RETURNING * INTO v_order;
+
+  INSERT INTO public.audit_log (actor_id, action, entity_type, entity_id, metadata) VALUES (auth.uid(), 'order_placed', 'order', v_order_id, jsonb_build_object('total_amount', v_total));
+
+  RETURN v_order;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.place_order(JSONB, TEXT, TEXT, TEXT, TEXT) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.place_order(JSONB, TEXT, TEXT, TEXT, TEXT) TO authenticated;
+
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created AFTER INSERT ON auth.users FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
@@ -535,6 +628,10 @@ CREATE POLICY reviews_public_read ON public.reviews FOR SELECT TO anon, authenti
 -- product can finally measure activation and retention; read is admin-only.
 CREATE POLICY analytics_insert ON public.analytics_events FOR INSERT TO anon, authenticated WITH CHECK (true);
 CREATE POLICY analytics_admin_read ON public.analytics_events FOR SELECT TO authenticated USING (public.is_admin());
+
+-- Product sales are only ever written by place_order() below — a vendor can
+-- read their own sales history but never write to it directly.
+CREATE POLICY product_sales_vendor_read ON public.product_sales FOR SELECT TO authenticated USING (vendor_id = auth.uid()::text OR public.is_admin());
 
 -- Service-role functions/Edge Functions write financial and booking state. Clients
 -- have read-only access to those records, preventing balance/refund manipulation.

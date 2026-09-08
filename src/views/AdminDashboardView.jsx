@@ -30,7 +30,7 @@ import {
   Ban,
   ArrowUpRight
 } from 'lucide-react';
-import { useApp } from '../context/AppContext';
+import { useApp, DEFAULT_AVATAR } from '../context/AppContext';
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient';
 
 export default function AdminDashboardView() {
@@ -461,7 +461,7 @@ export default function AdminDashboardView() {
                     <div className="flex items-start justify-between gap-3 mb-3">
                       <div className="flex items-center gap-3">
                         <img
-                          src={vendor.avatar || '/images/barber_service.jpg'}
+                          src={vendor.avatar || DEFAULT_AVATAR}
                           alt={vendor.name}
                           className="w-12 h-12 rounded-2xl object-cover border border-black/10 dark:border-white/10"
                         />
@@ -978,7 +978,7 @@ export default function AdminDashboardView() {
 
             <div className="flex items-center gap-3 mb-4">
               <img
-                src={selectedStylistToVerify.avatar || '/images/barber_service.jpg'}
+                src={selectedStylistToVerify.avatar || DEFAULT_AVATAR}
                 alt={selectedStylistToVerify.name}
                 className="w-14 h-14 rounded-2xl object-cover border border-black/10 dark:border-white/10"
               />

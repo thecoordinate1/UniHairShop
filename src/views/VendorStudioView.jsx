@@ -101,6 +101,7 @@ export default function VendorStudioView() {
     updateVendorProfile,
     toggleVendorDormTravel,
     vendorWallet,
+    vendorSales,
     requestVendorPayout,
     acceptBooking,
     completeBooking,
@@ -182,6 +183,8 @@ export default function VendorStudioView() {
   const myReviewsCount = myStylistObj.reviewsCount ?? myStylistObj.reviews_count ?? 0;
 
   const myProducts = products.filter((p) => (p.vendorId || p.vendor_id) === vendorProfile.id);
+  const totalUnitsSold = vendorSales.reduce((sum, s) => sum + s.quantity, 0);
+  const totalProductRevenue = vendorSales.reduce((sum, s) => sum + s.totalAmount, 0);
 
   const bioHandle = vendorProfile.handle || myStylistObj.handle || vendorProfile.id || '';
   const bioUrl = `${window.location.origin}/?stylist=${bioHandle}`;
@@ -901,6 +904,23 @@ export default function VendorStudioView() {
             </button>
           </div>
 
+          {myProducts.length > 0 && (
+            <div className="grid-3">
+              <div className="card p-4">
+                <span className="text-[11px] text-slate-500 dark:text-slate-300 font-semibold uppercase tracking-wider block">Products Listed</span>
+                <h3 className="text-xl font-extrabold text-slate-900 dark:text-white my-1 font-heading">{myProducts.length}</h3>
+              </div>
+              <div className="card p-4">
+                <span className="text-[11px] text-slate-500 dark:text-slate-300 font-semibold uppercase tracking-wider block">Units Sold</span>
+                <h3 className="text-xl font-extrabold text-slate-900 dark:text-white my-1 font-heading">{totalUnitsSold}</h3>
+              </div>
+              <div className="card p-4 bg-gradient-to-br from-amber-500/15 via-white/80 to-white dark:via-[#1A1A22] dark:to-slate-900 border border-amber-500/30">
+                <span className="text-[11px] text-slate-500 dark:text-slate-300 font-semibold uppercase tracking-wider block">Shop Revenue</span>
+                <h3 className="text-xl font-extrabold text-amber-500 my-1 font-heading">K {totalProductRevenue}</h3>
+              </div>
+            </div>
+          )}
+
           {myProducts.length === 0 ? (
             <div className="card p-8 text-center text-slate-400">
               <ShoppingBag size={32} className="mx-auto mb-2 opacity-50" />
@@ -909,40 +929,77 @@ export default function VendorStudioView() {
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {myProducts.map((prd) => (
-                <div key={prd.id} className="card p-4 flex flex-col justify-between border border-black/10 dark:border-white/10 bg-white dark:bg-[#15151c]">
-                  <div>
-                    <div className="relative h-36 w-full rounded-2xl overflow-hidden mb-3 bg-slate-800">
-                      <img src={prd.image} alt={prd.name} className="w-full h-full object-cover" />
+              {myProducts.map((prd) => {
+                const stockLevel = Number(prd.stock) || 0;
+                const stockBadge = stockLevel === 0
+                  ? { label: 'Out of Stock', cls: 'badge-out-of-stock' }
+                  : stockLevel <= 3
+                    ? { label: `Low Stock (${stockLevel})`, cls: 'badge-low-stock' }
+                    : { label: 'In Stock', cls: 'badge-in-stock' };
+                return (
+                  <div key={prd.id} className="card p-4 flex flex-col justify-between border border-black/10 dark:border-white/10 bg-white dark:bg-[#15151c]">
+                    <div>
+                      <div className="relative h-36 w-full rounded-2xl overflow-hidden mb-3 bg-slate-800">
+                        <img src={prd.image} alt={prd.name} className="w-full h-full object-cover" />
+                        <span className={`badge ${stockBadge.cls} absolute top-2 left-2 text-[10px]`}>{stockBadge.label}</span>
+                      </div>
+                      <h4 className="text-sm font-bold text-slate-900 dark:text-white tracking-tight mb-1">{prd.name}</h4>
+                      <p className="text-[11px] text-slate-400 mb-2 line-clamp-2">{prd.description}</p>
+                      <span className="price-tag text-base">K {prd.price}</span>
                     </div>
-                    <h4 className="text-sm font-bold text-slate-900 dark:text-white tracking-tight mb-1">{prd.name}</h4>
-                    <p className="text-[11px] text-slate-400 mb-2 line-clamp-2">{prd.description}</p>
-                    <span className="price-tag text-base">K {prd.price}</span>
-                  </div>
 
-                  <div className="pt-3 mt-3 border-t border-black/5 dark:border-white/5 flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-1.5">
-                      <label className="text-[10px] text-slate-400 font-semibold" htmlFor={`stock-${prd.id}`}>Stock:</label>
-                      <input
-                        id={`stock-${prd.id}`}
-                        type="number"
-                        min="0"
-                        className="form-input text-xs py-1 w-16"
-                        defaultValue={prd.stock}
-                        onBlur={(e) => updateProductStock(prd.id, e.target.value)}
-                      />
+                    <div className="pt-3 mt-3 border-t border-black/5 dark:border-white/5 flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5">
+                        <label className="text-[10px] text-slate-400 font-semibold" htmlFor={`stock-${prd.id}`}>Stock:</label>
+                        <input
+                          id={`stock-${prd.id}`}
+                          type="number"
+                          min="0"
+                          className="form-input text-xs py-1 w-16"
+                          defaultValue={prd.stock}
+                          onBlur={(e) => updateProductStock(prd.id, e.target.value)}
+                        />
+                      </div>
+                      <button
+                        onClick={() => deleteProduct(prd.id)}
+                        className="text-red-500 hover:text-red-600 bg-transparent border-0 cursor-pointer text-xs font-semibold"
+                      >
+                        Remove
+                      </button>
                     </div>
-                    <button
-                      onClick={() => deleteProduct(prd.id)}
-                      className="text-red-500 hover:text-red-600 bg-transparent border-0 cursor-pointer text-xs font-semibold"
-                    >
-                      Remove
-                    </button>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
+
+          {/* Sales History — a real, tamper-proof record of what's actually sold */}
+          <div>
+            <h3 className="text-base font-bold text-slate-900 dark:text-white tracking-tight mb-3">
+              Sales History ({vendorSales.length})
+            </h3>
+            {vendorSales.length === 0 ? (
+              <div className="card p-6 text-center text-slate-400">
+                <p className="text-xs m-0">No sales yet. Once a student buys one of your products, it'll show up here.</p>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {vendorSales.map((sale) => (
+                  <div key={sale.id} className="card p-3.5 flex items-center justify-between gap-3 text-xs">
+                    <div>
+                      <span className="font-bold text-slate-900 dark:text-white">{sale.productName}</span>
+                      <span className="text-slate-400"> × {sale.quantity}</span>
+                      <p className="text-[11px] text-slate-400 m-0">
+                        {sale.customerName ? `Sold to ${sale.customerName} • ` : ''}
+                        {new Date(sale.createdAt).toLocaleDateString()} • Ref: {sale.orderId}
+                      </p>
+                    </div>
+                    <span className="price-tag text-sm shrink-0">K {sale.totalAmount}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
 

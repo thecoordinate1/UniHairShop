@@ -20,7 +20,7 @@ import {
   Zap,
   Tag
 } from 'lucide-react';
-import { useApp } from '../context/AppContext';
+import { useApp, DEFAULT_AVATAR } from '../context/AppContext';
 import CampusTransformationFeed from '../components/CampusTransformationFeed';
 
 export default function HomeView() {
@@ -51,6 +51,10 @@ export default function HomeView() {
   } = useApp();
 
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Only ever show stylists here as "verified" once an admin has actually
+  // approved them — never based on client-side or default state.
+  const verifiedStaffList = staffList.filter((s) => s.isVerified || s.is_verified);
 
   const categories = [
     'All',
@@ -202,13 +206,20 @@ export default function HomeView() {
           </button>
         </div>
 
+        {verifiedStaffList.length === 0 ? (
+          <div className="card p-8 text-center text-slate-400">
+            <ShieldCheck size={28} className="mx-auto mb-2 opacity-50" />
+            <p className="text-sm font-bold text-slate-900 dark:text-white m-0">No verified stylists yet</p>
+            <p className="text-xs text-slate-400 mt-1">Check back soon as campus stylists get admin-verified.</p>
+          </div>
+        ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {staffList.map((stylist) => {
+          {verifiedStaffList.map((stylist) => {
             const dormLoc = stylist.dormLocation || stylist.dorm_location || 'Campus Hostel';
             const respTime = stylist.responseTime || stylist.response_time || '15 mins';
             const specialtiesList = Array.isArray(stylist.specialties) ? stylist.specialties : ['Campus Specialist', 'Verified Pro'];
-            const badgeText = stylist.badge || (stylist.is_verified || stylist.isVerified ? 'Verified Stylist' : 'Campus Stylist');
-            const ratingVal = stylist.rating || 5.0;
+            const badgeText = stylist.badge || 'Verified Campus Stylist';
+            const ratingVal = stylist.rating || 0;
 
             return (
               <div
@@ -218,7 +229,7 @@ export default function HomeView() {
               >
                 <div>
                   <div className="relative h-44 w-full rounded-2xl overflow-hidden mb-3 bg-slate-800">
-                    <img src={stylist.avatar || '/images/barber_service.jpg'} alt={stylist.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" />
+                    <img src={stylist.avatar || DEFAULT_AVATAR} alt={stylist.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" />
                     <span className="badge badge-verified absolute top-2.5 left-2.5 text-[10px]">
                       <ShieldCheck size={11} />
                       <span>{badgeText}</span>
@@ -256,6 +267,7 @@ export default function HomeView() {
             );
           })}
         </div>
+        )}
       </section>
 
       {/* Campus Hair Lookbook & Transformation Feed */}

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Sparkles, Check, ArrowRight, ArrowLeft, UploadCloud, Scissors, MapPin, Phone, ShieldCheck, DollarSign, Clock, Store, Truck, Camera } from 'lucide-react';
-import { useApp } from '../context/AppContext';
+import { useApp, DEFAULT_AVATAR } from '../context/AppContext';
 import { campusHostels, lusakaUniversities } from '../data/mockData';
 import { playSuccessChime } from '../lib/soundEffects';
 import { uploadImage } from '../lib/uploadImage';
@@ -30,7 +30,7 @@ export default function FastStylistOnboardingModal({ isOpen, onClose }) {
 
   // Step 3 State
   const [bio, setBio] = useState('Passionate student stylist offering clean, scalp-friendly hair services right on campus!');
-  const [portfolioImage, setPortfolioImage] = useState('/images/barber_service.jpg');
+  const [portfolioImage, setPortfolioImage] = useState(DEFAULT_AVATAR);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [completedStylist, setCompletedStylist] = useState(null);
 
@@ -84,7 +84,7 @@ export default function FastStylistOnboardingModal({ isOpen, onClose }) {
       role: specialty === 'Barbering' ? 'Campus Barber' : specialty === 'Braids & Wigs' ? 'Braider & Wig Artist' : `${specialty} Specialist`,
       campus: selectedCampus,
       dormLocation: `${selectedHostel}${roomNumber ? `, Room ${roomNumber}` : ''}`,
-      avatar: portfolioImage || '/images/barber_service.jpg',
+      avatar: portfolioImage || DEFAULT_AVATAR,
       bio: bio.trim(),
       specialties: [specialty, serviceName],
       travelsToDorm,

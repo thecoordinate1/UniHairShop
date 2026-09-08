@@ -42,16 +42,20 @@ export default function CartView() {
     }
   };
 
-  const handleLencoSuccess = (lencoResult) => {
+  const handleLencoSuccess = async (lencoResult) => {
     setShowLencoModal(false);
-    const newOrder = createOrder({
-      totalAmount,
-      deliveryType,
-      hostelDetails,
-      paymentMethod: lencoResult.paymentMethod,
-      lencoRef: lencoResult.lencoReference
-    });
-    setPlacedOrder(newOrder);
+    try {
+      const newOrder = await createOrder({
+        totalAmount,
+        deliveryType,
+        hostelDetails,
+        paymentMethod: lencoResult.paymentMethod,
+        lencoRef: lencoResult.lencoReference
+      });
+      setPlacedOrder(newOrder);
+    } catch {
+      // createOrder already shows a toast explaining what went wrong
+    }
   };
 
   if (placedOrder) {

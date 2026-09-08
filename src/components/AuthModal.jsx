@@ -274,7 +274,7 @@ export default function AuthModal() {
         {/* OAuth Quick Sign-In */}
         {(authMode === 'signin' || authMode === 'signup') && (
           <div className="mb-4">
-            <OAuthButtons theme="light" />
+            <OAuthButtons theme="light" isSignup={authMode === 'signup'} />
             <div className="flex items-center gap-3 mt-3.5 mb-0.5">
               <div className="flex-1 h-px bg-black/10 dark:bg-white/10" />
               <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">or use email</span>

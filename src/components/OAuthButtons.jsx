@@ -12,7 +12,7 @@ function GoogleIcon() {
   );
 }
 
-export default function OAuthButtons({ theme = 'dark' }) {
+export default function OAuthButtons({ theme = 'dark', isSignup = false }) {
   const { signInWithOAuth } = useApp();
 
   const buttonClass = theme === 'dark'
@@ -24,6 +24,9 @@ export default function OAuthButtons({ theme = 'dark' }) {
       <button type="button" onClick={() => signInWithOAuth('google')} className={buttonClass} aria-label="Continue with Google">
         <GoogleIcon />
         <span>Continue with Google</span>
+        {isSignup && (
+          <span className="text-amber-500 font-extrabold">+35 pts</span>
+        )}
       </button>
     </div>
   );

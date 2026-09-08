@@ -38,6 +38,7 @@ export default function StylistProfileModal() {
   const stylistReviews = reviews.filter((r) => (r.vendorId || r.vendor_id) === selectedStylist.id);
   const stylistRating = selectedStylist.rating ?? 0;
   const stylistReviewsCount = selectedStylist.reviewsCount ?? selectedStylist.reviews_count ?? stylistReviews.length;
+  const stylistIsVerified = selectedStylist.isVerified ?? selectedStylist.is_verified ?? false;
   const bioHandle = selectedStylist.handle || selectedStylist.id;
   const shareUrl = `${window.location.origin}/?stylist=${bioHandle}`;
 
@@ -122,7 +123,7 @@ export default function StylistProfileModal() {
                 alt={selectedStylist.name}
                 className="w-24 h-24 rounded-3xl object-cover border-4 border-white dark:border-[#121217] shadow-xl bg-slate-800"
               />
-              {selectedStylist.isVerified && (
+              {stylistIsVerified && (
                 <div className="absolute -bottom-1 -right-1 bg-blue-500 text-white p-1 rounded-full border-2 border-white dark:border-[#121217]" title="Verified Campus Stylist">
                   <ShieldCheck size={16} />
                 </div>
@@ -155,7 +156,11 @@ export default function StylistProfileModal() {
           <div className="mb-4">
             <div className="flex items-center gap-2">
               <h2 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight m-0">{selectedStylist.name}</h2>
-              <span className="badge badge-verified text-[10px] py-0.5 px-2 font-bold">{selectedStylist.badge}</span>
+              {stylistIsVerified ? (
+                <span className="badge badge-verified text-[10px] py-0.5 px-2 font-bold">{selectedStylist.badge || 'Verified Campus Stylist'}</span>
+              ) : (
+                <span className="badge badge-low-stock text-[10px] py-0.5 px-2 font-bold">Pending Verification</span>
+              )}
             </div>
             <div className="flex items-center gap-2 mt-0.5 mb-2">
               <span className="text-xs text-amber-500 font-semibold">{selectedStylist.role}</span>
