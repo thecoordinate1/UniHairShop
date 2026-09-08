@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient';
+import { isPushSupported, subscribeToPush, unsubscribeFromPush, getCurrentPushEndpoint } from '../lib/pushNotifications';
 import {
   initialServices,
   initialProducts,
@@ -765,14 +766,20 @@ export const AppProvider = ({ children }) => {
     // Sync message to Supabase
     if (isSupabaseConfigured && supabase) {
       const convId = `conv-${stylistId}`;
-      supabase.from('conversations').upsert([{
+      const convUpsertPayload = {
         id: convId,
         stylist_id: stylistId,
         stylist_name: staffList.find((s) => s.id === stylistId)?.name || 'Campus Stylist',
         last_message: text.trim(),
         last_timestamp: timeStr,
         unread_count: 0
-      }]).then(() => {
+      };
+      // Only the customer side sets customer_id — a stylist reply upserts the
+      // same conversation without touching who the customer already is.
+      if (sender === 'user' && user?.id) {
+        convUpsertPayload.customer_id = user.id;
+      }
+      supabase.from('conversations').upsert([convUpsertPayload]).then(() => {
         supabase.from('messages').insert([{
           id: newMsg.id,
           conversation_id: convId,
@@ -825,7 +832,7 @@ export const AppProvider = ({ children }) => {
         }
       }, 1800);
     }
-  }, [userMode, staffList]);
+  }, [userMode, staffList, user]);
 
   // Smart Booking Creation with Escrow & No-Show Deposit Support
   const createBooking = useCallback(async (newBookingData) => {
@@ -1723,6 +1730,50 @@ export const AppProvider = ({ children }) => {
     }
   }, [user?.isLoggedIn, session]);
 
+  const [pushEnabled, setPushEnabled] = useState(false);
+  const [pushSupported, setPushSupported] = useState(false);
+
+  useEffect(() => {
+    setPushSupported(isPushSupported());
+    if (!isPushSupported()) return;
+    getCurrentPushEndpoint().then((endpoint) => setPushEnabled(Boolean(endpoint))).catch(() => {});
+  }, []);
+
+  const enablePushNotifications = useCallback(async () => {
+    if (!isSupabaseConfigured || !supabase || !user?.id) {
+      addToast('Sign in to enable push notifications.', 'error');
+      return false;
+    }
+    try {
+      const subscription = await subscribeToPush();
+      await supabase.from('push_subscriptions').upsert([{
+        user_id: user.id,
+        endpoint: subscription.endpoint,
+        p256dh: subscription.keys.p256dh,
+        auth_key: subscription.keys.auth
+      }], { onConflict: 'endpoint' });
+      setPushEnabled(true);
+      addToast('Push notifications enabled! You\'ll get alerts for messages and appointments.', 'success');
+      return true;
+    } catch (err) {
+      addToast(err.message || 'Could not enable push notifications.', 'error');
+      return false;
+    }
+  }, [user?.id, addToast]);
+
+  const disablePushNotifications = useCallback(async () => {
+    try {
+      const endpoint = await unsubscribeFromPush();
+      if (endpoint && isSupabaseConfigured && supabase) {
+        await supabase.from('push_subscriptions').delete().eq('endpoint', endpoint);
+      }
+      setPushEnabled(false);
+      addToast('Push notifications turned off.', 'info');
+    } catch (err) {
+      addToast(err.message || 'Could not disable push notifications.', 'error');
+    }
+  }, [addToast]);
+
   const updateUserProfile = useCallback(async (profileUpdates) => {
     setUser((prev) => ({ ...prev, ...profileUpdates }));
     if (isSupabaseConfigured && supabase && user.id) {
@@ -1878,6 +1929,10 @@ export const AppProvider = ({ children }) => {
     pendingAuthCallback,
     setPendingAuthCallback,
     updateUserProfile,
+    pushEnabled,
+    pushSupported,
+    enablePushNotifications,
+    disablePushNotifications,
     onboardAsStylist,
     services,
     products,
@@ -1949,6 +2004,7 @@ export const AppProvider = ({ children }) => {
     requestVendorPayout, acceptBooking, completeBooking, addVendorPortfolioItem,
     activeTab, currentCampus, session, authLoading, isGuestMode, continueAsGuest, exitGuestMode, user,
     signIn, signUp, signOut, terminateAllSessions, requireAuth, pendingAuthCallback, updateUserProfile, onboardAsStylist,
+    pushEnabled, pushSupported, enablePushNotifications, disablePushNotifications,
     verifyStylist, settleVendorPayout,
     services, products, bundles, staffList, bookings, orders, cart,
     showAuthModal, isCartOpen, bookingService, selectedProduct, selectedStylist,

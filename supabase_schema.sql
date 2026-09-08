@@ -8,6 +8,10 @@
 -- triggers/publications. See scripts/migrate.js for how this gets applied.
 -- ==============================================================================
 
+-- pg_net lets Postgres triggers fire an async HTTP call (used below to invoke
+-- the send-push Edge Function) — pre-installed on Supabase, safe to no-op here.
+CREATE EXTENSION IF NOT EXISTS pg_net;
+
 -- 1. PROFILES (Students & Stylists)
 CREATE TABLE IF NOT EXISTS public.profiles (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -276,6 +280,19 @@ CREATE TABLE IF NOT EXISTS public.product_sales (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- 14. PUSH SUBSCRIPTIONS — one row per browser/device a user has enabled push
+-- notifications on (new messages, booking updates). Holds only the public Web
+-- Push endpoint/keys for that device, so a user managing their own rows here
+-- carries no security risk — the worst a forged row does is fail silently.
+CREATE TABLE IF NOT EXISTS public.push_subscriptions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  endpoint TEXT NOT NULL UNIQUE,
+  p256dh TEXT NOT NULL,
+  auth_key TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 -- ==============================================================================
 -- Row Level Security (RLS)
 -- ==============================================================================
@@ -296,6 +313,7 @@ ALTER TABLE public.audit_log ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.reviews ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.analytics_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.product_sales ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.push_subscriptions ENABLE ROW LEVEL SECURITY;
 
 -- ==============================================================================
 -- Server-side functions (SECURITY DEFINER) — trusted business logic clients
@@ -305,6 +323,32 @@ ALTER TABLE public.product_sales ENABLE ROW LEVEL SECURITY;
 CREATE OR REPLACE FUNCTION public.is_admin()
 RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
   SELECT EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin');
+$$;
+
+-- Fires the send-push Edge Function for one user's registered devices. Reads
+-- its target URL/auth from Postgres settings rather than a hardcoded value so
+-- nothing here needs editing once push notifications are actually deployed —
+-- see the setup notes near the end of this file. No-ops quietly (never raises)
+-- if those settings haven't been configured yet, so it's always safe to call.
+CREATE OR REPLACE FUNCTION public.notify_push(p_user_id UUID, p_title TEXT, p_body TEXT, p_url TEXT DEFAULT '/')
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE v_function_url TEXT; v_service_key TEXT;
+BEGIN
+  IF p_user_id IS NULL THEN RETURN; END IF;
+  v_function_url := current_setting('app.settings.push_function_url', true);
+  v_service_key := current_setting('app.settings.service_role_key', true);
+  IF v_function_url IS NULL OR v_function_url = '' OR v_service_key IS NULL OR v_service_key = '' THEN
+    RETURN;
+  END IF;
+  PERFORM net.http_post(
+    url := v_function_url,
+    headers := jsonb_build_object('Content-Type', 'application/json', 'Authorization', 'Bearer ' || v_service_key),
+    body := jsonb_build_object('user_id', p_user_id, 'title', p_title, 'body', p_body, 'url', p_url)
+  );
+EXCEPTION WHEN OTHERS THEN
+  -- A push failure should never break the booking/message it rode in on.
+  NULL;
+END;
 $$;
 
 CREATE OR REPLACE FUNCTION public.protect_profile_fields()
@@ -388,6 +432,7 @@ BEGIN
   VALUES ('UHS-' || replace(gen_random_uuid()::text, '-', ''), auth.uid(), p_service_id, p_service_name, p_category, p_staff_id, v_vendor.name, p_date, p_time, v_profile.campus, p_hostel, p_service_type, v_profile.name, v_profile.phone, p_add_ons, p_price, p_total_price, 'Payment pending', 'Pending payment setup', 'Requested')
   RETURNING * INTO v_booking;
   INSERT INTO public.audit_log (actor_id, action, entity_type, entity_id) VALUES (auth.uid(), 'booking_requested', 'booking', v_booking.id);
+  PERFORM public.notify_push(v_vendor.id::uuid, 'New Booking Request', v_profile.name || ' requested ' || p_service_name, '/?tab=vendor');
   RETURN v_booking;
 END;
 $$;
@@ -419,6 +464,13 @@ BEGIN
     END IF;
   END IF;
   INSERT INTO public.audit_log (actor_id, action, entity_type, entity_id, metadata) VALUES (auth.uid(), lower(replace(p_status, ' ', '_')), 'booking', p_booking_id, jsonb_build_object('status', p_status));
+  IF p_status = 'Confirmed' THEN
+    PERFORM public.notify_push(v_booking.customer_id, 'Appointment Confirmed', v_booking.service_name || ' on ' || v_booking.date || ' at ' || v_booking.time, '/?tab=account');
+  ELSIF p_status = 'Completed' THEN
+    PERFORM public.notify_push(v_booking.customer_id, 'Appointment Completed', 'Rate your stylist for ' || v_booking.service_name, '/?tab=account');
+  ELSIF p_status = 'Cancelled' THEN
+    PERFORM public.notify_push(v_booking.customer_id, 'Appointment Cancelled', v_booking.service_name || ' was cancelled', '/?tab=account');
+  END IF;
   RETURN v_booking;
 END;
 $$;
@@ -435,6 +487,26 @@ BEGIN
       NEW.badge := CASE WHEN OLD.is_verified THEN OLD.badge ELSE 'Campus Stylist (Pending Verification)' END;
     END IF;
   END IF;
+  RETURN NEW;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.notify_new_message()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE v_conv public.conversations; v_recipient UUID; v_sender_name TEXT;
+BEGIN
+  SELECT * INTO v_conv FROM public.conversations WHERE id = NEW.conversation_id;
+  IF v_conv.id IS NULL THEN RETURN NEW; END IF;
+  IF NEW.sender = 'user' THEN
+    v_recipient := v_conv.stylist_id::uuid;
+    SELECT name INTO v_sender_name FROM public.profiles WHERE id = v_conv.customer_id;
+  ELSE
+    v_recipient := v_conv.customer_id;
+    SELECT name INTO v_sender_name FROM public.vendor_profiles WHERE id = v_conv.stylist_id;
+  END IF;
+  PERFORM public.notify_push(v_recipient, COALESCE(v_sender_name, 'New message'), NEW.text, '/?tab=messages');
+  RETURN NEW;
+EXCEPTION WHEN OTHERS THEN
   RETURN NEW;
 END;
 $$;
@@ -579,6 +651,10 @@ DROP TRIGGER IF EXISTS vendor_profiles_protect_verification ON public.vendor_pro
 CREATE TRIGGER vendor_profiles_protect_verification BEFORE INSERT OR UPDATE ON public.vendor_profiles
 FOR EACH ROW EXECUTE FUNCTION public.prevent_vendor_self_verification();
 
+DROP TRIGGER IF EXISTS messages_notify_push ON public.messages;
+CREATE TRIGGER messages_notify_push AFTER INSERT ON public.messages
+FOR EACH ROW EXECUTE FUNCTION public.notify_new_message();
+
 -- ==============================================================================
 -- RLS Policies — drop everything first (including any legacy "Allow public
 -- read/write" policies from an older version of this file) so re-running this
@@ -611,7 +687,12 @@ CREATE POLICY products_vendor_write ON public.products FOR ALL TO authenticated 
 CREATE POLICY bookings_participant_read ON public.bookings FOR SELECT TO authenticated USING (customer_id = auth.uid() OR staff_id = auth.uid()::text OR public.is_admin());
 CREATE POLICY orders_customer_read ON public.orders FOR SELECT TO authenticated USING (customer_id = auth.uid() OR public.is_admin());
 CREATE POLICY conversations_participant_read ON public.conversations FOR SELECT TO authenticated USING (customer_id = auth.uid() OR stylist_id = auth.uid()::text OR public.is_admin());
+-- Chat previously had no write policy at all — every message send was being
+-- silently dropped by RLS and only ever lived in local browser state.
+CREATE POLICY conversations_participant_insert ON public.conversations FOR INSERT TO authenticated WITH CHECK (customer_id = auth.uid() OR stylist_id = auth.uid()::text);
+CREATE POLICY conversations_participant_update ON public.conversations FOR UPDATE TO authenticated USING (customer_id = auth.uid() OR stylist_id = auth.uid()::text OR public.is_admin()) WITH CHECK (customer_id = auth.uid() OR stylist_id = auth.uid()::text OR public.is_admin());
 CREATE POLICY messages_participant_read ON public.messages FOR SELECT TO authenticated USING (EXISTS (SELECT 1 FROM public.conversations c WHERE c.id = messages.conversation_id AND (c.customer_id = auth.uid() OR c.stylist_id = auth.uid()::text OR public.is_admin())));
+CREATE POLICY messages_participant_insert ON public.messages FOR INSERT TO authenticated WITH CHECK (EXISTS (SELECT 1 FROM public.conversations c WHERE c.id = messages.conversation_id AND (c.customer_id = auth.uid() OR c.stylist_id = auth.uid()::text)));
 CREATE POLICY wallets_owner_read ON public.vendor_wallets FOR SELECT TO authenticated USING (vendor_id = auth.uid()::text OR public.is_admin());
 CREATE POLICY payouts_owner_read ON public.vendor_payouts FOR SELECT TO authenticated USING (vendor_id = auth.uid()::text OR public.is_admin());
 CREATE POLICY ledger_owner_read ON public.points_ledger FOR SELECT TO authenticated USING (profile_id = auth.uid() OR public.is_admin());
@@ -629,6 +710,9 @@ CREATE POLICY analytics_admin_read ON public.analytics_events FOR SELECT TO auth
 -- Product sales are only ever written by place_order() below — a vendor can
 -- read their own sales history but never write to it directly.
 CREATE POLICY product_sales_vendor_read ON public.product_sales FOR SELECT TO authenticated USING (vendor_id = auth.uid()::text OR public.is_admin());
+
+-- Each user manages only their own device push subscriptions.
+CREATE POLICY push_subscriptions_owner_all ON public.push_subscriptions FOR ALL TO authenticated USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid());
 
 -- Service-role functions/Edge Functions write financial and booking state. Clients
 -- have read-only access to those records, preventing balance/refund manipulation.

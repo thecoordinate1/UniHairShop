@@ -65,6 +65,7 @@ function ViewSkeleton() {
 export default function App() {
   const {
     activeTab,
+    setActiveTab,
     userMode,
     user,
     authLoading,
@@ -79,6 +80,20 @@ export default function App() {
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [activeTab, userMode]);
+
+  // Deep-link for a notification click (?tab=messages, ?tab=account, ?tab=vendor)
+  useEffect(() => {
+    try {
+      const tabParam = new URLSearchParams(window.location.search).get('tab');
+      const validTabs = ['home', 'services', 'shop', 'cart', 'messages', 'vendor', 'account', 'about', 'legal', 'admin'];
+      if (tabParam && validTabs.includes(tabParam)) {
+        setActiveTab(tabParam);
+        window.history.replaceState(null, '', window.location.pathname);
+      }
+    } catch (e) {
+      console.warn('Tab deep-link parsing fallback:', e);
+    }
+  }, [setActiveTab]);
 
   // Deep-link resolution for stylist handles (?stylist=juniorfades or /@juniorfades)
   useEffect(() => {

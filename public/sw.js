@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v2';
+const CACHE_VERSION = 'v3';
 const CACHE_NAME = `unihairshop-${CACHE_VERSION}`;
 const FONTS_CACHE_NAME = `unihairshop-fonts-${CACHE_VERSION}`;
 
@@ -101,6 +101,48 @@ self.addEventListener('fetch', (event) => {
         });
 
       return cachedResponse || fetchPromise;
+    })
+  );
+});
+
+// Push Notifications - shows an OS-level notification when the send-push
+// Edge Function delivers one (new message, booking confirmed/completed/cancelled)
+self.addEventListener('push', (event) => {
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch {
+    data = { title: 'UniHairShop', body: event.data ? event.data.text() : '' };
+  }
+
+  const title = data.title || 'UniHairShop';
+  const options = {
+    body: data.body || '',
+    icon: '/icons/icon-192.png',
+    badge: '/icons/icon-192.png',
+    data: { url: data.url || '/' }
+  };
+
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+// Clicking a notification focuses an existing tab (navigating it to the
+// relevant view) or opens a new one if the app isn't already open.
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const targetUrl = (event.notification.data && event.notification.data.url) || '/';
+
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientsArr) => {
+      const existing = clientsArr.find((c) => c.url.startsWith(self.location.origin));
+      if (existing) {
+        existing.focus();
+        if ('navigate' in existing) {
+          return existing.navigate(targetUrl);
+        }
+        return null;
+      }
+      return self.clients.openWindow(targetUrl);
     })
   );
 });

@@ -33,7 +33,9 @@ import {
   Check,
   TrendingUp,
   Zap,
-  Phone
+  Phone,
+  Bell,
+  BellOff
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import BookingDetailModal from '../components/BookingDetailModal';
@@ -59,8 +61,14 @@ export default function AccountView() {
     setShowSafetyModal,
     userMode,
     toggleUserMode,
-    switchViewMode
+    switchViewMode,
+    pushEnabled,
+    pushSupported,
+    enablePushNotifications,
+    disablePushNotifications
   } = useApp();
+
+  const [pushToggling, setPushToggling] = useState(false);
 
   const [accountTab, setAccountTab] = useState('bookings');
   const [rescheduleModal, setRescheduleModal] = useState(null);
@@ -352,6 +360,38 @@ export default function AccountView() {
             className="apple-btn-primary text-xs py-2 px-4 shrink-0 font-bold shadow-apple-gold cursor-pointer"
           >
             Add Phone Number
+          </button>
+        </div>
+      )}
+
+      {/* Push Notifications Toggle */}
+      {user?.isLoggedIn && pushSupported && (
+        <div className="card p-5 flex flex-wrap items-center justify-between gap-4 shadow-sm">
+          <div className="flex items-center gap-3.5 min-w-0">
+            <div className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 border ${pushEnabled ? 'bg-emerald-400/20 text-emerald-500 border-emerald-400/30' : 'bg-black/5 dark:bg-white/5 text-slate-400 border-black/10 dark:border-white/10'}`}>
+              {pushEnabled ? <Bell size={20} /> : <BellOff size={20} />}
+            </div>
+            <div>
+              <h2 className="text-sm font-bold text-slate-900 dark:text-white m-0">Push Notifications</h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400 m-0 mt-0.5">
+                {pushEnabled ? 'On — you\'ll be alerted for new messages and appointment updates.' : 'Get alerted for new messages and appointment updates.'}
+              </p>
+            </div>
+          </div>
+          <button
+            disabled={pushToggling}
+            onClick={async () => {
+              setPushToggling(true);
+              if (pushEnabled) {
+                await disablePushNotifications();
+              } else {
+                await enablePushNotifications();
+              }
+              setPushToggling(false);
+            }}
+            className={pushEnabled ? 'apple-btn-secondary text-xs py-2 px-4 shrink-0 font-bold cursor-pointer' : 'apple-btn-primary text-xs py-2 px-4 shrink-0 font-bold cursor-pointer'}
+          >
+            {pushToggling ? 'Please wait…' : pushEnabled ? 'Turn Off' : 'Enable'}
           </button>
         </div>
       )}
