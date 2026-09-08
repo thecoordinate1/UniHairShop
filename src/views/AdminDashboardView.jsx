@@ -28,10 +28,12 @@ import {
   MessageSquare,
   BadgeCheck,
   Ban,
-  ArrowUpRight
+  ArrowUpRight,
+  UploadCloud
 } from 'lucide-react';
 import { useApp, DEFAULT_AVATAR } from '../context/AppContext';
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient';
+import { uploadImage } from '../lib/uploadImage';
 
 export default function AdminDashboardView() {
   const {
@@ -74,6 +76,8 @@ export default function AdminDashboardView() {
   const [newSrvPrice, setNewSrvPrice] = useState('90');
   const [newSrvDuration, setNewSrvDuration] = useState('40');
   const [newSrvDesc, setNewSrvDesc] = useState('');
+  const [newSrvImage, setNewSrvImage] = useState(null);
+  const [uploadingSrvPhoto, setUploadingSrvPhoto] = useState(false);
 
   // New product form state
   const [newPrdName, setNewPrdName] = useState('');
@@ -81,6 +85,8 @@ export default function AdminDashboardView() {
   const [newPrdPrice, setNewPrdPrice] = useState('120');
   const [newPrdStock, setNewPrdStock] = useState('20');
   const [newPrdDesc, setNewPrdDesc] = useState('');
+  const [newPrdImage, setNewPrdImage] = useState(null);
+  const [uploadingPrdPhoto, setUploadingPrdPhoto] = useState(false);
 
   // New Vendor Form State
   const [newVendorName, setNewVendorName] = useState('');
@@ -200,6 +206,38 @@ export default function AdminDashboardView() {
     return matchesCampus && matchesStatus;
   });
 
+  const handleServiceImagePicker = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingSrvPhoto(true);
+    try {
+      const url = await uploadImage(file, { userId: user?.id, folder: 'services' });
+      if (url) {
+        setNewSrvImage(url);
+      } else {
+        addToast('Could not upload photo. Please try again.', 'error');
+      }
+    } finally {
+      setUploadingSrvPhoto(false);
+    }
+  };
+
+  const handleProductImagePicker = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingPrdPhoto(true);
+    try {
+      const url = await uploadImage(file, { userId: user?.id, folder: 'products' });
+      if (url) {
+        setNewPrdImage(url);
+      } else {
+        addToast('Could not upload photo. Please try again.', 'error');
+      }
+    } finally {
+      setUploadingPrdPhoto(false);
+    }
+  };
+
   const handleCreateService = (e) => {
     e.preventDefault();
     if (!newSrvName.trim()) {
@@ -212,6 +250,7 @@ export default function AdminDashboardView() {
       price: Number(newSrvPrice) || 80,
       duration: Number(newSrvDuration) || 40,
       description: newSrvDesc.trim() || 'Campus beauty and styling service.',
+      image: newSrvImage || undefined,
       canTravel: true,
       inStudio: true,
       popular: false
@@ -219,6 +258,7 @@ export default function AdminDashboardView() {
     setShowAddServiceModal(false);
     setNewSrvName('');
     setNewSrvDesc('');
+    setNewSrvImage(null);
   };
 
   const handleCreateProduct = (e) => {
@@ -232,11 +272,13 @@ export default function AdminDashboardView() {
       category: newPrdCat,
       price: Number(newPrdPrice) || 100,
       stock: Number(newPrdStock) || 20,
-      description: newPrdDesc.trim() || 'Campus hair care product.'
+      description: newPrdDesc.trim() || 'Campus hair care product.',
+      image: newPrdImage || undefined
     });
     setShowAddProductModal(false);
     setNewPrdName('');
     setNewPrdDesc('');
+    setNewPrdImage(null);
   };
 
   const handleCreateVendor = (e) => {
@@ -918,7 +960,31 @@ export default function AdminDashboardView() {
                 <textarea className="form-textarea text-xs" rows={2} value={newSrvDesc} onChange={(e) => setNewSrvDesc(e.target.value)} />
               </div>
 
-              <button type="submit" className="apple-btn-primary w-full text-xs py-2.5 mt-2">
+              <div className="form-group">
+                <label className="form-label">Service Photo:</label>
+                <div className="flex items-center gap-4 bg-black/[0.02] dark:bg-white/[0.02] p-3.5 rounded-2xl border border-black/10 dark:border-white/10">
+                  <div className="w-16 h-16 rounded-2xl overflow-hidden border-2 border-amber-400 shadow-sm shrink-0 bg-slate-800 flex items-center justify-center">
+                    {newSrvImage ? (
+                      <img src={newSrvImage} alt="Preview" className="w-full h-full object-cover" />
+                    ) : (
+                      <UploadCloud size={20} className="text-slate-500" />
+                    )}
+                  </div>
+                  <label className={`apple-btn-secondary text-xs px-3 py-1.5 inline-flex items-center gap-1.5 cursor-pointer ${uploadingSrvPhoto ? 'opacity-60 pointer-events-none' : ''}`}>
+                    <UploadCloud size={13} />
+                    <span>{uploadingSrvPhoto ? 'Uploading…' : newSrvImage ? 'Change Photo' : 'Upload Photo'}</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      disabled={uploadingSrvPhoto}
+                      onChange={handleServiceImagePicker}
+                    />
+                  </label>
+                </div>
+              </div>
+
+              <button type="submit" disabled={uploadingSrvPhoto} className="apple-btn-primary w-full text-xs py-2.5 mt-2">
                 <span>Publish Service to Campus</span>
                 <CheckCircle2 size={14} />
               </button>
@@ -948,6 +1014,16 @@ export default function AdminDashboardView() {
                 />
               </div>
 
+              <div className="form-group">
+                <label className="form-label">Category:</label>
+                <select className="form-select text-xs" value={newPrdCat} onChange={(e) => setNewPrdCat(e.target.value)}>
+                  <option value="Hair Care Products">Hair Care Products</option>
+                  <option value="Nails & Lashes">Nails & Lashes</option>
+                  <option value="Wigs & Weaves">Wigs & Weaves</option>
+                  <option value="Barber Supplies">Barber Supplies</option>
+                </select>
+              </div>
+
               <div className="grid grid-cols-2 gap-2">
                 <div className="form-group">
                   <label className="form-label">Retail Price (ZMW):</label>
@@ -959,7 +1035,36 @@ export default function AdminDashboardView() {
                 </div>
               </div>
 
-              <button type="submit" className="apple-btn-primary w-full text-xs py-2.5 mt-2">
+              <div className="form-group">
+                <label className="form-label">Description:</label>
+                <textarea className="form-textarea text-xs" rows={2} value={newPrdDesc} onChange={(e) => setNewPrdDesc(e.target.value)} />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Product Photo:</label>
+                <div className="flex items-center gap-4 bg-black/[0.02] dark:bg-white/[0.02] p-3.5 rounded-2xl border border-black/10 dark:border-white/10">
+                  <div className="w-16 h-16 rounded-2xl overflow-hidden border-2 border-amber-400 shadow-sm shrink-0 bg-slate-800 flex items-center justify-center">
+                    {newPrdImage ? (
+                      <img src={newPrdImage} alt="Preview" className="w-full h-full object-cover" />
+                    ) : (
+                      <UploadCloud size={20} className="text-slate-500" />
+                    )}
+                  </div>
+                  <label className={`apple-btn-secondary text-xs px-3 py-1.5 inline-flex items-center gap-1.5 cursor-pointer ${uploadingPrdPhoto ? 'opacity-60 pointer-events-none' : ''}`}>
+                    <UploadCloud size={13} />
+                    <span>{uploadingPrdPhoto ? 'Uploading…' : newPrdImage ? 'Change Photo' : 'Upload Photo'}</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      disabled={uploadingPrdPhoto}
+                      onChange={handleProductImagePicker}
+                    />
+                  </label>
+                </div>
+              </div>
+
+              <button type="submit" disabled={uploadingPrdPhoto} className="apple-btn-primary w-full text-xs py-2.5 mt-2">
                 <span>Add Product to Shop</span>
                 <CheckCircle2 size={14} />
               </button>
