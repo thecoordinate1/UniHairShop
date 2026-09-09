@@ -1,0 +1,28 @@
+# Changelog
+
+All notable changes to UniHairShop are recorded here, newest first. Versions follow [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`. While the version stays below `1.0.0`, the app is pre-launch (see `PRODUCTION_READINESS.md`) — `1.0.0` is reserved for the first real production launch (live payments deployed, schema migrated, legal reviewed).
+
+Each release is tagged in git as `vX.Y.Z` — refer to that tag instead of a commit hash when talking about "which version."
+
+## [0.9.0] — 2026-09-09
+
+Production-readiness gap-fill pass (everything except the payment pipe, tracked separately in `PRODUCTION_READINESS.md`).
+
+### Added
+- Account suspension: admins can suspend/reactivate any customer or vendor from new "Customers" and "Reports" admin tabs, with a reason shown to the affected user. Enforced server-side (`is_user_suspended()`) in every booking/order/review/chat write path and in vendor visibility — not just a UI gate.
+- In-app safety reporting: a "Report" action on a stylist's profile and in the chat header, reviewed by admins in a new Reports tab.
+- Self-service "Download My Data" and "Delete My Account" in Account settings. Deletion anonymizes PII and permanently bans the login (real bookings/orders/reviews referencing the account are kept for accounting/dispute history) — see `supabase/functions/delete-account`.
+- Remote error monitoring via Sentry, loaded from their CDN bundle (no npm dependency, inert until `VITE_SENTRY_DSN` is set).
+- Signup/login/password-reset CAPTCHA via Cloudflare Turnstile, wired into both auth entry points (inert until `VITE_TURNSTILE_SITE_KEY` is set and the matching secret is enabled in Supabase).
+- Baseline security response headers (X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy, HSTS) in `vercel.json`; `robots.txt` and `sitemap.xml`.
+- A proper "verify your email" step on the main signup wall, a dedicated "Email Verified — Sign In Now" screen, a real "Set a New Password" recovery landing page, and referral-code prefill from shared `?ref=` links.
+- Real PawaPay mobile money payments (collections), replacing the simulated checkout — 10% + K5 platform commission, deposit/balance tracking, location sharing for dorm visits.
+- Admin overview KPIs (total registered users, pending vendor approvals), service/product detail pages, multi-provider mobile money payout accounts, lower loyalty ratio (K0.10/point), lightweight "premium" UI polish (shimmer skeletons, spring easing, entrance animation).
+
+### Fixed
+- Several dual-read (camelCase/snake_case) display bugs that made real bookings always show "Paid in Full" regardless of actual payment status.
+- Two "component torn down before payment could complete" regressions in the cart/checkout flow.
+
+## Before this changelog
+
+62 commits of initial buildout predate this file — see `git log` for that history.
