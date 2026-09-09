@@ -26,6 +26,7 @@ export default function AuthModal() {
     userMode,
     pendingAuthCallback,
     setPendingAuthCallback,
+    pendingReferralCode,
     addToast
   } = useApp();
 
@@ -41,7 +42,7 @@ export default function AuthModal() {
   const [campus, setCampus] = useState(currentCampus);
   const [hostel, setHostel] = useState('');
   const [specialty, setSpecialty] = useState('Barbering');
-  const [referralCode, setReferralCode] = useState('');
+  const [referralCode, setReferralCode] = useState(() => pendingReferralCode || '');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [resetSuccess, setResetSuccess] = useState(false);

@@ -108,14 +108,44 @@ export const AppProvider = ({ children }) => {
   const [authLoading, setAuthLoading] = useState(true);
   const [pendingAuthCallback, setPendingAuthCallback] = useState(null);
 
-  // Guest Mode State
+  // Guest Mode State — a referral link always means "sign up," so it overrides
+  // any stale guest-mode flag left over from a previous visit on this device.
   const [isGuestMode, setIsGuestMode] = useState(() => {
     try {
+      if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('ref')) {
+        return false;
+      }
       return localStorage.getItem('unihair_guest_mode') === 'true';
     } catch {
       return false;
     }
   });
+
+  // A referral code captured from a shared link's `?ref=` param, to prefill the signup form.
+  const [pendingReferralCode] = useState(() => {
+    try {
+      if (typeof window === 'undefined') return '';
+      const code = new URLSearchParams(window.location.search).get('ref');
+      return code ? code.trim().toUpperCase() : '';
+    } catch {
+      return '';
+    }
+  });
+
+  // Full-screen takeover shown after an email confirmation or password recovery link
+  // is clicked: null | 'verified' | 'reset'. Takes priority over the normal auth gate.
+  const [postAuthScreen, setPostAuthScreen] = useState(null);
+
+  // Which tab AuthWall should open on when it next mounts (e.g. after "Sign In Now").
+  const [authWallDefaultMode, setAuthWallDefaultMode] = useState('signup');
+
+  // Clear the `?ref=` param from the address bar once captured above, so it doesn't
+  // linger or get re-applied if the page is refreshed after signing up.
+  useEffect(() => {
+    if (pendingReferralCode && typeof window !== 'undefined') {
+      window.history.replaceState(null, '', window.location.pathname);
+    }
+  }, [pendingReferralCode]);
 
   // 2. User & Vendor Profiles
   const [user, setUser] = useState(() => {
@@ -387,17 +417,20 @@ export const AppProvider = ({ children }) => {
         } catch { /* ignore */ }
       } else if (hash.includes('type=signup') || hash.includes('type=email_change')) {
         justConfirmedEmail = true;
-        addToast('🎉 Email verified successfully! Please sign in to continue.', 'success');
         window.history.replaceState(null, '', window.location.pathname);
         // The confirmation link auto-establishes a session; sign back out so the
-        // user lands on the sign-in screen instead of being silently logged in.
+        // user lands on the dedicated "verified, sign in now" screen instead of
+        // being silently logged in.
         if (isSupabaseConfigured && supabase) {
           supabase.auth.signOut().catch(() => {});
         }
-        setShowAuthModal(true);
+        setPostAuthScreen('verified');
       } else if (hash.includes('type=recovery')) {
-        addToast('🔑 Password recovery session authenticated. You can update your password in Settings.', 'info');
         window.history.replaceState(null, '', window.location.pathname);
+        // Supabase's recovery link auto-establishes a temporary session that the
+        // reset-password screen uses via supabase.auth.updateUser() — let the normal
+        // session hydration below pick it up rather than signing it out.
+        setPostAuthScreen('reset');
       }
     }
 
@@ -1945,6 +1978,11 @@ export const AppProvider = ({ children }) => {
     setIsGuestMode,
     continueAsGuest,
     exitGuestMode,
+    pendingReferralCode,
+    postAuthScreen,
+    setPostAuthScreen,
+    authWallDefaultMode,
+    setAuthWallDefaultMode,
     user,
     setUser,
     signIn,
@@ -2028,7 +2066,8 @@ export const AppProvider = ({ children }) => {
     theme, toggleTheme, userMode, toggleUserMode, switchViewMode, availableViewModes, vendorTab,
     vendorProfile, updateVendorProfile, toggleVendorDormTravel, vendorWallet, vendorSales,
     requestVendorPayout, acceptBooking, completeBooking, addVendorPortfolioItem,
-    activeTab, currentCampus, session, authLoading, isGuestMode, continueAsGuest, exitGuestMode, user,
+    activeTab, currentCampus, session, authLoading, isGuestMode, continueAsGuest, exitGuestMode,
+    pendingReferralCode, postAuthScreen, authWallDefaultMode, user,
     signIn, signUp, signOut, terminateAllSessions, requireAuth, pendingAuthCallback, updateUserProfile, onboardAsStylist,
     pushEnabled, pushSupported, enablePushNotifications, disablePushNotifications,
     verifyStylist, settleVendorPayout,

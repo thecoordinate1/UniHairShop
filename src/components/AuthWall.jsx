@@ -26,6 +26,16 @@ import {
 import { useApp } from '../context/AppContext';
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient';
 
+// Deep-link into the webmail inbox for common providers; fall back to mailto:
+// (opens the device's default mail app) for anything else.
+function getEmailProviderLink(emailAddress) {
+  const domain = (emailAddress.split('@')[1] || '').toLowerCase();
+  if (domain.includes('gmail')) return 'https://mail.google.com/mail/u/0/#inbox';
+  if (domain.includes('outlook') || domain.includes('hotmail') || domain.includes('live')) return 'https://outlook.live.com/mail/0/inbox';
+  if (domain.includes('yahoo')) return 'https://mail.yahoo.com/d/folders/1';
+  return `mailto:${emailAddress}`;
+}
+
 export default function AuthWall() {
   const {
     signIn,
@@ -34,10 +44,12 @@ export default function AuthWall() {
     terminateAllSessions,
     lusakaUniversities,
     currentCampus,
-    addToast
+    addToast,
+    pendingReferralCode,
+    authWallDefaultMode
   } = useApp();
 
-  const [authMode, setAuthMode] = useState('signup'); // 'signup' | 'login' | 'forgot'
+  const [authMode, setAuthMode] = useState(() => authWallDefaultMode || 'signup'); // 'signup' | 'login' | 'forgot' | 'verify'
   const [roleType, setRoleType] = useState('customer'); // 'customer' | 'vendor'
 
   // Form Fields
@@ -48,7 +60,7 @@ export default function AuthWall() {
   const [phone, setPhone] = useState('');
   const [campus, setCampus] = useState(currentCampus || 'UNILUS Silverest Campus');
   const [hostel, setHostel] = useState('');
-  const [referralCode, setReferralCode] = useState('');
+  const [referralCode, setReferralCode] = useState(() => pendingReferralCode || '');
   const [agreedTerms, setAgreedTerms] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
 
@@ -56,6 +68,8 @@ export default function AuthWall() {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [resetSent, setResetSent] = useState(false);
+  const [verificationEmail, setVerificationEmail] = useState('');
+  const [resendingVerification, setResendingVerification] = useState(false);
   const errorRef = useRef(null);
 
   // The error banner renders above a long, scrollable form — without this, a
@@ -114,7 +128,7 @@ export default function AuthWall() {
     setLoading(true);
     setErrorMsg('');
     try {
-      await signUp({
+      const result = await signUp({
         name: name.trim(),
         email: email.trim(),
         phone: phone.trim(),
@@ -124,11 +138,44 @@ export default function AuthWall() {
         role: roleType,
         referralCode: referralCode.trim()
       });
+
+      // A live session means either local/no-Supabase mode (always instant) or
+      // Supabase with email confirmation disabled — either way they're already
+      // signed in and the app will render past this gate on its own. Otherwise
+      // (real Supabase with confirmation required) signUp() intentionally did NOT
+      // log them in, so show the verify-your-email step instead of leaving them
+      // stranded on the same form with just a toast.
+      if (!isSupabaseConfigured || result?.data?.session) {
+        return;
+      }
+      setVerificationEmail(email.trim());
+      setAuthMode('verify');
     } catch (err) {
       console.error('Sign Up Error:', err);
       setErrorMsg(err.message || 'Registration failed. This email may already be in use.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleResendVerification = async () => {
+    if (!verificationEmail || !isSupabaseConfigured || !supabase) return;
+    setResendingVerification(true);
+    setErrorMsg('');
+    try {
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email: verificationEmail,
+        options: {
+          emailRedirectTo: typeof window !== 'undefined' ? `${window.location.origin}/` : 'https://www.unihair.shop/'
+        }
+      });
+      if (error) throw error;
+      addToast('A new verification email is on its way.', 'success');
+    } catch (err) {
+      setErrorMsg(err.message || 'Could not resend the verification email.');
+    } finally {
+      setResendingVerification(false);
     }
   };
 
@@ -373,6 +420,12 @@ export default function AuthWall() {
                   value={referralCode}
                   onChange={(e) => setReferralCode(e.target.value.trim().toUpperCase())}
                 />
+                {pendingReferralCode && referralCode === pendingReferralCode && (
+                  <p className="text-[10px] text-emerald-400 font-semibold mt-1 flex items-center gap-1">
+                    <Check size={11} />
+                    <span>Applied from your friend's referral link</span>
+                  </p>
+                )}
               </div>
 
               {/* Safety & Anti-Impersonation Agreement */}
@@ -421,6 +474,37 @@ export default function AuthWall() {
                 </button>
               </div>
             </form>
+          )}
+
+          {/* 1.5 VERIFY EMAIL (shown right after signup, when confirmation is required) */}
+          {authMode === 'verify' && (
+            <div className="text-center py-2" role="status" aria-live="polite">
+              <div className="w-14 h-14 rounded-full bg-emerald-500/15 text-emerald-400 flex items-center justify-center mx-auto mb-3 border border-emerald-500/25">
+                <Mail size={26} />
+              </div>
+              <h3 className="text-base font-bold text-white mb-1">Check Your Email</h3>
+              <p className="text-xs text-slate-400 leading-relaxed mb-4">
+                We sent a verification link to <strong className="text-slate-200 break-all">{verificationEmail}</strong>. Open it, then return here to sign in.
+              </p>
+              <div className="rounded-2xl bg-amber-400/10 border border-amber-400/25 px-3 py-2.5 text-left text-[11px] text-slate-300 mb-4">
+                <span className="font-bold text-amber-300">1.</span> Check your inbox and spam folder&nbsp; <span className="font-bold text-amber-300">2.</span> Tap "Verify email"&nbsp; <span className="font-bold text-amber-300">3.</span> Sign in
+              </div>
+              <a
+                href={getEmailProviderLink(verificationEmail)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="apple-btn-primary w-full text-xs py-2.5 mb-2 flex items-center justify-center gap-1.5 rounded-xl"
+              >
+                <Mail size={14} />
+                <span>Open Email App</span>
+              </a>
+              <button type="button" onClick={handleResendVerification} disabled={resendingVerification || !isSupabaseConfigured} className="w-full py-2.5 px-4 rounded-2xl bg-white/[0.06] hover:bg-white/[0.12] border border-white/15 text-white text-xs font-bold transition-all cursor-pointer mb-2">
+                {resendingVerification ? 'Sending verification email…' : 'Resend Verification Email'}
+              </button>
+              <button type="button" onClick={() => { setAuthMode('login'); setErrorMsg(''); }} className="text-xs text-amber-400 font-bold hover:underline bg-transparent border-0 cursor-pointer py-2">
+                I've verified my email — Sign In
+              </button>
+            </div>
           )}
 
           {/* 2. LOG IN FLOW */}

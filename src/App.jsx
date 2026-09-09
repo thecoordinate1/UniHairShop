@@ -13,6 +13,7 @@ import InstallBanner from './components/InstallBanner';
 import AuthModal from './components/AuthModal';
 import AuthGuard from './components/AuthGuard';
 import AuthWall from './components/AuthWall';
+import PostAuthScreen from './components/PostAuthScreen';
 
 // Auto-retrying dynamic import wrapper to survive post-deployment chunk hash rotations
 function lazyWithRetry(componentImport) {
@@ -71,6 +72,7 @@ export default function App() {
     user,
     authLoading,
     isGuestMode,
+    postAuthScreen,
     setShowAuthModal,
     staffList,
     setSelectedStylist,
@@ -133,6 +135,17 @@ export default function App() {
         <h2 className="text-base font-extrabold text-amber-400 tracking-wide m-0">UniHairShop Campus Hub</h2>
         <p className="text-xs text-slate-400 mt-1">Verifying campus session...</p>
       </div>
+    );
+  }
+
+  // Post-Auth Gate: email confirmation / password recovery links land here first,
+  // taking priority over guest mode or the normal sign-in wall until resolved.
+  if (postAuthScreen) {
+    return (
+      <ErrorBoundary>
+        <PostAuthScreen mode={postAuthScreen} />
+        <Toast />
+      </ErrorBoundary>
     );
   }
 
