@@ -76,6 +76,30 @@
   *:focus:not(:focus-visible) {
     outline: none;
   }
+
+  /* Thin, theme-aware scrollbars instead of the browser default chrome */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--card-border-hover) transparent;
+  }
+
+  *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background-color: var(--card-border-hover);
+    border-radius: 9999px;
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background-color: var(--text-muted);
+  }
 }
 
 @keyframes popIn {
@@ -106,6 +130,11 @@
 @keyframes shimmer {
   0% { background-position: -200% 0; }
   100% { background-position: 200% 0; }
+}
+
+@keyframes fadeInUp {
+  0% { opacity: 0; transform: translateY(10px); }
+  100% { opacity: 1; transform: translateY(0); }
 }
 
 @layer components {
@@ -200,23 +229,23 @@
 
   /* Buttons */
   .btn-primary, .apple-btn-primary {
-    @apply bg-[#007AFF] hover:bg-[#0062CC] text-white font-semibold text-sm px-5 py-2.5 rounded-full inline-flex items-center justify-center gap-2 shadow-apple-blue transition-all duration-200 active:scale-[0.97] border border-blue-400/30 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100;
+    @apply bg-[#007AFF] hover:bg-[#0062CC] text-white font-semibold text-sm px-5 py-2.5 rounded-full inline-flex items-center justify-center gap-2 shadow-apple-blue transition-all duration-200 ease-apple-spring active:scale-[0.97] border border-blue-400/30 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100;
   }
 
   .btn-gold {
-    @apply bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-slate-950 font-bold text-sm px-5 py-2.5 rounded-full inline-flex items-center justify-center gap-2 shadow-apple-gold transition-all duration-200 active:scale-[0.97] border-0 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-slate-950 font-bold text-sm px-5 py-2.5 rounded-full inline-flex items-center justify-center gap-2 shadow-apple-gold transition-all duration-200 ease-apple-spring active:scale-[0.97] border-0 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed;
   }
 
   .btn-secondary, .apple-btn-secondary {
-    @apply bg-black/5 hover:bg-black/10 dark:bg-white/10 dark:hover:bg-white/15 text-slate-800 dark:text-white font-semibold text-sm px-5 py-2.5 rounded-full inline-flex items-center justify-center gap-2 backdrop-blur-md transition-all duration-200 active:scale-[0.97] border border-black/10 dark:border-white/10 hover:border-black/20 dark:hover:border-white/20 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100;
+    @apply bg-black/5 hover:bg-black/10 dark:bg-white/10 dark:hover:bg-white/15 text-slate-800 dark:text-white font-semibold text-sm px-5 py-2.5 rounded-full inline-flex items-center justify-center gap-2 backdrop-blur-md transition-all duration-200 ease-apple-spring active:scale-[0.97] border border-black/10 dark:border-white/10 hover:border-black/20 dark:hover:border-white/20 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100;
   }
 
   .btn-success {
-    @apply bg-[#34C759] hover:bg-[#2FB34F] text-white font-semibold text-sm px-5 py-2.5 rounded-full inline-flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/25 transition-all duration-200 active:scale-[0.97] border-0 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply bg-[#34C759] hover:bg-[#2FB34F] text-white font-semibold text-sm px-5 py-2.5 rounded-full inline-flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/25 transition-all duration-200 ease-apple-spring active:scale-[0.97] border-0 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed;
   }
 
   .btn-danger {
-    @apply bg-[#FF2D55] hover:bg-[#E6264D] text-white font-semibold text-sm px-5 py-2.5 rounded-full inline-flex items-center justify-center gap-2 shadow-lg shadow-pink-500/25 transition-all duration-200 active:scale-[0.97] border-0 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply bg-[#FF2D55] hover:bg-[#E6264D] text-white font-semibold text-sm px-5 py-2.5 rounded-full inline-flex items-center justify-center gap-2 shadow-lg shadow-pink-500/25 transition-all duration-200 ease-apple-spring active:scale-[0.97] border-0 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed;
   }
 
   .price-tag {
@@ -280,14 +309,23 @@
   }
 
   .card, .apple-card {
-    @apply w-full rounded-3xl overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-xl box-border border;
+    @apply w-full rounded-3xl overflow-hidden transition-all duration-300 ease-apple-spring hover:-translate-y-1 hover:shadow-xl box-border border;
     background-color: var(--card-bg);
     border-color: var(--card-border);
+    animation: fadeInUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) backwards;
   }
 
   .card:hover, .apple-card:hover {
     background-color: var(--card-hover);
     border-color: var(--card-border-hover);
+  }
+
+  /* Shimmer loading placeholder — reuses the shimmer keyframe below */
+  .skeleton {
+    @apply rounded-2xl;
+    background: linear-gradient(90deg, var(--card-border) 25%, var(--card-hover) 37%, var(--card-border) 63%);
+    background-size: 400% 100%;
+    animation: shimmer 1.8s ease-in-out infinite;
   }
 
   /* Forms */

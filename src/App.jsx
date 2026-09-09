@@ -51,12 +51,12 @@ const AdminDashboardView = lazyWithRetry(() => import('./views/AdminDashboardVie
 
 function ViewSkeleton() {
   return (
-    <div className="w-full flex flex-col gap-6 animate-pulse" aria-busy="true" aria-label="Loading content">
-      <div className="w-3/4 h-8 bg-black/5 dark:bg-white/[0.06] rounded-2xl" />
-      <div className="w-1/2 h-4 bg-black/5 dark:bg-white/[0.04] rounded-xl" />
+    <div className="w-full flex flex-col gap-6" aria-busy="true" aria-label="Loading content">
+      <div className="w-3/4 h-8 skeleton" />
+      <div className="w-1/2 h-4 skeleton" />
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {[1, 2, 3, 4].map((i) => (
-          <div key={i} className="h-64 bg-black/5 dark:bg-white/[0.04] rounded-3xl border border-black/5 dark:border-white/5" />
+          <div key={i} className="h-64 skeleton rounded-3xl border border-black/5 dark:border-white/5" />
         ))}
       </div>
     </div>
