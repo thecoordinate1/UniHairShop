@@ -504,7 +504,7 @@ export const AppProvider = ({ children }) => {
                 referredBy: profile?.referred_by || '',
                 referralCount: validCount,
                 pointsHistory: validHistory,
-                favorites: [],
+                favorites: Array.isArray(profile?.favorites) ? profile.favorites : [],
                 isSuspended: profile?.is_suspended || false,
                 suspendedReason: profile?.suspended_reason || ''
               });
@@ -560,6 +560,7 @@ export const AppProvider = ({ children }) => {
           referredBy: profile?.referred_by || prev.referredBy || '',
           referralCount: validCount,
           pointsHistory: validHistory,
+          favorites: Array.isArray(profile?.favorites) ? profile.favorites : prev.favorites,
           isSuspended: profile?.is_suspended || false,
           suspendedReason: profile?.suspended_reason || ''
         }));
@@ -795,12 +796,11 @@ export const AppProvider = ({ children }) => {
       const updated = exists
         ? prev.favorites.filter((favId) => favId !== id)
         : [...prev.favorites, id];
+      if (isSupabaseConfigured && supabase && prev.id) {
+        supabase.from('profiles').update({ favorites: updated }).eq('id', prev.id).then(null, () => {});
+      }
+      addToast(exists ? 'Removed from favorites' : 'Saved to favorites!', 'success');
       return { ...prev, favorites: updated };
-    });
-    setUser((prev) => {
-      const justToggled = prev.favorites.includes(id);
-      addToast(justToggled ? 'Saved to favorites!' : 'Removed from favorites', 'success');
-      return prev;
     });
   }, [addToast]);
 

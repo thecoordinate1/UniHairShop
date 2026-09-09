@@ -4,6 +4,11 @@ All notable changes to UniHairShop are recorded here, newest first. Versions fol
 
 Each release is tagged in git as `vX.Y.Z` — refer to that tag instead of a commit hash when talking about "which version."
 
+## [0.9.8] — 2026-09-10
+
+### Fixed
+- Favorites were entirely client-side (never synced to the database) — hardcoded to an empty array on every login/token refresh, meaning they didn't survive a new device, cleared browser storage, or (intermittently) even a token refresh mid-session. Added `profiles.favorites`, read on login and written on every toggle.
+
 ## [0.9.7] — 2026-09-10
 
 ### Fixed
