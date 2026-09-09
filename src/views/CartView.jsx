@@ -9,6 +9,7 @@ export default function CartView() {
     updateCartQuantity,
     removeFromCart,
     createOrder,
+    confirmArrivalOrder,
     setActiveTab,
     products,
     setSelectedProduct,
@@ -63,6 +64,9 @@ export default function CartView() {
   };
 
   const handlePaymentSuccess = (paymentResult) => {
+    if (paymentResult?.paymentMethod === 'Pay on Arrival / Pickup' && pendingOrder?.id) {
+      confirmArrivalOrder(pendingOrder.id);
+    }
     setShowPaymentWizard(false);
     setPlacedOrder({ ...pendingOrder, paymentMethod: paymentResult.paymentMethod });
   };

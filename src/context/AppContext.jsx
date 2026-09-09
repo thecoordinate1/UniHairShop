@@ -1121,32 +1121,18 @@ export const AppProvider = ({ children }) => {
       const { data: freshProducts } = await supabase.from('products').select('*');
       if (freshProducts) setProducts(freshProducts);
 
-      const pointsEarned = Math.max(5, Math.floor(newOrder.totalAmount / 10));
-      const newOrderPtEntry = {
-        id: `pt-ord-${Date.now()}`,
-        type: 'order',
-        points: pointsEarned,
-        title: `Hostel Beauty Order (${currentCart.length || 1} items) 🛍️`,
-        date: new Date().toISOString()
-      };
-      setUser((prev) => {
-        const nextPoints = (prev.loyaltyPoints || 0) + pointsEarned;
-        const nextHistory = [newOrderPtEntry, ...(prev.pointsHistory || [])];
-        if (prev.id) {
-          supabase.from('profiles').update({
-            loyalty_points: nextPoints,
-            points_history: nextHistory
-          }).eq('id', prev.id).then(null, () => {});
-        }
-        return { ...prev, loyaltyPoints: nextPoints, pointsHistory: nextHistory };
-      });
+      // Loyalty points are credited by confirm_paid_order() only once PawaPay
+      // actually confirms the payment — never here at placement — so an
+      // abandoned or failed mobile money payment can't be farmed for free
+      // points. The profile's points_history/loyalty_points will simply
+      // reflect the reward once the webhook fires; nothing to do client-side.
 
       // Cart is cleared here (the order now owns these items), but the cart
       // drawer/page itself stays open — the caller is about to show a
       // payment wizard against this order and closes it only once payment
       // actually succeeds.
       clearCart();
-      addToast(`Order ${newOrder.id} placed for ${currentCampus}! +${pointsEarned} points earned 💎 — complete payment to confirm.`, 'success');
+      addToast(`Order ${newOrder.id} placed for ${currentCampus}! Complete payment to confirm and earn points.`, 'success');
       trackEvent('order_placed', { orderId: newOrder.id, totalAmount: newOrder.totalAmount, itemCount: currentCart.length });
       return newOrder;
     }
@@ -1196,6 +1182,20 @@ export const AppProvider = ({ children }) => {
     trackEvent('order_placed', { orderId, totalAmount: orderData.totalAmount, itemCount: currentCart.length });
     return newOrder;
   }, [cart, currentCampus, user.name, user.phone, clearCart, addToast, trackEvent]);
+
+  // Cash-on-pickup orders never get a PawaPay webhook (no online payment was
+  // ever attempted), so confirm_arrival_order() is the equivalent of
+  // confirm_paid_order() for that path — same server-side points reward,
+  // just triggered by the customer's committed choice instead of a payment
+  // callback, mirroring how a Pay-on-Arrival booking earns points too.
+  const confirmArrivalOrder = useCallback(async (orderId) => {
+    if (!isSupabaseConfigured || !supabase) return;
+    try {
+      await supabase.rpc('confirm_arrival_order', { p_order_id: orderId });
+    } catch (err) {
+      console.warn('Confirm arrival order:', err);
+    }
+  }, []);
 
   // Vendor Specific Actions
   const updateVendorProfile = useCallback(async (profileData) => {
@@ -2222,6 +2222,7 @@ export const AppProvider = ({ children }) => {
     updateVendorSchedule,
     exportToCalendar,
     createOrder,
+    confirmArrivalOrder,
     addService,
     updateService,
     addProduct,
@@ -2264,7 +2265,7 @@ export const AppProvider = ({ children }) => {
     addToCart, addBundleToCart, updateCartQuantity, removeFromCart, clearCart,
     toggleFavorite, sendMessage, createBooking, cancelBooking, rescheduleBooking,
     claimNoShowRefund, claimClientNoShow,
-    updateVendorSchedule, exportToCalendar, createOrder, addService, updateService, addProduct,
+    updateVendorSchedule, exportToCalendar, createOrder, confirmArrivalOrder, addService, updateService, addProduct,
     updateProductStock, deleteProduct, updateOrderStatus, updateBookingStatus,
     addToast, dismissToast
   ]);

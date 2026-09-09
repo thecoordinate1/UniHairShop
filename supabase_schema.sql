@@ -235,6 +235,8 @@ CREATE TABLE IF NOT EXISTS public.points_ledger (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+ALTER TABLE public.points_ledger ADD COLUMN IF NOT EXISTS order_id TEXT REFERENCES public.orders(id);
+
 -- Loyalty points are now worth K0.10 each (was K0.15) — a generated column's
 -- expression can't be altered in place pre-PG18, so drop and recreate it.
 -- Safe to re-run: this only recomputes from the points already stored.
@@ -494,13 +496,14 @@ BEGIN
 END;
 $$;
 
-CREATE OR REPLACE FUNCTION public.apply_points(p_profile_id UUID, p_points INTEGER, p_reason TEXT, p_booking_id TEXT DEFAULT NULL)
+DROP FUNCTION IF EXISTS public.apply_points(UUID, INTEGER, TEXT, TEXT);
+CREATE OR REPLACE FUNCTION public.apply_points(p_profile_id UUID, p_points INTEGER, p_reason TEXT, p_booking_id TEXT DEFAULT NULL, p_order_id TEXT DEFAULT NULL)
 RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE v_history JSONB;
 BEGIN
   IF p_points = 0 THEN RAISE EXCEPTION 'Points adjustment cannot be zero'; END IF;
   PERFORM set_config('app.unihair_trusted', 'on', true);
-  INSERT INTO public.points_ledger (profile_id, points, reason, booking_id) VALUES (p_profile_id, p_points, p_reason, p_booking_id);
+  INSERT INTO public.points_ledger (profile_id, points, reason, booking_id, order_id) VALUES (p_profile_id, p_points, p_reason, p_booking_id, p_order_id);
   SELECT COALESCE(points_history, '[]'::jsonb) INTO v_history FROM public.profiles WHERE id = p_profile_id FOR UPDATE;
   UPDATE public.profiles
   SET loyalty_points = GREATEST(0, loyalty_points + p_points),
@@ -785,8 +788,13 @@ GRANT EXECUTE ON FUNCTION public.place_order(JSONB, TEXT, TEXT, TEXT, TEXT) TO a
 -- fires for those), so COD orders never touch the wallet at all.
 CREATE OR REPLACE FUNCTION public.confirm_paid_order(p_order_id TEXT)
 RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
-DECLARE v_sale RECORD; v_fee NUMERIC; v_net NUMERIC;
+DECLARE v_sale RECORD; v_fee NUMERIC; v_net NUMERIC; v_order public.orders; v_points INTEGER;
 BEGIN
+  SELECT * INTO v_order FROM public.orders WHERE id = p_order_id FOR UPDATE;
+  -- Idempotency: PawaPay (or any webhook) can retry the same delivery, and this
+  -- must never double-credit a vendor's wallet or a customer's loyalty points.
+  IF v_order.id IS NULL OR v_order.payment_status = 'Paid' THEN RETURN; END IF;
+
   FOR v_sale IN SELECT * FROM public.product_sales WHERE order_id = p_order_id LOOP
     v_fee := round(v_sale.total_amount * 0.10 + 5, 2);
     v_net := v_sale.total_amount - v_fee;
@@ -799,12 +807,45 @@ BEGIN
     INSERT INTO public.platform_fees (source_type, source_id, vendor_id, gross_amount, fee_amount, net_amount)
     VALUES ('product_sale', v_sale.id::text, v_sale.vendor_id, v_sale.total_amount, v_fee, v_net);
   END LOOP;
+
   UPDATE public.orders SET payment_status = 'Paid' WHERE id = p_order_id;
+
+  -- Loyalty points are only ever earned once the payment is actually
+  -- confirmed here -- never at checkout/place_order() time, so an abandoned
+  -- or failed mobile money payment can't be farmed for free points.
+  IF v_order.customer_id IS NOT NULL THEN
+    v_points := GREATEST(5, floor(v_order.total_amount / 10));
+    PERFORM public.apply_points(v_order.customer_id, v_points, 'Order payment reward', NULL, p_order_id);
+  END IF;
 END;
 $$;
 
 REVOKE ALL ON FUNCTION public.confirm_paid_order(TEXT) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.confirm_paid_order(TEXT) TO service_role;
+
+-- Cash-on-pickup orders never trigger a PawaPay webhook (no online payment
+-- was ever attempted), so this is confirm_paid_order()'s equivalent for that
+-- path: called by the customer themselves once they commit to "Pay on
+-- Arrival" in the checkout wizard. Safe to let the customer call directly
+-- (unlike confirm_paid_order) because there's no payment amount to trust or
+-- forge here -- it only ever touches the caller's own order.
+CREATE OR REPLACE FUNCTION public.confirm_arrival_order(p_order_id TEXT)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE v_order public.orders; v_points INTEGER;
+BEGIN
+  SELECT * INTO v_order FROM public.orders WHERE id = p_order_id AND customer_id = auth.uid() FOR UPDATE;
+  IF v_order.id IS NULL THEN RAISE EXCEPTION 'Order not found'; END IF;
+  IF v_order.payment_status IN ('Paid', 'Pending (Pay on Arrival)') THEN RETURN; END IF;
+
+  UPDATE public.orders SET payment_status = 'Pending (Pay on Arrival)', payment_method = 'Pay on Arrival / Pickup' WHERE id = p_order_id;
+
+  v_points := GREATEST(5, floor(v_order.total_amount / 10));
+  PERFORM public.apply_points(v_order.customer_id, v_points, 'Order payment reward', NULL, p_order_id);
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.confirm_arrival_order(TEXT) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.confirm_arrival_order(TEXT) TO authenticated;
 
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created AFTER INSERT ON auth.users FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
@@ -897,7 +938,7 @@ CREATE POLICY reports_admin_update ON public.reports FOR UPDATE TO authenticated
 -- Service-role functions/Edge Functions write financial and booking state. Clients
 -- have read-only access to those records, preventing balance/refund manipulation.
 REVOKE ALL ON public.points_ledger, public.payment_transactions, public.audit_log FROM anon, authenticated;
-REVOKE ALL ON FUNCTION public.apply_points(UUID, INTEGER, TEXT, TEXT) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.apply_points(UUID, INTEGER, TEXT, TEXT, TEXT) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.request_booking(TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, NUMERIC, NUMERIC, JSONB) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.transition_booking(TEXT, TEXT, TEXT, TEXT) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.request_booking(TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, NUMERIC, NUMERIC, JSONB) TO authenticated;

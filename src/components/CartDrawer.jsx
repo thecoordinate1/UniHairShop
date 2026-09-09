@@ -11,6 +11,7 @@ export default function CartDrawer() {
     updateCartQuantity,
     removeFromCart,
     createOrder,
+    confirmArrivalOrder,
     bundles,
     addBundleToCart,
     user,
@@ -86,7 +87,10 @@ export default function CartDrawer() {
     }
   };
 
-  const handlePaymentSuccess = () => {
+  const handlePaymentSuccess = (paymentResult) => {
+    if (paymentResult?.paymentMethod === 'Pay on Arrival / Pickup' && pendingOrder?.id) {
+      confirmArrivalOrder(pendingOrder.id);
+    }
     setShowPaymentWizard(false);
     setPendingOrder(null);
     setIsCartOpen(false);

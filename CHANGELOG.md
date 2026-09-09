@@ -4,6 +4,11 @@ All notable changes to UniHairShop are recorded here, newest first. Versions fol
 
 Each release is tagged in git as `vX.Y.Z` — refer to that tag instead of a commit hash when talking about "which version."
 
+## [0.9.4] — 2026-09-09
+
+### Fixed
+- Shop checkout awarded loyalty points immediately at order placement, before the PawaPay mobile money payment was ever confirmed — an abandoned or failed payment still kept the points. Points are now credited by `confirm_paid_order()` only once the webhook confirms payment actually succeeded (with an idempotency guard so a retried webhook can't double-credit), or by a new `confirm_arrival_order()` for the cash-on-pickup path (no webhook fires for that one, so it's confirmed by the customer's own commitment instead — mirroring how a Pay-on-Arrival booking already only earns points on completion).
+
 ## [0.9.3] — 2026-09-09
 
 ### Added
