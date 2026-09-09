@@ -62,6 +62,7 @@ export default function AdminDashboardView() {
   } = useApp();
 
   const [adminTab, setAdminTab] = useState('overview'); // 'overview' | 'vendors' | 'traffic' | 'payouts' | 'catalog' | 'users' | 'reports'
+  const [catalogSubTab, setCatalogSubTab] = useState('services'); // 'services' | 'products'
   const [vendorSearch, setVendorSearch] = useState('');
   const [vendorCampusFilter, setVendorCampusFilter] = useState('All');
   const [vendorVerifyFilter, setVendorVerifyFilter] = useState('All'); // 'All' | 'Verified' | 'Pending'
@@ -100,7 +101,7 @@ export default function AdminDashboardView() {
   const [newPrdPrice, setNewPrdPrice] = useState('120');
   const [newPrdStock, setNewPrdStock] = useState('20');
   const [newPrdDesc, setNewPrdDesc] = useState('');
-  const [newPrdImage, setNewPrdImage] = useState(null);
+  const [newPrdImages, setNewPrdImages] = useState([]);
   const [uploadingPrdPhoto, setUploadingPrdPhoto] = useState(false);
 
   // New Vendor Form State
@@ -329,13 +330,18 @@ export default function AdminDashboardView() {
     try {
       const url = await uploadImage(file, { userId: user?.id, folder: 'products' });
       if (url) {
-        setNewPrdImage(url);
+        setNewPrdImages((prev) => [...prev, url]);
       } else {
         addToast('Could not upload photo. Please try again.', 'error');
       }
     } finally {
       setUploadingPrdPhoto(false);
     }
+    e.target.value = '';
+  };
+
+  const handleRemoveProductImage = (index) => {
+    setNewPrdImages((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleCreateService = (e) => {
@@ -373,12 +379,12 @@ export default function AdminDashboardView() {
       price: Number(newPrdPrice) || 100,
       stock: Number(newPrdStock) || 20,
       description: newPrdDesc.trim() || 'Campus hair care product.',
-      image: newPrdImage || undefined
+      images: newPrdImages
     });
     setShowAddProductModal(false);
     setNewPrdName('');
     setNewPrdDesc('');
-    setNewPrdImage(null);
+    setNewPrdImages([]);
   };
 
   const handleCreateVendor = (e) => {
@@ -845,35 +851,58 @@ export default function AdminDashboardView() {
 
       {/* 5. SERVICES & PRODUCTS CATALOG TAB */}
       {adminTab === 'catalog' && (
-        <div className="space-y-6">
-          {/* Services List */}
-          <div className="card p-5">
-            <div className="flex justify-between items-center mb-4">
-              <div>
-                <h3 className="text-base font-bold text-slate-900 dark:text-white m-0">Campus Services Menu ({services.length})</h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400 m-0">Active hairstyles and grooming options available to students</p>
-              </div>
-              <button onClick={() => setShowAddServiceModal(true)} className="apple-btn-primary text-xs px-3.5 py-1.5 flex items-center gap-1">
-                <Plus size={13} />
-                <span>Add Service</span>
-              </button>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {services.map((srv) => (
-                <div key={srv.id} className="p-3.5 rounded-2xl border border-black/10 dark:border-white/10 flex items-center justify-between gap-3">
-                  <div>
-                    <span className="badge badge-in-stock text-[9px] mb-1">{srv.category}</span>
-                    <h4 className="text-xs font-bold text-slate-900 dark:text-white m-0">{srv.name}</h4>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400 m-0">Duration: {srv.duration} mins</p>
-                  </div>
-                  <span className="price-tag text-sm">K {srv.price}</span>
-                </div>
-              ))}
-            </div>
+        <div className="space-y-4">
+          {/* Sub-tab switcher — avoids stacking both long lists in one scroll */}
+          <div className="flex gap-2 p-1 bg-black/[0.03] dark:bg-white/[0.04] rounded-2xl w-fit">
+            <button
+              onClick={() => setCatalogSubTab('services')}
+              className={`text-xs font-semibold px-3.5 py-1.5 rounded-xl transition-all cursor-pointer border-0 ${
+                catalogSubTab === 'services' ? 'bg-amber-400 text-slate-950' : 'bg-transparent text-slate-500 dark:text-slate-400'
+              }`}
+            >
+              Services ({services.length})
+            </button>
+            <button
+              onClick={() => setCatalogSubTab('products')}
+              className={`text-xs font-semibold px-3.5 py-1.5 rounded-xl transition-all cursor-pointer border-0 ${
+                catalogSubTab === 'products' ? 'bg-amber-400 text-slate-950' : 'bg-transparent text-slate-500 dark:text-slate-400'
+              }`}
+            >
+              Products ({products.length})
+            </button>
           </div>
 
+          {/* Services List */}
+          {catalogSubTab === 'services' && (
+            <div className="card p-5">
+              <div className="flex justify-between items-center mb-4">
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white m-0">Campus Services Menu ({services.length})</h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 m-0">Active hairstyles and grooming options available to students</p>
+                </div>
+                <button onClick={() => setShowAddServiceModal(true)} className="apple-btn-primary text-xs px-3.5 py-1.5 flex items-center gap-1">
+                  <Plus size={13} />
+                  <span>Add Service</span>
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {services.map((srv) => (
+                  <div key={srv.id} className="p-3.5 rounded-2xl border border-black/10 dark:border-white/10 flex items-center justify-between gap-3">
+                    <div>
+                      <span className="badge badge-in-stock text-[9px] mb-1">{srv.category}</span>
+                      <h4 className="text-xs font-bold text-slate-900 dark:text-white m-0">{srv.name}</h4>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 m-0">Duration: {srv.duration} mins</p>
+                    </div>
+                    <span className="price-tag text-sm">K {srv.price}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Products List */}
+          {catalogSubTab === 'products' && (
           <div className="card p-5">
             <div className="flex justify-between items-center mb-4">
               <div>
@@ -906,6 +935,7 @@ export default function AdminDashboardView() {
               ))}
             </div>
           </div>
+          )}
         </div>
       )}
 
@@ -1340,18 +1370,34 @@ export default function AdminDashboardView() {
               </div>
 
               <div className="form-group">
-                <label className="form-label">Product Photo:</label>
+                <label className="form-label">Product Photos:</label>
+                {newPrdImages.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {newPrdImages.map((img, i) => (
+                      <div key={img + i} className="relative w-16 h-16 rounded-2xl overflow-hidden border-2 border-amber-400 shadow-sm shrink-0 bg-slate-800">
+                        <img src={img} alt={`Preview ${i + 1}`} className="w-full h-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveProductImage(i)}
+                          className="absolute top-0.5 right-0.5 w-5 h-5 rounded-full bg-black/70 text-white flex items-center justify-center border-0 cursor-pointer"
+                          title="Remove photo"
+                        >
+                          <X size={11} />
+                        </button>
+                        {i === 0 && (
+                          <span className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-[9px] text-center py-0.5">Main</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
                 <div className="flex items-center gap-4 bg-black/[0.02] dark:bg-white/[0.02] p-3.5 rounded-2xl border border-black/10 dark:border-white/10">
-                  <div className="w-16 h-16 rounded-2xl overflow-hidden border-2 border-amber-400 shadow-sm shrink-0 bg-slate-800 flex items-center justify-center">
-                    {newPrdImage ? (
-                      <img src={newPrdImage} alt="Preview" className="w-full h-full object-cover" />
-                    ) : (
-                      <UploadCloud size={20} className="text-slate-500" />
-                    )}
+                  <div className="w-16 h-16 rounded-2xl overflow-hidden border-2 border-dashed border-black/15 dark:border-white/15 shadow-sm shrink-0 bg-slate-800 flex items-center justify-center">
+                    <UploadCloud size={20} className="text-slate-500" />
                   </div>
                   <label className={`apple-btn-secondary text-xs px-3 py-1.5 inline-flex items-center gap-1.5 cursor-pointer ${uploadingPrdPhoto ? 'opacity-60 pointer-events-none' : ''}`}>
                     <UploadCloud size={13} />
-                    <span>{uploadingPrdPhoto ? 'Uploading…' : newPrdImage ? 'Change Photo' : 'Upload Photo'}</span>
+                    <span>{uploadingPrdPhoto ? 'Uploading…' : newPrdImages.length > 0 ? 'Add Another Photo' : 'Upload Photo'}</span>
                     <input
                       type="file"
                       accept="image/*"

@@ -15,6 +15,7 @@ export default function ProductDetailModal() {
   } = useApp();
 
   const [qty, setQty] = useState(1);
+  const [activeImageIndex, setActiveImageIndex] = useState(0);
 
   const cartItem = selectedProduct ? cart.find((i) => i.id === selectedProduct.id) : null;
   const isInCart = Boolean(cartItem);
@@ -26,6 +27,7 @@ export default function ProductDetailModal() {
     // If item is already in cart, set initial selector to its cart quantity
     const existing = cart.find((i) => i.id === selectedProduct.id);
     setQty(existing ? existing.quantity : 1);
+    setActiveImageIndex(0);
 
     document.body.classList.add('modal-open');
     const handleKeyDown = (e) => {
@@ -94,9 +96,9 @@ export default function ProductDetailModal() {
           <X size={18} />
         </button>
 
-        <div className="relative h-56 w-full rounded-3xl overflow-hidden mb-4 border border-black/10 dark:border-white/10 shadow-sm bg-black/5 dark:bg-white/5">
+        <div className="relative h-56 w-full rounded-3xl overflow-hidden mb-2 border border-black/10 dark:border-white/10 shadow-sm bg-black/5 dark:bg-white/5">
           <img
-            src={selectedProduct.image}
+            src={(selectedProduct.images?.length ? selectedProduct.images[activeImageIndex] : null) || selectedProduct.image}
             alt={selectedProduct.name}
             className="w-full h-full object-cover"
             loading="lazy"
@@ -108,6 +110,23 @@ export default function ProductDetailModal() {
             </div>
           )}
         </div>
+
+        {selectedProduct.images?.length > 1 && (
+          <div className="flex gap-2 mb-4 overflow-x-auto">
+            {selectedProduct.images.map((img, i) => (
+              <button
+                key={img + i}
+                type="button"
+                onClick={() => setActiveImageIndex(i)}
+                className={`w-12 h-12 rounded-xl overflow-hidden border-2 shrink-0 cursor-pointer p-0 ${
+                  i === activeImageIndex ? 'border-amber-400' : 'border-black/10 dark:border-white/10'
+                }`}
+              >
+                <img src={img} alt={`${selectedProduct.name} ${i + 1}`} className="w-full h-full object-cover" />
+              </button>
+            ))}
+          </div>
+        )}
 
         <div className="flex items-center gap-2 mb-2">
           <span className="badge badge-in-stock text-xs py-0.5 px-2">

@@ -4,6 +4,17 @@ All notable changes to UniHairShop are recorded here, newest first. Versions fol
 
 Each release is tagged in git as `vX.Y.Z` — refer to that tag instead of a commit hash when talking about "which version."
 
+## [0.9.7] — 2026-09-10
+
+### Fixed
+- **Critical**: vendors could not actually add a service — `services` had no RLS policy letting a non-admin write to it at all, only `products` did. The insert was silently rejected and swallowed by an empty error handler, so it only ever appeared in that vendor's own optimistic local state, never in the real table any customer fetches. Added `services_vendor_write` (and the matching `service_add_ons` policy), and `addService` now surfaces a real error toast instead of swallowing failures and persists add-ons too.
+
+## [0.9.6] — 2026-09-10
+
+### Added
+- Admin "Add Product" now supports uploading multiple photos (with a "Main" indicator and per-photo remove), stored in a new `products.images` column; the product quick-view now shows a tapable thumbnail strip when a product has more than one photo.
+- Admin's "Services & Inventory" tab now has a Services/Products sub-tab switcher instead of stacking both full lists on one page — avoids excessive scrolling as either catalog grows.
+
 ## [0.9.5] — 2026-09-09
 
 ### Fixed

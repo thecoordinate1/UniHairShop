@@ -124,6 +124,7 @@ CREATE TABLE IF NOT EXISTS public.products (
 -- correct it so newly-inserted rows never get a fabricated rating.
 ALTER TABLE public.products ALTER COLUMN rating SET DEFAULT 0;
 ALTER TABLE public.products ADD COLUMN IF NOT EXISTS vendor_id TEXT REFERENCES public.vendor_profiles(id) ON DELETE CASCADE;
+ALTER TABLE public.products ADD COLUMN IF NOT EXISTS images JSONB DEFAULT '[]'::jsonb;
 
 -- 6. BOOKINGS (Appointment Queue)
 CREATE TABLE IF NOT EXISTS public.bookings (
@@ -899,8 +900,14 @@ CREATE POLICY vendors_self_update ON public.vendor_profiles FOR UPDATE TO authen
 
 CREATE POLICY services_public_read ON public.services FOR SELECT TO anon, authenticated USING (true);
 CREATE POLICY services_admin_write ON public.services FOR ALL TO authenticated USING (public.is_admin()) WITH CHECK (public.is_admin());
+-- A vendor could add a service from their own Vendor Studio, but had no RLS
+-- policy letting them write to public.services at all (only admins did) --
+-- the insert silently failed, so it only ever showed up in that vendor's own
+-- optimistic local state, never for any customer fetching the real table.
+CREATE POLICY services_vendor_write ON public.services FOR ALL TO authenticated USING (auth.uid()::text = ANY(staff_ids)) WITH CHECK (auth.uid()::text = ANY(staff_ids));
 CREATE POLICY addons_public_read ON public.service_add_ons FOR SELECT TO anon, authenticated USING (true);
 CREATE POLICY addons_admin_write ON public.service_add_ons FOR ALL TO authenticated USING (public.is_admin()) WITH CHECK (public.is_admin());
+CREATE POLICY addons_vendor_write ON public.service_add_ons FOR ALL TO authenticated USING (EXISTS (SELECT 1 FROM public.services s WHERE s.id = service_add_ons.service_id AND auth.uid()::text = ANY(s.staff_ids))) WITH CHECK (EXISTS (SELECT 1 FROM public.services s WHERE s.id = service_add_ons.service_id AND auth.uid()::text = ANY(s.staff_ids)));
 CREATE POLICY products_public_read ON public.products FOR SELECT TO anon, authenticated USING (true);
 CREATE POLICY products_admin_write ON public.products FOR ALL TO authenticated USING (public.is_admin()) WITH CHECK (public.is_admin());
 CREATE POLICY products_vendor_write ON public.products FOR ALL TO authenticated USING (vendor_id = auth.uid()::text) WITH CHECK (vendor_id = auth.uid()::text);

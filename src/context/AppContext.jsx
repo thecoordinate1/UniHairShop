@@ -1499,10 +1499,9 @@ export const AppProvider = ({ children }) => {
       image: serviceData.image || '/images/barber_service.jpg',
       staffIds: [vendorProfile.id]
     };
-    setServices((prev) => [...prev, newSrv]);
 
     if (isSupabaseConfigured && supabase) {
-      supabase.from('services').insert([{
+      const { error } = await supabase.from('services').insert([{
         id: newId,
         name: serviceData.name,
         category: serviceData.category,
@@ -1513,9 +1512,19 @@ export const AppProvider = ({ children }) => {
         can_travel: serviceData.canTravel,
         in_studio: serviceData.inStudio,
         staff_ids: [vendorProfile.id]
-      }]).then(null, () => {});
+      }]);
+      if (error) {
+        addToast(error.message || 'Could not add this service. Please try again.', 'error');
+        return;
+      }
+      if (serviceData.addOns?.length) {
+        await supabase.from('service_add_ons').insert(
+          serviceData.addOns.map((a) => ({ id: a.id, service_id: newId, name: a.name, price: a.price, duration: a.duration || 10 }))
+        );
+      }
     }
 
+    setServices((prev) => [...prev, newSrv]);
     addToast(`New service "${serviceData.name}" added to your menu!`, 'success');
   }, [vendorProfile.id, addToast]);
 
@@ -1526,7 +1535,8 @@ export const AppProvider = ({ children }) => {
 
   const addProduct = useCallback(async (productData) => {
     const newId = generateId('prd');
-    const newPrd = { id: newId, ...productData, image: productData.image || '/images/hair_product.jpg', rating: 0, reviewsCount: 0 };
+    const images = productData.images?.length ? productData.images : (productData.image ? [productData.image] : []);
+    const newPrd = { id: newId, ...productData, image: images[0] || '/images/hair_product.jpg', images, rating: 0, reviewsCount: 0 };
     setProducts((prev) => [...prev, newPrd]);
 
     if (isSupabaseConfigured && supabase) {
@@ -1538,6 +1548,7 @@ export const AppProvider = ({ children }) => {
         stock: productData.stock,
         description: productData.description,
         image: newPrd.image,
+        images: newPrd.images,
         vendor_id: productData.vendorId || null
       }]).then(null, () => {});
     }
