@@ -225,6 +225,7 @@ export const AppProvider = ({ children }) => {
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [selectedStylist, setSelectedStylist] = useState(null);
   const [showSafetyModal, setShowSafetyModal] = useState(false);
+  const [showTutorial, setShowTutorial] = useState(false);
   const [filterCategory, setFilterCategory] = useState('All');
   const [serviceTypeFilter, setServiceTypeFilter] = useState('All');
   const [priceFilter, setPriceFilter] = useState('All');
@@ -2279,6 +2280,8 @@ export const AppProvider = ({ children }) => {
     setSelectedStylist,
     showSafetyModal,
     setShowSafetyModal,
+    showTutorial,
+    setShowTutorial,
     conversations,
     reviews,
     submitReview,
@@ -2331,7 +2334,7 @@ export const AppProvider = ({ children }) => {
     verifyStylist, settleVendorPayout, suspendUser, unsuspendUser,
     services, products, bundles, staffList, bookings, orders, cart,
     showAuthModal, isCartOpen, bookingService, selectedService, selectedProduct, selectedStylist,
-    showSafetyModal, conversations, reviews, submitReview, trackEvent, activeChatStylistId,
+    showSafetyModal, showTutorial, conversations, reviews, submitReview, trackEvent, activeChatStylistId,
     filterCategory, serviceTypeFilter, priceFilter, ratingFilter, availabilityFilter,
     toasts,
     addToCart, addBundleToCart, updateCartQuantity, removeFromCart, clearCart,

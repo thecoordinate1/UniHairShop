@@ -61,6 +61,7 @@ export default function AccountView() {
     theme,
     toggleTheme,
     setShowSafetyModal,
+    setShowTutorial,
     userMode,
     toggleUserMode,
     switchViewMode,
@@ -207,6 +208,15 @@ export default function AccountView() {
         <div className="flex flex-wrap items-center justify-end gap-2 min-w-0">
           {user.isLoggedIn ? (
             <>
+              <button
+                onClick={() => setShowTutorial(true)}
+                className="apple-btn-secondary text-xs px-3 py-1.5 flex items-center gap-1 text-slate-200"
+                title="Take a guided tour of the app"
+              >
+                <Sparkles size={13} />
+                <span>Take a Tour</span>
+              </button>
+
               <button
                 onClick={() => {
                   setEditName(user.name);

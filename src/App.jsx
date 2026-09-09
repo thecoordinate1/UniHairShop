@@ -15,6 +15,7 @@ import AuthGuard from './components/AuthGuard';
 import AuthWall from './components/AuthWall';
 import PostAuthScreen from './components/PostAuthScreen';
 import SuspendedAccountScreen from './components/SuspendedAccountScreen';
+import AppTutorial from './components/AppTutorial';
 
 // Auto-retrying dynamic import wrapper to survive post-deployment chunk hash rotations
 function lazyWithRetry(componentImport) {
@@ -77,6 +78,8 @@ export default function App() {
     setShowAuthModal,
     staffList,
     setSelectedStylist,
+    showTutorial,
+    setShowTutorial,
     addToast
   } = useApp();
 
@@ -303,6 +306,7 @@ export default function App() {
         <StylistProfileModal />
         <SafetyModal />
         <AuthModal />
+        <AppTutorial isOpen={showTutorial} onClose={() => setShowTutorial(false)} />
 
         <Suspense fallback={null}>
           <BookingModal />

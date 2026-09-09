@@ -4,6 +4,11 @@ All notable changes to UniHairShop are recorded here, newest first. Versions fol
 
 Each release is tagged in git as `vX.Y.Z` — refer to that tag instead of a commit hash when talking about "which version."
 
+## [0.10.1] — 2026-09-10
+
+### Added
+- Guided in-app tour ("Take a Tour" in Account) — a step-by-step walkthrough with Next/Back that actually switches tabs as it goes, explaining Explore, Services & booking, Shop, Messages & safety codes, Favorites, loyalty points & the Ambassador program, and Vendor Studio (for vendors/admins).
+
 ## [0.10.0] — 2026-09-10
 
 ### Added
