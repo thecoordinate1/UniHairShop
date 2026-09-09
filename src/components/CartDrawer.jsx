@@ -20,7 +20,7 @@ export default function CartDrawer() {
   } = useApp();
 
   const [deliveryType, setDeliveryType] = useState('Hostel Delivery');
-  const [hostelDetails, setHostelDetails] = useState(user.hostel || 'UNILUS Silverest Hostel, Block C, Room 14');
+  const [hostelDetails, setHostelDetails] = useState(user.hostel || '');
   const [promoCode, setPromoCode] = useState('');
   const [discountPercent, setDiscountPercent] = useState(0);
   const [showPaymentWizard, setShowPaymentWizard] = useState(false);
@@ -292,6 +292,17 @@ export default function CartDrawer() {
                   <span>Salon Pickup (Free)</span>
                 </button>
               </div>
+
+              {deliveryType === 'Hostel Delivery' && (
+                <input
+                  type="text"
+                  className="form-input py-1.5 text-xs"
+                  placeholder="Hostel name & room number"
+                  value={hostelDetails}
+                  onChange={(e) => setHostelDetails(e.target.value)}
+                  aria-label="Hostel name and room number"
+                />
+              )}
 
               {/* Promo code input */}
               <div className="flex gap-2">

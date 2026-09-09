@@ -600,7 +600,14 @@ export default function VendorStudioView() {
                       <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 mb-0">
                         Client: <strong className="text-slate-900 dark:text-white">{b.customerName}</strong> ({b.customerPhone}) • <span className="text-amber-500">{b.date} at {b.time}</span>
                       </p>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 m-0">Location: {b.campus} ({b.hostel})</p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 m-0">
+                        Location: {b.campus} ({b.hostel})
+                        {(b.locationLink || b.location_link) && (
+                          <a href={b.locationLink || b.location_link} target="_blank" rel="noopener noreferrer" className="ml-1.5 text-[#007AFF] font-semibold">
+                            View Map Pin →
+                          </a>
+                        )}
+                      </p>
                     </div>
 
                     <div className="flex items-center gap-2">
@@ -761,21 +768,28 @@ export default function VendorStudioView() {
                         <div className="flex items-center gap-2 mb-1">
                           <span className="badge badge-in-stock text-[10px]">{b.serviceType || 'Dorm Appointment'}</span>
                           <span className="text-[11px] text-slate-400 font-mono">Ref: {b.id}</span>
-                          {b.depositAmount > 0 && (
-                            <span className="badge badge-verified text-[10px] bg-emerald-500/15 text-emerald-600">Deposit Paid (K{b.depositAmount})</span>
+                          {(b.depositAmount || b.deposit_amount) > 0 && (
+                            <span className="badge badge-verified text-[10px] bg-emerald-500/15 text-emerald-600">Deposit Paid (K{b.depositAmount || b.deposit_amount})</span>
                           )}
                         </div>
                         <h3 className="text-base font-bold text-slate-900 dark:text-white tracking-tight m-0">{b.serviceName}</h3>
                         <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 mb-0">
                           Client: <strong className="text-slate-900 dark:text-white">{b.customerName}</strong> • Phone: <strong className="text-slate-900 dark:text-white">{b.customerPhone}</strong>
                         </p>
-                        <p className="text-xs text-slate-500 dark:text-slate-400 m-0">Location: {b.campus} — {b.hostel}</p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 m-0">
+                          Location: {b.campus} — {b.hostel}
+                          {(b.locationLink || b.location_link) && (
+                            <a href={b.locationLink || b.location_link} target="_blank" rel="noopener noreferrer" className="ml-1.5 text-[#007AFF] font-semibold">
+                              View Map Pin →
+                            </a>
+                          )}
+                        </p>
                       </div>
 
                       <div className="text-right">
-                        <span className="price-tag text-base">K {b.totalPrice || b.price}</span>
-                        {b.balanceDue > 0 ? (
-                          <span className="text-[11px] text-amber-500 block font-semibold">Collect K{b.balanceDue} on Arrival</span>
+                        <span className="price-tag text-base">K {b.totalPrice || b.total_price || b.price}</span>
+                        {(b.balanceDue ?? b.balance_due) > 0 ? (
+                          <span className="text-[11px] text-amber-500 block font-semibold">Collect K{b.balanceDue ?? b.balance_due} on Arrival</span>
                         ) : (
                           <span className="text-[11px] text-emerald-500 block font-semibold">Paid in Full</span>
                         )}

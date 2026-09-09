@@ -170,6 +170,16 @@ export default function BookingDetailModal({ booking, onClose, onReschedule, onC
               <p className="text-xs text-slate-500 dark:text-slate-400 m-0 truncate">
                 {booking.campus} • {booking.hostel || 'Hostel Room'}
               </p>
+              {(booking.locationLink || booking.location_link) && (
+                <a
+                  href={booking.locationLink || booking.location_link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs font-semibold text-[#007AFF] inline-block mt-0.5"
+                >
+                  View Shared Map Pin →
+                </a>
+              )}
             </div>
           </div>
 
@@ -197,23 +207,23 @@ export default function BookingDetailModal({ booking, onClose, onReschedule, onC
               <span className="text-slate-400">Payment Status</span>
               <span className="font-bold text-emerald-500 flex items-center gap-1">
                 <CreditCard size={12} className="text-emerald-500" />
-                <span>{booking.paymentStatus || booking.paymentMethod || 'Paid'}</span>
+                <span>{booking.paymentStatus || booking.payment_status || booking.paymentMethod || booking.payment_method || 'Pending'}</span>
               </span>
             </div>
             <div className="flex justify-between items-center text-xs">
               <span className="text-slate-400">Base Service Fee</span>
               <span className="font-semibold text-slate-900 dark:text-white">K {basePrice}</span>
             </div>
-            {booking.depositAmount > 0 && (
+            {(booking.depositAmount || booking.deposit_amount) > 0 && (
               <div className="flex justify-between items-center text-xs text-emerald-600 font-semibold">
                 <span>Commitment Deposit Paid</span>
-                <span>-K {booking.depositAmount}</span>
+                <span>-K {booking.depositAmount || booking.deposit_amount}</span>
               </div>
             )}
-            {booking.balanceDue > 0 && (
+            {(booking.balanceDue ?? booking.balance_due) > 0 && (
               <div className="flex justify-between items-center text-xs text-amber-500 font-bold">
                 <span>Balance Due on Arrival</span>
-                <span>K {booking.balanceDue}</span>
+                <span>K {booking.balanceDue ?? booking.balance_due}</span>
               </div>
             )}
             <div className="flex justify-between items-center pt-2 border-t border-black/5 dark:border-white/10">

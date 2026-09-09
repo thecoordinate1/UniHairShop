@@ -583,9 +583,9 @@ export default function AccountView() {
                     <div className="flex items-center gap-2 mb-1">
                       <span className="badge badge-in-stock text-[10px]">{b.category}</span>
                       <span className="text-[11px] text-slate-400 font-mono">Ref: {b.id}</span>
-                      {b.depositAmount > 0 && (
+                      {(b.depositAmount || b.deposit_amount) > 0 && (
                         <span className="badge badge-verified text-[10px] bg-emerald-500/15 text-emerald-600">
-                          K{b.depositAmount} Deposit Paid
+                          K{b.depositAmount || b.deposit_amount} Deposit Paid
                         </span>
                       )}
                     </div>
@@ -596,9 +596,9 @@ export default function AccountView() {
                     <span className={`badge ${b.status === 'Confirmed' ? 'badge-in-stock' : b.status === 'Completed' ? 'badge-verified' : 'badge-out-of-stock'}`}>
                       {b.status}
                     </span>
-                    {b.balanceDue > 0 && (
+                    {(b.balanceDue ?? b.balance_due) > 0 && (
                       <span className="text-[10px] text-amber-500 font-bold block mt-1">
-                        Due on arrival: K{b.balanceDue}
+                        Due on arrival: K{b.balanceDue ?? b.balance_due}
                       </span>
                     )}
                   </div>

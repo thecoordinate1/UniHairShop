@@ -152,6 +152,9 @@ ALTER TABLE public.bookings ADD COLUMN IF NOT EXISTS customer_id UUID REFERENCES
 ALTER TABLE public.bookings ADD COLUMN IF NOT EXISTS deposit_amount NUMERIC DEFAULT 0;
 ALTER TABLE public.bookings DROP COLUMN IF EXISTS balance_due;
 ALTER TABLE public.bookings ADD COLUMN balance_due NUMERIC GENERATED ALWAYS AS (total_price - deposit_amount) STORED;
+-- Optional Google Maps link the customer can share instead of (or alongside)
+-- typing their hostel/room, so the stylist has a precise pin to navigate to.
+ALTER TABLE public.bookings ADD COLUMN IF NOT EXISTS location_link TEXT;
 
 -- 7. ORDERS (Retail Shop Orders)
 CREATE TABLE IF NOT EXISTS public.orders (
@@ -454,7 +457,8 @@ $$;
 CREATE OR REPLACE FUNCTION public.request_booking(
   p_service_id TEXT, p_service_name TEXT, p_category TEXT, p_staff_id TEXT, p_date TEXT, p_time TEXT,
   p_hostel TEXT, p_service_type TEXT, p_price NUMERIC, p_total_price NUMERIC, p_add_ons JSONB DEFAULT '[]'::jsonb,
-  p_deposit_amount NUMERIC DEFAULT 0
+  p_deposit_amount NUMERIC DEFAULT 0,
+  p_location_link TEXT DEFAULT NULL
 ) RETURNS public.bookings LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE v_profile public.profiles; v_booking public.bookings; v_vendor public.vendor_profiles;
 BEGIN
@@ -465,8 +469,8 @@ BEGIN
   IF p_total_price < 0 OR p_price < 0 THEN RAISE EXCEPTION 'Invalid price'; END IF;
   IF p_deposit_amount < 0 OR p_deposit_amount > p_total_price THEN RAISE EXCEPTION 'Invalid deposit amount'; END IF;
   IF EXISTS (SELECT 1 FROM public.bookings WHERE staff_id = p_staff_id AND date = p_date AND time = p_time AND status IN ('Requested','Confirmed','In Progress')) THEN RAISE EXCEPTION 'That time is no longer available'; END IF;
-  INSERT INTO public.bookings (id, customer_id, service_id, service_name, category, staff_id, staff_name, date, time, campus, hostel, service_type, customer_name, customer_phone, selected_add_ons, price, total_price, deposit_amount, payment_method, payment_status, status)
-  VALUES ('UHS-' || replace(gen_random_uuid()::text, '-', ''), auth.uid(), p_service_id, p_service_name, p_category, p_staff_id, v_vendor.name, p_date, p_time, v_profile.campus, p_hostel, p_service_type, v_profile.name, v_profile.phone, p_add_ons, p_price, p_total_price, p_deposit_amount, 'Payment pending', 'Pending', 'Requested')
+  INSERT INTO public.bookings (id, customer_id, service_id, service_name, category, staff_id, staff_name, date, time, campus, hostel, service_type, customer_name, customer_phone, selected_add_ons, price, total_price, deposit_amount, location_link, payment_method, payment_status, status)
+  VALUES ('UHS-' || replace(gen_random_uuid()::text, '-', ''), auth.uid(), p_service_id, p_service_name, p_category, p_staff_id, v_vendor.name, p_date, p_time, v_profile.campus, p_hostel, p_service_type, v_profile.name, v_profile.phone, p_add_ons, p_price, p_total_price, p_deposit_amount, p_location_link, 'Payment pending', 'Pending', 'Requested')
   RETURNING * INTO v_booking;
   INSERT INTO public.audit_log (actor_id, action, entity_type, entity_id) VALUES (auth.uid(), 'booking_requested', 'booking', v_booking.id);
   PERFORM public.notify_push(v_vendor.id::uuid, 'New Booking Request', v_profile.name || ' requested ' || p_service_name, '/?tab=vendor');

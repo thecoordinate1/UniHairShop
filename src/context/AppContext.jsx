@@ -882,6 +882,7 @@ export const AppProvider = ({ children }) => {
           p_category: newBookingData.category || 'Barbering',
           p_staff_id: newBookingData.staffId || 'stf-1',
           p_deposit_amount: depositAmount,
+          p_location_link: newBookingData.locationLink || null,
           p_date: newBookingData.date || new Date().toISOString().split('T')[0],
           p_time: newBookingData.time || '14:00',
           p_hostel: newBookingData.hostel || 'Hostel Room',
@@ -956,7 +957,8 @@ export const AppProvider = ({ children }) => {
 
   const claimNoShowRefund = useCallback(async (bookingId) => {
     const target = bookings.find((b) => b.id === bookingId);
-    const refundAmount = target?.depositAmount > 0 ? target.depositAmount : (target?.totalPrice || 25);
+    const targetDeposit = target?.depositAmount ?? target?.deposit_amount ?? 0;
+    const refundAmount = targetDeposit > 0 ? targetDeposit : (target?.totalPrice || target?.total_price || 25);
 
     setBookings((prev) =>
       prev.map((b) => (b.id === bookingId ? { ...b, status: 'Refunded (Stylist No-Show)', paymentStatus: 'Refunded to MoMo' } : b))

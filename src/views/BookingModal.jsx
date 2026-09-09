@@ -18,7 +18,8 @@ import {
   Users,
   Lock,
   Sparkles,
-  AlertCircle
+  AlertCircle,
+  LocateFixed
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { campusHostels } from '../data/mockData';
@@ -52,6 +53,8 @@ export default function BookingModal() {
   ];
   const [selectedHostelHall, setSelectedHostelHall] = useState(() => availableHostels[0] || 'Hostel Block A');
   const [roomNumber, setRoomNumber] = useState('');
+  const [locationLink, setLocationLink] = useState('');
+  const [sharingLocation, setSharingLocation] = useState(false);
 
   const [phone, setPhone] = useState(user?.phone || '');
   const [selectedAddOns, setSelectedAddOns] = useState([]);
@@ -63,11 +66,15 @@ export default function BookingModal() {
   const [confirmedBooking, setConfirmedBooking] = useState(null);
   const [errors, setErrors] = useState({});
 
-  // Sync available hostels on campus change
+  // Sync available hostels on campus change — default to the customer's own
+  // saved hostel when it matches one of this campus's halls, instead of
+  // always picking the first option and making them re-select it every time.
   useEffect(() => {
     const list = campusHostels[selectedCampus] || ['Main Campus Hostels'];
-    setSelectedHostelHall(list[0] || 'Hostel Block A');
-  }, [selectedCampus]);
+    const savedHostel = (user?.hostel || '').toLowerCase();
+    const matched = savedHostel && list.find((h) => savedHostel.includes(h.toLowerCase()) || h.toLowerCase().includes(savedHostel));
+    setSelectedHostelHall(matched || list[0] || 'Hostel Block A');
+  }, [selectedCampus, user?.hostel]);
 
   // Lock body scroll and handle Escape key
   useEffect(() => {
@@ -113,6 +120,27 @@ export default function BookingModal() {
   // Amount to charge upfront
   const payableNowAmount = paymentMode === 'deposit' ? 25 : (paymentMode === 'full' ? grandTotal : 0);
   const balanceDue = Math.max(0, grandTotal - payableNowAmount);
+
+  const handleShareLocation = () => {
+    if (!navigator.geolocation) {
+      addToast('Location sharing isn\'t supported on this device/browser.', 'error');
+      return;
+    }
+    setSharingLocation(true);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        setLocationLink(`https://maps.google.com/?q=${latitude},${longitude}`);
+        setSharingLocation(false);
+        addToast('Location shared! Your stylist will see a map pin to your exact spot.', 'success');
+      },
+      () => {
+        setSharingLocation(false);
+        addToast('Could not get your location. Please check location permissions and try again.', 'error');
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  };
 
   const toggleAddOn = (addon) => {
     setSelectedAddOns((prev) => {
@@ -167,6 +195,7 @@ export default function BookingModal() {
           time: selectedTime,
           campus: selectedCampus,
           hostel: serviceType === 'travel' ? `${selectedHostelHall} (${roomNumber})` : 'Campus Studio / Student Centre',
+          locationLink: serviceType === 'travel' ? locationLink : null,
           paymentMethod: 'Pay on Arrival (Cash / MoMo)'
         });
         setConfirmedBooking(newBooking);
@@ -198,6 +227,7 @@ export default function BookingModal() {
         time: selectedTime,
         campus: selectedCampus,
         hostel: serviceType === 'travel' ? `${selectedHostelHall} (${roomNumber})` : 'Campus Studio / Student Centre',
+        locationLink: serviceType === 'travel' ? locationLink : null,
         paymentMethod: 'Pending Mobile Money Payment'
       });
       setPendingBooking(newBooking);
@@ -221,6 +251,7 @@ export default function BookingModal() {
     setConfirmedBooking(null);
     setPendingBooking(null);
     setSelectedAddOns([]);
+    setLocationLink('');
     setErrors({});
   };
 
@@ -433,6 +464,29 @@ export default function BookingModal() {
                       }}
                     />
                     {errors.room && <p className="form-error-text">{errors.room}</p>}
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <button
+                      type="button"
+                      onClick={handleShareLocation}
+                      disabled={sharingLocation}
+                      className={`w-full p-2.5 rounded-2xl border flex items-center justify-center gap-2 text-xs font-semibold cursor-pointer transition-all ${
+                        locationLink
+                          ? 'border-emerald-500 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+                          : 'border-black/10 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.04] text-slate-600 dark:text-slate-400'
+                      }`}
+                    >
+                      <LocateFixed size={15} className={locationLink ? 'text-emerald-500' : 'text-[#007AFF]'} />
+                      <span>
+                        {sharingLocation
+                          ? 'Getting your location…'
+                          : locationLink
+                            ? 'Location Shared — Tap to Update'
+                            : 'Share My Current Location (Optional)'}
+                      </span>
+                    </button>
+                    <p className="text-[10px] text-slate-400 mt-1 m-0">Gives your stylist a precise map pin, on top of your room number above.</p>
                   </div>
                 </div>
               )}
