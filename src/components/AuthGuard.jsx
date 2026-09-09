@@ -56,7 +56,8 @@ export default function AuthGuard({ children, requiredRole = 'authenticated', fa
   }
 
   // 2. Requires Vendor/Stylist Role, but user is regular Customer
-  if (requiredRole === 'vendor' && user.role !== 'vendor') {
+  // Admins implicitly have vendor access too (matches availableViewModes in AppContext).
+  if (requiredRole === 'vendor' && user.role !== 'vendor' && user.role !== 'admin') {
     const handleQuickOnboard = async (e) => {
       e.preventDefault();
       setOnboardingLoading(true);

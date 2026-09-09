@@ -4,6 +4,11 @@ All notable changes to UniHairShop are recorded here, newest first. Versions fol
 
 Each release is tagged in git as `vX.Y.Z` — refer to that tag instead of a commit hash when talking about "which version."
 
+## [0.9.1] — 2026-09-09
+
+### Fixed
+- `AuthGuard` blocked admin accounts from opening Vendor Studio even when they had a real, pre-existing `vendor_profiles` row — the "requires vendor" gate checked `role === 'vendor'` strictly, so promoting an existing vendor to admin silently locked them out of their own vendor account. Admins now implicitly satisfy the vendor gate too, matching the `availableViewModes` rule already used for mode-switching.
+
 ## [0.9.0] — 2026-09-09
 
 Production-readiness gap-fill pass (everything except the payment pipe, tracked separately in `PRODUCTION_READINESS.md`).
