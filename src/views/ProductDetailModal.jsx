@@ -128,9 +128,15 @@ export default function ProductDetailModal() {
             <span className="text-[11px] text-slate-400 block">Unit Price (ZMW)</span>
           </div>
           <div className="flex items-center gap-1.5 text-amber-500 text-sm ml-auto bg-amber-400/10 px-3 py-1.5 rounded-xl border border-amber-400/20">
-            <Star size={16} fill="#F5A623" aria-hidden="true" />
-            <span className="font-bold">{selectedProduct.rating || 4.9}</span>
-            <span className="text-slate-400 text-xs">({selectedProduct.reviewsCount || 24} reviews)</span>
+            {(selectedProduct.rating || 0) > 0 ? (
+              <>
+                <Star size={16} fill="#F5A623" aria-hidden="true" />
+                <span className="font-bold">{Number(selectedProduct.rating).toFixed(1)}</span>
+                <span className="text-slate-400 text-xs">({selectedProduct.reviewsCount || selectedProduct.reviews_count || 0} reviews)</span>
+              </>
+            ) : (
+              <span className="text-slate-400 text-xs">No ratings yet</span>
+            )}
           </div>
         </div>
 

@@ -40,6 +40,7 @@ const ServicesView = lazyWithRetry(() => import('./views/ServicesView'));
 const BookingModal = lazyWithRetry(() => import('./views/BookingModal'));
 const ShopView = lazyWithRetry(() => import('./views/ShopView'));
 const ProductDetailModal = lazyWithRetry(() => import('./views/ProductDetailModal'));
+const ServiceDetailModal = lazyWithRetry(() => import('./views/ServiceDetailModal'));
 const CartView = lazyWithRetry(() => import('./views/CartView'));
 const AccountView = lazyWithRetry(() => import('./views/AccountView'));
 const MessagesView = lazyWithRetry(() => import('./views/MessagesView'));
@@ -256,6 +257,7 @@ export default function App() {
         <Suspense fallback={null}>
           <BookingModal />
           <ProductDetailModal />
+          <ServiceDetailModal />
         </Suspense>
       </div>
     </ErrorBoundary>

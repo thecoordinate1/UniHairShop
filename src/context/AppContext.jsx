@@ -173,6 +173,7 @@ export const AppProvider = ({ children }) => {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [bookingService, setBookingService] = useState(null);
+  const [selectedService, setSelectedService] = useState(null);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [selectedStylist, setSelectedStylist] = useState(null);
   const [showSafetyModal, setShowSafetyModal] = useState(false);
@@ -1978,6 +1979,8 @@ export const AppProvider = ({ children }) => {
     setIsCartOpen,
     bookingService,
     setBookingService,
+    selectedService,
+    setSelectedService,
     selectedProduct,
     setSelectedProduct,
     selectedStylist,
@@ -2030,7 +2033,7 @@ export const AppProvider = ({ children }) => {
     pushEnabled, pushSupported, enablePushNotifications, disablePushNotifications,
     verifyStylist, settleVendorPayout,
     services, products, bundles, staffList, bookings, orders, cart,
-    showAuthModal, isCartOpen, bookingService, selectedProduct, selectedStylist,
+    showAuthModal, isCartOpen, bookingService, selectedService, selectedProduct, selectedStylist,
     showSafetyModal, conversations, reviews, submitReview, trackEvent, activeChatStylistId,
     filterCategory, serviceTypeFilter, priceFilter, ratingFilter, availabilityFilter,
     toasts,

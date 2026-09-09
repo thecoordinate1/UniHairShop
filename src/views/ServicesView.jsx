@@ -4,7 +4,7 @@ import { useApp } from '../context/AppContext';
 import CampusTransformationFeed from '../components/CampusTransformationFeed';
 
 export default function ServicesView() {
-  const { services, setBookingService, toggleFavorite, user } = useApp();
+  const { services, setBookingService, setSelectedService, toggleFavorite, user } = useApp();
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -88,10 +88,14 @@ export default function ServicesView() {
         <div className="grid-2">
           {filteredServices.map((srv) => (
             <div key={srv.id} className="apple-card flex flex-col justify-between">
-              <div className="relative h-48 w-full bg-slate-800">
+              <div
+                className="relative h-48 w-full bg-slate-800 cursor-pointer"
+                onClick={() => setSelectedService(srv)}
+                title="Tap to view full service details"
+              >
                 <img src={srv.image} alt={srv.name} className="w-full h-full object-cover" loading="lazy" />
                 <button
-                  onClick={() => toggleFavorite(srv.id)}
+                  onClick={(e) => { e.stopPropagation(); toggleFavorite(srv.id); }}
                   className="absolute top-3 right-3 bg-black/60 backdrop-blur-md text-white p-2.5 rounded-full border border-white/10 active:scale-95 transition-all"
                   aria-label={user?.favorites?.includes(srv.id) ? `Remove ${srv.name} from favorites` : `Add ${srv.name} to favorites`}
                 >
@@ -116,7 +120,12 @@ export default function ServicesView() {
                       </span>
                     )}
                   </div>
-                  <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-1.5 tracking-tight">{srv.name}</h3>
+                  <h3
+                    onClick={() => setSelectedService(srv)}
+                    className="text-lg font-bold text-slate-900 dark:text-white mb-1.5 tracking-tight cursor-pointer hover:text-amber-500 transition-colors"
+                  >
+                    {srv.name}
+                  </h3>
                   <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 leading-relaxed">
                     {srv.description}
                   </p>
