@@ -36,6 +36,7 @@ import {
 import { useApp } from '../context/AppContext';
 import { playSuccessChime } from '../lib/soundEffects';
 import { uploadImage } from '../lib/uploadImage';
+import { lusakaUniversities, campusHostels } from '../data/mockData';
 
 export const wholesaleSupplies = [
   {
@@ -153,6 +154,8 @@ export default function VendorStudioView() {
   const [editBio, setEditBio] = useState(vendorProfile.bio || '');
   const [editPhone, setEditPhone] = useState(vendorProfile.phone || '');
   const [editAvatar, setEditAvatar] = useState(vendorProfile.avatar || '');
+  const [editCampus, setEditCampus] = useState(vendorProfile.campus || lusakaUniversities[0].name);
+  const [editDormLocation, setEditDormLocation] = useState(vendorProfile.dormLocation || vendorProfile.dorm_location || '');
   const [editIdDocument, setEditIdDocument] = useState(vendorProfile.idDocumentUrl || vendorProfile.id_document_url || '');
   const [editSpecialties, setEditSpecialties] = useState(vendorProfile.specialties || []);
   const [editSocialLinks, setEditSocialLinks] = useState(
@@ -418,6 +421,8 @@ export default function VendorStudioView() {
         bio: editBio.trim(),
         phone: editPhone.trim(),
         avatar: editAvatar || vendorProfile.avatar,
+        campus: editCampus,
+        dormLocation: editDormLocation.trim(),
         idDocumentUrl: editIdDocument || null,
         specialties: editSpecialties,
         socialLink: editSocialLinks[0] || '',
@@ -516,6 +521,8 @@ export default function VendorStudioView() {
               setEditBio(vendorProfile.bio || '');
               setEditPhone(vendorProfile.phone || '');
               setEditAvatar(vendorProfile.avatar || '');
+              setEditCampus(vendorProfile.campus || lusakaUniversities[0].name);
+              setEditDormLocation(vendorProfile.dormLocation || vendorProfile.dorm_location || '');
               setEditIdDocument(vendorProfile.idDocumentUrl || vendorProfile.id_document_url || '');
               setEditSpecialties(vendorProfile.specialties || []);
               setEditSocialLinks(
@@ -1521,6 +1528,44 @@ export default function VendorStudioView() {
                 value={editBio}
                 onChange={(e) => setEditBio(e.target.value)}
               />
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 form-group">
+              <div>
+                <label className="form-label">Campus:</label>
+                <select
+                  className="form-select text-xs"
+                  value={editCampus}
+                  onChange={(e) => setEditCampus(e.target.value)}
+                >
+                  {lusakaUniversities.map((uni) => (
+                    <option key={uni.id} value={uni.name}>{uni.shortName}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="form-label">Hostel / Studio Location:</label>
+                {campusHostels[editCampus] ? (
+                  <select
+                    className="form-select text-xs"
+                    value={editDormLocation}
+                    onChange={(e) => setEditDormLocation(e.target.value)}
+                  >
+                    <option value="">Select…</option>
+                    {campusHostels[editCampus].map((h) => (
+                      <option key={h} value={h}>{h}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    type="text"
+                    placeholder="e.g. Hostel Block C, Room 14"
+                    className="form-input text-xs"
+                    value={editDormLocation}
+                    onChange={(e) => setEditDormLocation(e.target.value)}
+                  />
+                )}
+              </div>
             </div>
 
             <div className="form-group">

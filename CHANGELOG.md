@@ -4,6 +4,14 @@ All notable changes to UniHairShop are recorded here, newest first. Versions fol
 
 Each release is tagged in git as `vX.Y.Z` — refer to that tag instead of a commit hash when talking about "which version."
 
+## [0.9.3] — 2026-09-09
+
+### Added
+- Edit Profile now lets a stylist change their Campus and Hostel/Studio Location, not just view them.
+- An "Update available" banner (with a Refresh button) appears when a new deployment lands while the app is open, and a manual "Refresh App" button in Account settings — the installed PWA has no browser reload button of its own.
+- Campus Ambassador Hub now tracks real referral earnings: a referral only becomes available for withdrawal once the friend it brought in completes an appointment, shown via a new "pending vs. available" split and an explanatory rule. Added a "Request Payout" action (WhatsApp, matching how vendor payouts are already settled manually). The personal ambassador link now points at `https://unihair.shop` instead of whatever origin the page happened to load from.
+- Redesigned the default profile-photo placeholder to match the app's dark/gold aesthetic instead of a generic gray silhouette.
+
 ## [0.9.2] — 2026-09-09
 
 ### Fixed

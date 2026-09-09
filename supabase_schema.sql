@@ -395,6 +395,28 @@ RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS
   SELECT COALESCE((SELECT is_suspended FROM public.profiles WHERE id = p_user_id), false);
 $$;
 
+-- Ambassador cash-bounty availability: a referral only becomes "available"
+-- (withdrawable) once the person it brought in has actually completed a
+-- booking -- not merely signed up. Runs as the caller (auth.uid()) only, so
+-- one student can never query another's referral earnings; SECURITY DEFINER
+-- is needed because the caller has no direct RLS access to referred
+-- strangers' bookings, only this narrow aggregate count of them.
+CREATE OR REPLACE FUNCTION public.get_ambassador_earnings()
+RETURNS TABLE(completed_referrals INT, pending_referrals INT)
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+  SELECT
+    COUNT(DISTINCT p.id) FILTER (WHERE EXISTS (
+      SELECT 1 FROM public.bookings b WHERE b.customer_id = p.id AND b.status = 'Completed'
+    ))::INT AS completed_referrals,
+    COUNT(DISTINCT p.id) FILTER (WHERE NOT EXISTS (
+      SELECT 1 FROM public.bookings b WHERE b.customer_id = p.id AND b.status = 'Completed'
+    ))::INT AS pending_referrals
+  FROM public.profiles p
+  WHERE p.referred_by = (SELECT referral_code FROM public.profiles WHERE id = auth.uid());
+$$;
+
+GRANT EXECUTE ON FUNCTION public.get_ambassador_earnings() TO authenticated;
+
 -- Fires the send-push Edge Function for one user's registered devices. Reads
 -- its target URL/auth from Postgres settings rather than a hardcoded value so
 -- nothing here needs editing once push notifications are actually deployed —

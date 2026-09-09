@@ -16,6 +16,7 @@ export function registerSW(onUpdateCallback) {
                   if (typeof onUpdateCallback === 'function') {
                     onUpdateCallback();
                   }
+                  window.dispatchEvent(new CustomEvent('unihair:update-available'));
                 }
               });
             }

@@ -1206,6 +1206,10 @@ export const AppProvider = ({ children }) => {
         dbPayload.id_document_url = dbPayload.idDocumentUrl;
         delete dbPayload.idDocumentUrl;
       }
+      if ('dormLocation' in dbPayload) {
+        dbPayload.dorm_location = dbPayload.dormLocation;
+        delete dbPayload.dormLocation;
+      }
       if ('payoutAccounts' in dbPayload) {
         dbPayload.payout_accounts = dbPayload.payoutAccounts;
         delete dbPayload.payoutAccounts;

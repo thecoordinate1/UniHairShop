@@ -1116,6 +1116,18 @@ export default function AccountView() {
         </div>
       )}
 
+      {/* Manual App Refresh — useful on the installed PWA, which has no browser reload button */}
+      <div className="flex items-center justify-center pt-1">
+        <button
+          type="button"
+          onClick={() => window.location.reload()}
+          className="text-[11px] text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 bg-transparent border-0 cursor-pointer p-0 flex items-center gap-1.5"
+        >
+          <RefreshCw size={12} />
+          <span>Refresh App</span>
+        </button>
+      </div>
+
       {/* Legal Footer Links */}
       <div className="flex items-center justify-center gap-3 text-[11px] text-slate-400 pt-2">
         <button onClick={() => setActiveTab('legal')} className="bg-transparent border-0 cursor-pointer p-0 hover:text-slate-600 dark:hover:text-slate-200 underline">

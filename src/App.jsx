@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useEffect } from 'react';
+import React, { Suspense, lazy, useEffect, useState } from 'react';
 import { Scissors } from 'lucide-react';
 import { useApp } from './context/AppContext';
 import Header from './components/Header';
@@ -80,10 +80,21 @@ export default function App() {
     addToast
   } = useApp();
 
+  const [updateAvailable, setUpdateAvailable] = useState(false);
+
   // Scroll to top on tab change
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [activeTab, userMode]);
+
+  // A new service worker has installed (new deployment) — the running app is
+  // still the old JS bundle in memory, so prompt a reload instead of leaving
+  // installed/PWA users silently stuck on a stale version indefinitely.
+  useEffect(() => {
+    const handleUpdate = () => setUpdateAvailable(true);
+    window.addEventListener('unihair:update-available', handleUpdate);
+    return () => window.removeEventListener('unihair:update-available', handleUpdate);
+  }, []);
 
   // Deep-link for a notification click (?tab=messages, ?tab=account, ?tab=vendor)
   useEffect(() => {
@@ -245,6 +256,20 @@ export default function App() {
 
       <div className="app-container">
         <Header />
+
+        {/* New Version Available Banner */}
+        {updateAvailable && (
+          <div className="bg-gradient-to-r from-emerald-500/15 via-emerald-400/10 to-emerald-500/15 border-b border-emerald-400/20 px-3 sm:px-4 py-2 text-center text-xs text-emerald-600 dark:text-emerald-300 flex flex-wrap items-center justify-center gap-1.5 sm:gap-2 shadow-sm backdrop-blur-md">
+            <span>✨ A new version of UniHairShop is available.</span>
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="font-bold underline text-emerald-600 dark:text-emerald-300 hover:text-emerald-500 dark:hover:text-emerald-100 bg-transparent border-0 cursor-pointer p-0"
+            >
+              Refresh Now
+            </button>
+          </div>
+        )}
 
         {/* Guest Mode Indicator Banner */}
         {isGuestMode && !user?.isLoggedIn && (

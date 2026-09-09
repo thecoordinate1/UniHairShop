@@ -1,25 +1,50 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Award, Users, DollarSign, Share2, Copy, Check, TrendingUp, Trophy, ShieldCheck, Sparkles, MessageSquare } from 'lucide-react';
+import { X, Award, Users, DollarSign, Share2, Copy, Check, TrendingUp, Trophy, ShieldCheck, Sparkles, MessageSquare, Info } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { supabase, isSupabaseConfigured } from '../lib/supabaseClient';
 
 export default function AmbassadorHubModal({ isOpen, onClose }) {
   const { user, addToast } = useApp();
 
   const [copiedLink, setCopiedLink] = useState(false);
+  const [completedReferrals, setCompletedReferrals] = useState(0);
+  const [pendingReferrals, setPendingReferrals] = useState(0);
+  const [loadingEarnings, setLoadingEarnings] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen || !isSupabaseConfigured || !supabase || !user?.isLoggedIn) return;
+    setLoadingEarnings(true);
+    supabase
+      .rpc('get_ambassador_earnings')
+      .then(({ data }) => {
+        const row = Array.isArray(data) ? data[0] : data;
+        setCompletedReferrals(row?.completed_referrals || 0);
+        setPendingReferrals(row?.pending_referrals || 0);
+      })
+      .finally(() => setLoadingEarnings(false));
+  }, [isOpen, user?.isLoggedIn]);
 
   if (!isOpen) return null;
 
   const referralCode = user?.referralCode || 'STUDENT15';
-  const ambassadorLink = `${window.location.origin}/?ref=${referralCode}`;
+  const ambassadorLink = `https://unihair.shop/?ref=${referralCode}`;
 
-  // Real referral count from the user's profile (signup referral bonuses are
-  // already live via the DB trigger). The K10-per-booking cash bounty and
-  // leaderboard prize described below aren't backed by any tracking yet —
-  // see the "Coming Soon" notice on the payout form.
+  // A referral only pays out once the friend it brought in has actually
+  // completed a booking, not merely signed up — see get_ambassador_earnings()
+  // in the schema. totalReferrals (signups) still drives the leaderboard
+  // count shown below; earnings are the completed/pending split.
   const totalReferrals = user?.referralCount || 0;
-  const earnedBounty = totalReferrals * 10;
-  const availableBounty = 0;
+  const availableBounty = completedReferrals * 10;
+  const pendingBounty = pendingReferrals * 10;
+  const earnedBounty = availableBounty + pendingBounty;
+
+  const handleRequestPayout = () => {
+    const text = encodeURIComponent(
+      `Hi, I'd like to withdraw my Campus Ambassador earnings (K${availableBounty} available). My referral code is ${referralCode}.`
+    );
+    window.open(`https://wa.me/260772822579?text=${text}`, '_blank');
+  };
 
   const leaderboard = [
     { rank: 1, name: 'You (' + (user?.name || 'Student') + ')', campus: user?.campus || '', hostel: user?.hostel || '', count: totalReferrals, earnings: `K ${earnedBounty}`, isMe: true }
@@ -80,8 +105,17 @@ export default function AmbassadorHubModal({ isOpen, onClose }) {
 
           <div className="p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-center">
             <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold uppercase block">Available</span>
-            <span className="text-lg font-extrabold text-emerald-600 dark:text-emerald-400">K {availableBounty}</span>
+            <span className="text-lg font-extrabold text-emerald-600 dark:text-emerald-400">{loadingEarnings ? '…' : `K ${availableBounty}`}</span>
           </div>
+        </div>
+
+        {/* Availability Rule */}
+        <div className="flex items-start gap-2 p-3 rounded-2xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/5 dark:border-white/10 mb-5">
+          <Info size={14} className="text-amber-500 shrink-0 mt-0.5" />
+          <p className="text-[11px] text-slate-500 dark:text-slate-400 m-0 leading-relaxed">
+            Earnings become <strong>available for withdrawal</strong> once your referred friend completes an appointment — signing up alone keeps a referral pending.
+            {pendingReferrals > 0 && ` You have ${pendingReferrals} referral${pendingReferrals === 1 ? '' : 's'} still pending their first completed appointment.`}
+          </p>
         </div>
 
         {/* Shareable Link Box */}
@@ -109,14 +143,22 @@ export default function AmbassadorHubModal({ isOpen, onClose }) {
           </button>
         </div>
 
-        {/* Cash Payout — not yet live */}
+        {/* Cash Payout Request */}
         <div className="card p-4 border border-amber-400/25 bg-amber-400/5 mb-5">
           <h3 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider mb-1">
-            Cash Payouts — Coming Soon
+            Request Your Payout
           </h3>
-          <p className="text-xs text-slate-500 dark:text-slate-400 m-0">
-            Direct MoMo cash payouts for referral bookings aren't live yet. Your referral link and code above already work — friends who sign up with it earn you real loyalty points today.
+          <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
+            Payouts are settled manually via mobile money — message us with your available balance and we'll send it over.
           </p>
+          <button
+            onClick={handleRequestPayout}
+            disabled={availableBounty <= 0}
+            className="apple-btn-primary w-full text-xs py-2.5 flex items-center justify-center gap-2 disabled:opacity-40"
+          >
+            <DollarSign size={14} />
+            <span>{availableBounty > 0 ? `Request K${availableBounty} Payout` : 'No Balance Available Yet'}</span>
+          </button>
         </div>
 
         {/* Your Referral Stats */}
