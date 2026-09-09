@@ -167,17 +167,23 @@ export default function StylistProfileModal() {
             <div className="flex items-center gap-2 mt-0.5 mb-2">
               <span className="text-xs text-amber-500 font-semibold">{selectedStylist.role}</span>
               <span className="text-[11px] font-mono text-slate-400">@{bioHandle}</span>
-              {(selectedStylist.socialLink || selectedStylist.social_link) && (
-                <a
-                  href={selectedStylist.socialLink || selectedStylist.social_link}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-[11px] text-[#007AFF] font-semibold"
-                >
-                  <Link2 size={12} />
-                  <span>Social</span>
-                </a>
-              )}
+              {(() => {
+                const links = (selectedStylist.socialLinks?.length ? selectedStylist.socialLinks : selectedStylist.social_links) || [];
+                const legacy = selectedStylist.socialLink || selectedStylist.social_link;
+                const allLinks = links.length > 0 ? links : (legacy ? [legacy] : []);
+                return allLinks.map((link, i) => (
+                  <a
+                    key={link + i}
+                    href={link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-[11px] text-[#007AFF] font-semibold"
+                  >
+                    <Link2 size={12} />
+                    <span>{allLinks.length > 1 ? `Social ${i + 1}` : 'Social'}</span>
+                  </a>
+                ));
+              })()}
               {user?.isLoggedIn && user?.id !== selectedStylist.id && (
                 <button
                   type="button"

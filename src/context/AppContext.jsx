@@ -175,7 +175,8 @@ export const AppProvider = ({ children }) => {
     idDocumentUrl: null,
     specialties: [],
     payoutAccounts: [],
-    socialLink: ''
+    socialLink: '',
+    socialLinks: []
   }));
 
   const [vendorWallet, setVendorWallet] = useState(() => safeGetItem('unihair_vendor_wallet', {
@@ -296,7 +297,7 @@ export const AppProvider = ({ children }) => {
         try {
           const { data: vendorData } = await supabase
             .from('vendor_profiles')
-            .select('id, name, is_verified, role, dorm_location, avatar, phone, bio, specialties, payout_accounts, social_link')
+            .select('id, name, is_verified, role, dorm_location, avatar, phone, bio, specialties, payout_accounts, social_link, social_links')
             .eq('id', user.id)
             .maybeSingle();
           if (vendorData) {
@@ -312,7 +313,8 @@ export const AppProvider = ({ children }) => {
               bio: vendorData.bio || prev.bio,
               specialties: vendorData.specialties || prev.specialties,
               payoutAccounts: vendorData.payout_accounts || prev.payoutAccounts,
-              socialLink: vendorData.social_link || prev.socialLink
+              socialLink: vendorData.social_link || prev.socialLink,
+              socialLinks: vendorData.social_links?.length ? vendorData.social_links : (vendorData.social_link ? [vendorData.social_link] : prev.socialLinks)
             }));
           } else {
             setVendorProfile((prev) => ({
@@ -377,7 +379,8 @@ export const AppProvider = ({ children }) => {
             bio: vendorData.bio || prev.bio,
             specialties: vendorData.specialties || prev.specialties,
             payoutAccounts: vendorData.payout_accounts || prev.payoutAccounts,
-            socialLink: vendorData.social_link || prev.socialLink
+            socialLink: vendorData.social_link || prev.socialLink,
+            socialLinks: vendorData.social_links?.length ? vendorData.social_links : (vendorData.social_link ? [vendorData.social_link] : prev.socialLinks)
           }));
         }
       } catch (err) {
@@ -1211,6 +1214,10 @@ export const AppProvider = ({ children }) => {
         dbPayload.social_link = dbPayload.socialLink;
         delete dbPayload.socialLink;
       }
+      if ('socialLinks' in dbPayload) {
+        dbPayload.social_links = dbPayload.socialLinks;
+        delete dbPayload.socialLinks;
+      }
       supabase.from('vendor_profiles').upsert([dbPayload]).then(null, () => {});
     }
     addToast('Vendor Studio profile updated!', 'success');
@@ -1956,6 +1963,12 @@ export const AppProvider = ({ children }) => {
   }, [user.id, addToast]);
 
   const onboardAsStylist = useCallback(async (stylistData) => {
+    // Admins already have vendor access via the role switcher (switchViewMode)
+    // and must never be downgraded to plain 'vendor' by this onboarding flow.
+    if (user.role === 'admin') {
+      addToast('You already have admin access to Vendor Studio — use the role switcher in the header instead.', 'info');
+      return;
+    }
     setUser((prev) => ({ ...prev, role: 'vendor' }));
     // Not verified yet — an admin has to review this stylist (and, ideally, an
     // ID document) before the "Verified" badge is real. The DB trigger already
@@ -1978,7 +1991,8 @@ export const AppProvider = ({ children }) => {
       payoutNumber: stylistData.phone || user.phone,
       specialties: stylistData.specialty ? [stylistData.specialty] : [],
       payoutAccounts: [],
-      socialLink: ''
+      socialLink: '',
+      socialLinks: []
     };
 
     setVendorProfile(newVendor);

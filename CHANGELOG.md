@@ -4,6 +4,15 @@ All notable changes to UniHairShop are recorded here, newest first. Versions fol
 
 Each release is tagged in git as `vX.Y.Z` — refer to that tag instead of a commit hash when talking about "which version."
 
+## [0.9.2] — 2026-09-09
+
+### Fixed
+- Vendor Studio's four modals (Edit Profile, Add Service, Add Product, Upload Portfolio) were rendered inline inside the view instead of portaled to `document.body`, and never locked body scroll. This let the page behind them keep scrolling while the modal looked frozen, and — because `.main-content` carries its own `z-10` stacking context — pinned every modal's Save/Cancel buttons visually underneath the floating bottom-nav pill, making them unclickable once scrolled to the bottom. All four now portal to `document.body` (matching every other modal in the app) and lock body scroll while open.
+- Hardened `onboardAsStylist` so it can never downgrade an admin account to `role: 'vendor'` — it now refuses and points the admin at the existing role switcher instead. This is what actually caused "admin privileges revoked when switching to Vendor Studio": the pre-`v0.9.1` `AuthGuard` bug showed admins the stylist self-onboarding wall instead of their real Vendor Studio, and submitting that form silently demoted them in the database.
+
+### Added
+- Vendor Studio's "Social Media Link" field now supports adding multiple links (Instagram, TikTok, etc.), stored in a new `vendor_profiles.social_links` column; the public stylist profile shows all of them. The old single `social_link` column and field are still read for backward compatibility.
+
 ## [0.9.1] — 2026-09-09
 
 ### Fixed

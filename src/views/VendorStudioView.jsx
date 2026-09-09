@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Sparkles,
   DollarSign,
@@ -154,7 +155,14 @@ export default function VendorStudioView() {
   const [editAvatar, setEditAvatar] = useState(vendorProfile.avatar || '');
   const [editIdDocument, setEditIdDocument] = useState(vendorProfile.idDocumentUrl || vendorProfile.id_document_url || '');
   const [editSpecialties, setEditSpecialties] = useState(vendorProfile.specialties || []);
-  const [editSocialLink, setEditSocialLink] = useState(vendorProfile.socialLink || vendorProfile.social_link || '');
+  const [editSocialLinks, setEditSocialLinks] = useState(
+    vendorProfile.socialLinks?.length
+      ? vendorProfile.socialLinks
+      : (vendorProfile.social_links?.length
+        ? vendorProfile.social_links
+        : ((vendorProfile.socialLink || vendorProfile.social_link) ? [vendorProfile.socialLink || vendorProfile.social_link] : []))
+  );
+  const [newSocialLinkInput, setNewSocialLinkInput] = useState('');
   const [editPayoutAccounts, setEditPayoutAccounts] = useState(vendorProfile.payoutAccounts || vendorProfile.payout_accounts || []);
   const [newAccountProvider, setNewAccountProvider] = useState('Airtel Money');
   const [newAccountNumber, setNewAccountNumber] = useState('');
@@ -186,6 +194,20 @@ export default function VendorStudioView() {
     setEditPayoutAccounts((prev) => prev.filter((a) => a.id !== id));
   };
 
+  const handleAddSocialLink = () => {
+    const trimmed = newSocialLinkInput.trim();
+    if (!trimmed) {
+      addToast('Enter a link first', 'error');
+      return;
+    }
+    setEditSocialLinks((prev) => [...prev, trimmed]);
+    setNewSocialLinkInput('');
+  };
+
+  const handleRemoveSocialLink = (index) => {
+    setEditSocialLinks((prev) => prev.filter((_, i) => i !== index));
+  };
+
   // My Shop (Vendor Product Listings) State
   const [showAddProductModal, setShowAddProductModal] = useState(false);
   const [newPrdName, setNewPrdName] = useState('');
@@ -195,6 +217,30 @@ export default function VendorStudioView() {
   const [newPrdDesc, setNewPrdDesc] = useState('');
   const [newPrdImage, setNewPrdImage] = useState(null);
   const [uploadingProductPhoto, setUploadingProductPhoto] = useState(false);
+
+  // Lock body scroll while any of this view's modals are open, and close on Escape.
+  // Without this, these modals (rendered inline in the view rather than via the
+  // shared portal-based ones) let the page behind them keep scrolling underneath.
+  const anyModalOpen = showAddServiceModal || showPortfolioModal || showEditProfileModal || showAddProductModal;
+  useEffect(() => {
+    if (!anyModalOpen) return;
+
+    document.body.classList.add('modal-open');
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        setShowAddServiceModal(false);
+        setShowPortfolioModal(false);
+        setShowEditProfileModal(false);
+        setShowAddProductModal(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.body.classList.remove('modal-open');
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [anyModalOpen]);
 
   // Payout Form State — prefer the first saved mobile money account, if any
   const savedPayoutAccounts = vendorProfile.payoutAccounts || vendorProfile.payout_accounts || [];
@@ -374,7 +420,8 @@ export default function VendorStudioView() {
         avatar: editAvatar || vendorProfile.avatar,
         idDocumentUrl: editIdDocument || null,
         specialties: editSpecialties,
-        socialLink: editSocialLink.trim(),
+        socialLink: editSocialLinks[0] || '',
+        socialLinks: editSocialLinks,
         payoutAccounts: editPayoutAccounts
       });
       setShowEditProfileModal(false);
@@ -471,7 +518,14 @@ export default function VendorStudioView() {
               setEditAvatar(vendorProfile.avatar || '');
               setEditIdDocument(vendorProfile.idDocumentUrl || vendorProfile.id_document_url || '');
               setEditSpecialties(vendorProfile.specialties || []);
-              setEditSocialLink(vendorProfile.socialLink || vendorProfile.social_link || '');
+              setEditSocialLinks(
+                vendorProfile.socialLinks?.length
+                  ? vendorProfile.socialLinks
+                  : (vendorProfile.social_links?.length
+                    ? vendorProfile.social_links
+                    : ((vendorProfile.socialLink || vendorProfile.social_link) ? [vendorProfile.socialLink || vendorProfile.social_link] : []))
+              );
+              setNewSocialLinkInput('');
               setEditPayoutAccounts(vendorProfile.payoutAccounts || vendorProfile.payout_accounts || []);
               setShowEditProfileModal(true);
             }}
@@ -1251,7 +1305,7 @@ export default function VendorStudioView() {
       )}
 
       {/* CREATE SERVICE MODAL */}
-      {showAddServiceModal && (
+      {showAddServiceModal && createPortal(
         <div className="modal-overlay" onClick={() => setShowAddServiceModal(false)}>
           <div className="modal-card max-w-md" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-3">Add New Campus Hairstyle / Service</h3>
@@ -1342,11 +1396,12 @@ export default function VendorStudioView() {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* UPLOAD PORTFOLIO MODAL */}
-      {showPortfolioModal && (
+      {showPortfolioModal && createPortal(
         <div className="modal-overlay" onClick={() => setShowPortfolioModal(false)}>
           <div className="modal-card max-w-md" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-3">Add Hairstyle Transformation</h3>
@@ -1406,11 +1461,12 @@ export default function VendorStudioView() {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* EDIT PROFILE MODAL */}
-      {showEditProfileModal && (
+      {showEditProfileModal && createPortal(
         <div className="modal-overlay" onClick={() => setShowEditProfileModal(false)}>
           <div className="modal-card max-w-md" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-3">Edit My Stylist Profile</h3>
@@ -1488,14 +1544,35 @@ export default function VendorStudioView() {
             </div>
 
             <div className="form-group">
-              <label className="form-label">Social Media Link (Instagram, TikTok, etc.):</label>
-              <input
-                type="url"
-                placeholder="https://instagram.com/yourhandle"
-                className="form-input text-xs"
-                value={editSocialLink}
-                onChange={(e) => setEditSocialLink(e.target.value)}
-              />
+              <label className="form-label">Social Media Links (Instagram, TikTok, etc.):</label>
+              {editSocialLinks.length > 0 && (
+                <div className="flex flex-col gap-1.5 mb-2">
+                  {editSocialLinks.map((link, i) => (
+                    <div key={link + i} className="flex items-center justify-between gap-2 bg-black/[0.02] dark:bg-white/[0.03] px-3 py-2 rounded-xl border border-black/5 dark:border-white/5 text-xs">
+                      <span className="font-semibold text-slate-700 dark:text-slate-200 truncate">{link}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveSocialLink(i)}
+                        className="text-red-500 hover:text-red-600 bg-transparent border-0 cursor-pointer text-[11px] font-semibold shrink-0"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="flex gap-2">
+                <input
+                  type="url"
+                  placeholder="https://instagram.com/yourhandle"
+                  className="form-input text-xs flex-1"
+                  value={newSocialLinkInput}
+                  onChange={(e) => setNewSocialLinkInput(e.target.value)}
+                />
+                <button type="button" className="apple-btn-secondary text-xs px-3" onClick={handleAddSocialLink}>
+                  Add
+                </button>
+              </div>
             </div>
 
             <div className="form-group">
@@ -1585,11 +1662,12 @@ export default function VendorStudioView() {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* ADD PRODUCT MODAL */}
-      {showAddProductModal && (
+      {showAddProductModal && createPortal(
         <div className="modal-overlay" onClick={() => setShowAddProductModal(false)}>
           <div className="modal-card max-w-md" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-3">Add Product to My Shop</h3>
@@ -1680,7 +1758,8 @@ export default function VendorStudioView() {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
