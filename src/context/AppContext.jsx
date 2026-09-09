@@ -1259,7 +1259,6 @@ export const AppProvider = ({ children }) => {
 
   // Vendor Specific Actions
   const updateVendorProfile = useCallback(async (profileData) => {
-    setVendorProfile((prev) => ({ ...prev, ...profileData }));
     if (isSupabaseConfigured && supabase) {
       const dbPayload = { id: vendorProfile.id, ...profileData };
       if ('idDocumentUrl' in dbPayload) {
@@ -1282,8 +1281,13 @@ export const AppProvider = ({ children }) => {
         dbPayload.social_links = dbPayload.socialLinks;
         delete dbPayload.socialLinks;
       }
-      supabase.from('vendor_profiles').upsert([dbPayload]).then(null, () => {});
+      const { error } = await supabase.from('vendor_profiles').upsert([dbPayload]);
+      if (error) {
+        addToast(error.message || 'Could not save your profile. Please try again.', 'error');
+        return;
+      }
     }
+    setVendorProfile((prev) => ({ ...prev, ...profileData }));
     addToast('Vendor Studio profile updated!', 'success');
   }, [vendorProfile.id, addToast]);
 

@@ -20,7 +20,7 @@ import {
   ShieldAlert,
   Star
 } from 'lucide-react';
-import { useApp, DEFAULT_AVATAR } from '../context/AppContext';
+import { useApp, DEFAULT_AVATAR, getAvatarHaloClass } from '../context/AppContext';
 
 export default function BookingDetailModal({ booking, onClose, onReschedule, onCancel }) {
   const { exportToCalendar, staffList, claimNoShowRefund, claimClientNoShow, userMode, reviews, submitReview } = useApp();
@@ -123,7 +123,7 @@ export default function BookingDetailModal({ booking, onClose, onReschedule, onC
                 <img
                   src={stylist.avatar || DEFAULT_AVATAR}
                   alt={stylist.name}
-                  className="w-12 h-12 rounded-2xl object-cover border border-black/10 dark:border-white/10 shrink-0"
+                  className={`w-12 h-12 rounded-2xl object-cover border border-black/10 dark:border-white/10 shrink-0 ${getAvatarHaloClass(stylist.gender)}`}
                 />
                 <div>
                   <h4 className="text-sm font-bold text-slate-900 dark:text-white m-0">{stylist.name}</h4>

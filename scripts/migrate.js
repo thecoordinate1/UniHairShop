@@ -52,6 +52,22 @@ async function runMigration() {
     }
 
     console.log(`✅ Automated SQL migration executed successfully on Supabase!`);
+
+    // Raw SQL run through the Management API doesn't trigger Supabase's usual
+    // "reload schema" notification the dashboard/CLI sends after a migration.
+    // Without this, PostgREST keeps serving its stale cached schema, so any
+    // newly-added column is silently rejected on every write/select made
+    // through the client SDK -- with no visible error, since most call sites
+    // here swallow write failures. Always reload after applying this file.
+    await fetch(`https://api.supabase.com/v1/projects/${projectRef}/database/query`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ query: "NOTIFY pgrst, 'reload schema';" })
+    });
+    console.log('🔄 Told PostgREST to reload its schema cache.');
   } catch (err) {
     console.error('❌ Network error during migration:', err);
   }

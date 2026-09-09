@@ -4,6 +4,15 @@ All notable changes to UniHairShop are recorded here, newest first. Versions fol
 
 Each release is tagged in git as `vX.Y.Z` — refer to that tag instead of a commit hash when talking about "which version."
 
+## [0.10.2] — 2026-09-10
+
+### Fixed
+- **Root cause of gender/halo (and every other recently-added column) silently not saving**: schema changes applied via the Management API's raw SQL endpoint don't trigger Supabase's usual "reload schema" notification, so PostgREST kept serving its stale cached schema and rejected writes touching any newly-added column — with no visible error, since the write path swallowed it. Manually reloaded the schema cache in production and made `db:migrate` always do this automatically from now on. Also stopped `updateVendorProfile` from swallowing write errors, so a genuine save failure surfaces a real error instead of a false "success" toast.
+- The gender halo now also shows on the customer-facing stylist discovery cards (Home) and booking details, not just the stylist's own profile view.
+
+### Changed
+- Moved "Take a Tour" out of Account's crowded action-button row into its own prominent banner card, right under the profile header.
+
 ## [0.10.1] — 2026-09-10
 
 ### Added

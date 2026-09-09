@@ -209,15 +209,6 @@ export default function AccountView() {
           {user.isLoggedIn ? (
             <>
               <button
-                onClick={() => setShowTutorial(true)}
-                className="apple-btn-secondary text-xs px-3 py-1.5 flex items-center gap-1 text-slate-200"
-                title="Take a guided tour of the app"
-              >
-                <Sparkles size={13} />
-                <span>Take a Tour</span>
-              </button>
-
-              <button
                 onClick={() => {
                   setEditName(user.name);
                   setEditPhone(user.phone);
@@ -274,6 +265,24 @@ export default function AccountView() {
           </button>
         </div>
       </div>
+
+      {/* Guided App Tour — kept as its own prominent banner, not buried among other action buttons */}
+      {user.isLoggedIn && (
+        <button
+          type="button"
+          onClick={() => setShowTutorial(true)}
+          className="card p-4 bg-gradient-to-r from-amber-500/15 via-amber-400/10 to-transparent border border-amber-400/30 flex items-center gap-3.5 text-left cursor-pointer w-full"
+        >
+          <div className="bg-amber-400 text-slate-950 w-11 h-11 rounded-2xl flex items-center justify-center shadow-md shrink-0">
+            <Sparkles size={20} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h3 className="text-sm font-bold text-slate-900 dark:text-white m-0">New here? Take a Tour</h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 m-0 mt-0.5">A 1-minute guided walkthrough of every part of the app</p>
+          </div>
+          <ArrowRight size={16} className="text-amber-500 shrink-0" />
+        </button>
+      )}
 
       {/* EDIT PROFILE MODAL */}
       {showEditModal && (

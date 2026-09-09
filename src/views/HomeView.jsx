@@ -20,7 +20,7 @@ import {
   Zap,
   Tag
 } from 'lucide-react';
-import { useApp, DEFAULT_AVATAR } from '../context/AppContext';
+import { useApp, DEFAULT_AVATAR, getAvatarHaloClass } from '../context/AppContext';
 import CampusTransformationFeed from '../components/CampusTransformationFeed';
 
 export default function HomeView() {
@@ -228,7 +228,7 @@ export default function HomeView() {
                 className="apple-card p-4 flex flex-col justify-between cursor-pointer group"
               >
                 <div>
-                  <div className="relative h-44 w-full rounded-2xl overflow-hidden mb-3 bg-slate-800">
+                  <div className={`relative h-44 w-full rounded-2xl overflow-hidden mb-3 bg-slate-800 ${getAvatarHaloClass(stylist.gender)}`}>
                     <img src={stylist.avatar || DEFAULT_AVATAR} alt={stylist.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" />
                     <span className="badge badge-verified absolute top-2.5 left-2.5 text-[10px]">
                       <ShieldCheck size={11} />
