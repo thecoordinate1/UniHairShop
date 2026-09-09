@@ -47,30 +47,50 @@ export default function MessagesView() {
   const [copiedCode, setCopiedCode] = useState(false);
   const messagesEndRef = useRef(null);
 
-  // 1. Resolve Active Conversation with strict isolation per stylist
+  // Which id identifies "the other party" flips depending on which side of
+  // the conversation the current viewer is on: a vendor's threads all share
+  // the same stylistId (their own), so the customerId is what actually
+  // distinguishes one client thread from another.
+  const getPartnerId = (conv) => (userMode === 'vendor' ? conv.customerId : conv.stylistId);
+  const getPartnerName = (conv) => (userMode === 'vendor' ? (conv.customerName || 'Campus Client') : conv.stylistName);
+
+  // 1. Resolve Active Conversation with strict isolation per conversation partner
   let activeConversation = null;
   let stylistObj = null;
 
+  // Only this account's own conversations for the role it's currently
+  // viewing as — otherwise a vendor who has also shopped as a customer
+  // elsewhere would see both mixed into one list.
+  const myConversations = conversations.filter((c) =>
+    userMode === 'vendor' ? c.stylistId === user.id : (!c.customerId || c.customerId === user.id)
+  );
+
   if (activeChatStylistId) {
-    const existing = conversations.find((c) => c.stylistId === activeChatStylistId);
-    stylistObj = staffList.find((s) => s.id === activeChatStylistId);
+    const existing = myConversations.find((c) => getPartnerId(c) === activeChatStylistId);
     if (existing) {
       activeConversation = existing;
-    } else if (stylistObj) {
-      activeConversation = {
-        id: `conv-${stylistObj.id}`,
-        stylistId: stylistObj.id,
-        stylistName: stylistObj.name,
-        stylistRole: stylistObj.role || 'Campus Stylist',
-        avatar: stylistObj.avatar || DEFAULT_AVATAR,
-        lastMessage: 'Start a conversation...',
-        lastTimestamp: 'New',
-        unreadCount: 0,
-        messages: []
-      };
+    } else if (userMode !== 'vendor') {
+      stylistObj = staffList.find((s) => s.id === activeChatStylistId);
+      if (stylistObj) {
+        activeConversation = {
+          id: `conv-${user.id}-${stylistObj.id}`,
+          stylistId: stylistObj.id,
+          customerId: user.id,
+          stylistName: stylistObj.name,
+          stylistRole: stylistObj.role || 'Campus Stylist',
+          avatar: stylistObj.avatar || DEFAULT_AVATAR,
+          lastMessage: 'Start a conversation...',
+          lastTimestamp: 'New',
+          unreadCount: 0,
+          messages: []
+        };
+      }
     }
-  } else if (conversations.length > 0) {
-    activeConversation = conversations[0];
+  } else if (myConversations.length > 0) {
+    activeConversation = myConversations[0];
+  }
+
+  if (activeConversation && userMode !== 'vendor') {
     stylistObj = staffList.find((s) => s.id === activeConversation.stylistId) || {
       id: activeConversation.stylistId,
       name: activeConversation.stylistName,
@@ -83,23 +103,25 @@ export default function MessagesView() {
   }
 
   // 2. Build list of display conversations for sidebar (only active/selected chats)
-  const displayConversations = [...conversations];
+  const displayConversations = [...myConversations];
   if (
     activeConversation &&
-    !displayConversations.some((c) => c.stylistId === activeConversation.stylistId)
+    !displayConversations.some((c) => getPartnerId(c) === getPartnerId(activeConversation))
   ) {
     displayConversations.unshift(activeConversation);
   }
 
   const filteredConversations = displayConversations.filter((c) =>
-    (c.stylistName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    getPartnerName(c).toLowerCase().includes(searchTerm.toLowerCase()) ||
     (c.lastMessage || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // Generate deterministic Chat-Specific Safety Verification Code
+  // Generate deterministic Chat-Specific Safety Verification Code — keyed off
+  // the conversation partner, not the stylist alone, so a vendor's many
+  // different client threads each get a distinct code.
   const chatSafetyCode = activeConversation
-    ? `SEC-${(activeConversation.stylistId || 'STF').replace(/[^a-zA-Z0-9]/g, '').slice(-3).toUpperCase()}-${Math.abs(
-        (activeConversation.stylistName || 'UNI').split('').reduce((acc, char) => acc + char.charCodeAt(0), 100) % 9000 + 1000
+    ? `SEC-${(getPartnerId(activeConversation) || 'STF').replace(/[^a-zA-Z0-9]/g, '').slice(-3).toUpperCase()}-${Math.abs(
+        (getPartnerName(activeConversation) || 'UNI').split('').reduce((acc, char) => acc + char.charCodeAt(0), 100) % 9000 + 1000
       )}`
     : 'SEC-CAMPUS-01';
 
@@ -110,13 +132,13 @@ export default function MessagesView() {
   const handleSend = (e) => {
     e?.preventDefault();
     if (!inputMessage.trim() || !activeConversation) return;
-    sendMessage(activeConversation.stylistId, inputMessage.trim());
+    sendMessage(getPartnerId(activeConversation), inputMessage.trim());
     setInputMessage('');
   };
 
   const handleQuickReply = (text) => {
     if (!activeConversation) return;
-    sendMessage(activeConversation.stylistId, text);
+    sendMessage(getPartnerId(activeConversation), text);
   };
 
   const handleCopyCode = () => {
@@ -196,11 +218,12 @@ export default function MessagesView() {
               </div>
             ) : (
               filteredConversations.map((conv) => {
-                const isSelected = activeConversation && conv.stylistId === activeConversation.stylistId;
+                const partnerId = getPartnerId(conv);
+                const isSelected = activeConversation && partnerId === getPartnerId(activeConversation);
                 return (
                   <div
-                    key={conv.stylistId}
-                    onClick={() => setActiveChatStylistId(conv.stylistId)}
+                    key={conv.id || partnerId}
+                    onClick={() => setActiveChatStylistId(partnerId)}
                     className={`p-3 rounded-2xl cursor-pointer transition-all flex items-center gap-3 shrink-0 md:shrink w-64 md:w-full border ${
                       isSelected
                         ? 'bg-amber-400/20 border-amber-400/50 text-slate-900 dark:text-white shadow-sm'
@@ -208,7 +231,7 @@ export default function MessagesView() {
                     }`}
                   >
                     <div className="relative shrink-0">
-                      <img src={conv.avatar} alt={conv.stylistName} className="w-11 h-11 rounded-2xl object-cover" />
+                      <img src={userMode === 'vendor' ? DEFAULT_AVATAR : conv.avatar} alt={getPartnerName(conv)} className="w-11 h-11 rounded-2xl object-cover" />
                       {conv.unreadCount > 0 && (
                         <span className="absolute -top-1 -right-1 bg-amber-500 text-slate-950 text-[10px] w-4 h-4 rounded-full flex items-center justify-center font-extrabold">
                           {conv.unreadCount}
@@ -218,7 +241,7 @@ export default function MessagesView() {
 
                     <div className="min-w-0 flex-1">
                       <div className="flex justify-between items-center mb-0.5">
-                        <h4 className="text-xs font-bold text-slate-900 dark:text-white truncate m-0">{conv.stylistName}</h4>
+                        <h4 className="text-xs font-bold text-slate-900 dark:text-white truncate m-0">{getPartnerName(conv)}</h4>
                         <span className="text-[10px] text-slate-400 shrink-0">{conv.lastTimestamp}</span>
                       </div>
                       <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate m-0">{conv.lastMessage}</p>
@@ -261,23 +284,23 @@ export default function MessagesView() {
               <div className="p-3 sm:p-3.5 border-b border-black/10 dark:border-white/10 flex items-center justify-between gap-3 bg-black/[0.01] dark:bg-white/[0.01]">
                 <div
                   className="flex items-center gap-3 cursor-pointer"
-                  onClick={() => stylistObj && setSelectedStylist(stylistObj)}
-                  title="View Profile Details"
+                  onClick={() => userMode !== 'vendor' && stylistObj && setSelectedStylist(stylistObj)}
+                  title={userMode === 'vendor' ? undefined : 'View Profile Details'}
                 >
                   <img
-                    src={activeConversation.avatar}
-                    alt={activeConversation.stylistName}
+                    src={userMode === 'vendor' ? DEFAULT_AVATAR : activeConversation.avatar}
+                    alt={getPartnerName(activeConversation)}
                     className="w-10 h-10 rounded-2xl object-cover shrink-0 border border-black/10 dark:border-white/10"
                   />
                   <div>
                     <div className="flex items-center gap-1.5">
                       <h3 className="text-sm font-bold text-slate-900 dark:text-white m-0 truncate">
-                        {activeConversation.stylistName}
+                        {getPartnerName(activeConversation)}
                       </h3>
-                      <span className="badge badge-verified text-[9px] py-0.2 px-1">Verified</span>
+                      {userMode !== 'vendor' && <span className="badge badge-verified text-[9px] py-0.2 px-1">Verified</span>}
                     </div>
                     <span className="text-[10px] text-slate-400 block truncate">
-                      {activeConversation.stylistRole} • {stylistObj?.dormLocation || 'Hostel Studio'}
+                      {userMode === 'vendor' ? 'Campus Client' : `${activeConversation.stylistRole} • ${stylistObj?.dormLocation || 'Hostel Studio'}`}
                     </span>
                   </div>
                 </div>
@@ -285,7 +308,7 @@ export default function MessagesView() {
                 {/* Header Direct Actions */}
                 <div className="flex items-center gap-2">
                   <a
-                    href={`https://wa.me/260${(stylistObj?.phone || '0971234567').replace(/^0/, '')}?text=Hi%20${encodeURIComponent(activeConversation.stylistName)},%20I'm%20chatting%20with%20you%20from%20the%20UniHairShop%20App%20(Safety%20Code:%20${chatSafetyCode}).`}
+                    href={`https://wa.me/260${((userMode === 'vendor' ? activeConversation.customerPhone : stylistObj?.phone) || '0971234567').replace(/^0/, '')}?text=Hi%20${encodeURIComponent(getPartnerName(activeConversation))},%20I'm%20chatting%20with%20you%20from%20the%20UniHairShop%20App%20(Safety%20Code:%20${chatSafetyCode}).`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="apple-btn-secondary text-xs px-2.5 py-1.5 flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-bold"
@@ -338,7 +361,7 @@ export default function MessagesView() {
                       <Sparkles size={20} />
                     </div>
                     <h4 className="text-sm font-bold text-slate-900 dark:text-white m-0">
-                      Chat with {activeConversation.stylistName}
+                      Chat with {getPartnerName(activeConversation)}
                     </h4>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-xs mx-auto">
                       Send a message to coordinate hairstyle details, ask about hair products, or request a hostel room visit.
@@ -438,7 +461,7 @@ export default function MessagesView() {
                 {chatSafetyCode}
               </span>
               <p className="text-[11px] text-slate-300 m-0">
-                Conversation: <strong>{user.name}</strong> ↔ <strong>{activeConversation.stylistName}</strong>
+                Conversation: <strong>{user.name}</strong> ↔ <strong>{getPartnerName(activeConversation)}</strong>
               </p>
             </div>
 

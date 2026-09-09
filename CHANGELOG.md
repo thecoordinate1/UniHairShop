@@ -4,6 +4,14 @@ All notable changes to UniHairShop are recorded here, newest first. Versions fol
 
 Each release is tagged in git as `vX.Y.Z` — refer to that tag instead of a commit hash when talking about "which version."
 
+## [0.9.5] — 2026-09-09
+
+### Fixed
+- **Critical**: chat conversation ids were generated from the stylist's id alone (`conv-<stylistId>`), so every different customer messaging the same stylist collided into one shared thread — their messages were mixed together and visible to each other and to the stylist as one continuous conversation. Conversations are now keyed by the (customer, stylist) pair, unique per relationship. This only prevents new collisions going forward; it does not retroactively un-mix any already-merged historical thread.
+- A hardcoded, randomly-picked "stylist reply" was injected into every real customer conversation ~1.8s after they sent a message — and written directly into the production `messages` table — regardless of whether the real stylist had actually replied. Left over from before real backend messaging existed; now only fires in the offline/no-backend demo mode, never against a live conversation.
+- The unread-message badge in the chat sidebar was permanently stuck at 0 — nothing ever incremented it. Now increments when a message arrives from the other party in a conversation that isn't currently open, and clears when that conversation is opened.
+- A vendor's own client conversations all shared one identity (their own stylist name/avatar, since customers weren't tracked at all), making every client look identical in the sidebar and header. Conversations now also store the customer's name and phone, shown correctly on the vendor side.
+
 ## [0.9.4] — 2026-09-09
 
 ### Fixed

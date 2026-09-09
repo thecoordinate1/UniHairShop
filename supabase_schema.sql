@@ -190,6 +190,16 @@ CREATE TABLE IF NOT EXISTS public.conversations (
 );
 
 ALTER TABLE public.conversations ADD COLUMN IF NOT EXISTS customer_id UUID REFERENCES auth.users(id);
+ALTER TABLE public.conversations ADD COLUMN IF NOT EXISTS customer_name TEXT;
+ALTER TABLE public.conversations ADD COLUMN IF NOT EXISTS customer_phone TEXT;
+
+-- The conversation id used to be conv-<stylist_id> alone, which meant every
+-- customer messaging the same stylist collided into one shared thread --
+-- messages from different, unrelated customers were mixed together and
+-- visible to each other. It's now conv-<customer_id>-<stylist_id> (unique
+-- per pair) everywhere new conversations are created; this only prevents
+-- new collisions going forward and does not retroactively split any
+-- already-merged historical thread.
 
 CREATE TABLE IF NOT EXISTS public.messages (
   id TEXT PRIMARY KEY,

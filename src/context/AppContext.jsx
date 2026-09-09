@@ -199,6 +199,14 @@ export const AppProvider = ({ children }) => {
   const [conversations, setConversations] = useState(() => safeGetItem('unihair_conversations', initialConversations));
   const [reviews, setReviews] = useState(() => safeGetItem('unihair_reviews', []));
   const [activeChatStylistId, setActiveChatStylistId] = useState(null);
+  // Read inside the long-lived realtime message subscription below, which is
+  // set up once on mount — refs (not the state values directly) so that
+  // closure always sees the current chat/mode instead of a stale one from
+  // whenever the subscription callback was created.
+  const activeChatStylistIdRef = useRef(null);
+  const userModeRef = useRef(userMode);
+  useEffect(() => { activeChatStylistIdRef.current = activeChatStylistId; }, [activeChatStylistId]);
+  useEffect(() => { userModeRef.current = userMode; }, [userMode]);
 
   // 4. Modals & Filters
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -596,7 +604,7 @@ export const AppProvider = ({ children }) => {
         if (convData && convData.length > 0) {
           const mapped = convData.map((c) => {
             const matchingMsgs = (msgData || [])
-              .filter((m) => m.conversation_id === c.id || m.conversation_id === `conv-${c.stylist_id}`)
+              .filter((m) => m.conversation_id === c.id)
               .map((m) => ({
                 id: m.id,
                 sender: m.sender,
@@ -606,7 +614,10 @@ export const AppProvider = ({ children }) => {
             return {
               id: c.id,
               stylistId: c.stylist_id,
+              customerId: c.customer_id,
               stylistName: c.stylist_name,
+              customerName: c.customer_name,
+              customerPhone: c.customer_phone,
               avatar: c.avatar || DEFAULT_AVATAR,
               stylistRole: c.stylist_role || 'Campus Stylist',
               lastMessage: c.last_message || (matchingMsgs.length > 0 ? matchingMsgs[matchingMsgs.length - 1].text : 'Hello!'),
@@ -652,12 +663,24 @@ export const AppProvider = ({ children }) => {
         const newMsg = payload.new;
         setConversations((prev) =>
           prev.map((c) => {
-            if (c.id === newMsg.conversation_id || `conv-${c.stylistId}` === newMsg.conversation_id) {
+            if (c.id === newMsg.conversation_id) {
               if (c.messages.some((m) => m.id === newMsg.id)) return c;
+              // A message from the other party, landing on a conversation the
+              // viewer doesn't currently have open, is unread. "Other party"
+              // and "which id identifies this thread" both flip depending on
+              // which side of the conversation the current viewer is on.
+              const partnerId = userModeRef.current === 'vendor' ? c.customerId : c.stylistId;
+              const isFromOtherParty = userModeRef.current === 'vendor' ? newMsg.sender === 'user' : newMsg.sender === 'stylist';
+              const isConversationOpen = activeChatStylistIdRef.current === partnerId;
+              const nextUnread = isFromOtherParty && !isConversationOpen ? (c.unreadCount || 0) + 1 : c.unreadCount || 0;
+              if (nextUnread !== c.unreadCount) {
+                supabase.from('conversations').update({ unread_count: nextUnread }).eq('id', c.id).then(null, () => {});
+              }
               return {
                 ...c,
                 lastMessage: newMsg.text,
                 lastTimestamp: newMsg.time || 'Just now',
+                unreadCount: nextUnread,
                 messages: [...c.messages, { id: newMsg.id, sender: newMsg.sender, text: newMsg.text, time: newMsg.time }]
               };
             }
@@ -672,6 +695,24 @@ export const AppProvider = ({ children }) => {
       supabase.removeChannel(messagesChannel);
     };
   }, []);
+
+  // Opening a conversation marks it read. Which id identifies "this thread"
+  // depends on which side of it the current viewer is on -- a vendor's
+  // conversations all share the same stylistId (their own), so a customer's
+  // id is what actually distinguishes one client thread from another.
+  useEffect(() => {
+    if (!activeChatStylistId) return;
+    setConversations((prev) =>
+      prev.map((c) => {
+        const partnerId = userMode === 'vendor' ? c.customerId : c.stylistId;
+        if (partnerId !== activeChatStylistId || !c.unreadCount) return c;
+        if (isSupabaseConfigured && supabase) {
+          supabase.from('conversations').update({ unread_count: 0 }).eq('id', c.id).then(null, () => {});
+        }
+        return { ...c, unreadCount: 0 };
+      })
+    );
+  }, [activeChatStylistId, userMode]);
 
   // Debounced persistence
   const persistTimers = useRef({});
@@ -763,10 +804,19 @@ export const AppProvider = ({ children }) => {
     });
   }, [addToast]);
 
-  // Messaging Management with Dual Role & Supabase Sync
-  const sendMessage = useCallback((stylistId, text, senderOverride) => {
+  // Messaging Management with Dual Role & Supabase Sync.
+  // `partnerId` is always "the other party's id from the current viewer's
+  // perspective" -- the stylist's id when a customer is sending, the
+  // customer's id when a vendor is sending. The conversation id is the
+  // (customerId, stylistId) pair, never just the stylist's id alone --
+  // otherwise every customer messaging the same stylist would collide into
+  // one shared thread, mixing unrelated customers' messages together.
+  const sendMessage = useCallback((partnerId, text, senderOverride) => {
     if (!text || !text.trim()) return;
     const sender = senderOverride || (userMode === 'vendor' ? 'stylist' : 'user');
+    const stylistId = sender === 'stylist' ? user.id : partnerId;
+    const customerId = sender === 'stylist' ? partnerId : user.id;
+    const convId = `conv-${customerId}-${stylistId}`;
     const msgId = `m-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
     const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
@@ -778,10 +828,10 @@ export const AppProvider = ({ children }) => {
     };
 
     setConversations((prev) => {
-      const existingConv = prev.find((c) => c.stylistId === stylistId);
+      const existingConv = prev.find((c) => c.id === convId);
       if (existingConv) {
         return prev.map((conv) => {
-          if (conv.stylistId === stylistId) {
+          if (conv.id === convId) {
             return {
               ...conv,
               lastMessage: text.trim(),
@@ -798,11 +848,13 @@ export const AppProvider = ({ children }) => {
           avatar: DEFAULT_AVATAR
         };
         const newConv = {
-          id: `conv-${stylistId}`,
+          id: convId,
           stylistId,
+          customerId,
           stylistName: targetStaff.name,
           avatar: targetStaff.avatar || DEFAULT_AVATAR,
           stylistRole: targetStaff.role || 'Campus Stylist',
+          customerName: sender === 'user' ? user.name : undefined,
           lastMessage: text.trim(),
           lastTimestamp: 'Just now',
           unreadCount: 0,
@@ -814,7 +866,6 @@ export const AppProvider = ({ children }) => {
 
     // Sync message to Supabase
     if (isSupabaseConfigured && supabase) {
-      const convId = `conv-${stylistId}`;
       const convUpsertPayload = {
         id: convId,
         stylist_id: stylistId,
@@ -823,10 +874,12 @@ export const AppProvider = ({ children }) => {
         last_timestamp: timeStr,
         unread_count: 0
       };
-      // Only the customer side sets customer_id — a stylist reply upserts the
+      // Only the customer side sets customer_* — a stylist reply upserts the
       // same conversation without touching who the customer already is.
       if (sender === 'user' && user?.id) {
         convUpsertPayload.customer_id = user.id;
+        convUpsertPayload.customer_name = user.name;
+        convUpsertPayload.customer_phone = user.phone;
       }
       supabase.from('conversations').upsert([convUpsertPayload]).then(() => {
         supabase.from('messages').insert([{
@@ -839,8 +892,13 @@ export const AppProvider = ({ children }) => {
       }, () => {});
     }
 
-    // Client assistant simulation if sending in customer mode
-    if (sender === 'user') {
+    // Canned auto-reply simulation — only for the offline/no-backend demo
+    // mode, where there's no real stylist on the other end to actually
+    // reply. With Supabase configured, real replies come from the real
+    // vendor's own sendMessage call and arrive via the messagesChannel
+    // realtime subscription; injecting a fake one here would collide with
+    // (and be indistinguishable from) that real reply in production.
+    if (sender === 'user' && (!isSupabaseConfigured || !supabase)) {
       setTimeout(() => {
         const replies = [
           "Got it! I have your slot booked and will be ready.",
@@ -869,16 +927,6 @@ export const AppProvider = ({ children }) => {
             return conv;
           });
         });
-
-        if (isSupabaseConfigured && supabase) {
-          supabase.from('messages').insert([{
-            id: stylistReply.id,
-            conversation_id: `conv-${stylistId}`,
-            sender: 'stylist',
-            text: randomReply,
-            time: stylistReply.time
-          }]).then(null, () => {});
-        }
       }, 1800);
     }
   }, [userMode, staffList, user]);
