@@ -4,6 +4,11 @@ All notable changes to UniHairShop are recorded here, newest first. Versions fol
 
 Each release is tagged in git as `vX.Y.Z` — refer to that tag instead of a commit hash when talking about "which version."
 
+## [0.9.9] — 2026-09-10
+
+### Added
+- Stylist onboarding (both the quick-onboard wall and the 60-second Fast Onboarding modal) and Vendor Studio's Edit Profile now ask for gender (Male/Female). A stylist's profile photo shows a glowing halo ring — blue for male, pink for female — on their own Vendor Studio banner and on their public profile view.
+
 ## [0.9.8] — 2026-09-10
 
 ### Fixed

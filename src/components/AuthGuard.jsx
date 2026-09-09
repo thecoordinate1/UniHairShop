@@ -15,6 +15,7 @@ export default function AuthGuard({ children, requiredRole = 'authenticated', fa
   const [onboardingSpecialty, setOnboardingSpecialty] = useState('Barbering');
   const [onboardingDorm, setOnboardingDorm] = useState(user.hostel || 'Hostel Block C');
   const [onboardingPhone, setOnboardingPhone] = useState(user.phone || '0971234567');
+  const [onboardingGender, setOnboardingGender] = useState('male');
   const [onboardingLoading, setOnboardingLoading] = useState(false);
 
   if (authLoading) {
@@ -67,7 +68,8 @@ export default function AuthGuard({ children, requiredRole = 'authenticated', fa
           specialty: onboardingSpecialty,
           campus: currentCampus,
           hostel: onboardingDorm,
-          phone: onboardingPhone
+          phone: onboardingPhone,
+          gender: onboardingGender
         });
       } finally {
         setOnboardingLoading(false);
@@ -116,6 +118,34 @@ export default function AuthGuard({ children, requiredRole = 'authenticated', fa
                 <option value="Locs">Locs & Retwist</option>
                 <option value="Nails & Lashes">Nails & Lashes</option>
               </select>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Gender:</label>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setOnboardingGender('male')}
+                  className={`flex-1 py-2 rounded-xl text-xs font-semibold border cursor-pointer transition-all ${
+                    onboardingGender === 'male'
+                      ? 'bg-blue-500 border-blue-500 text-white'
+                      : 'bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 text-slate-500 dark:text-slate-400'
+                  }`}
+                >
+                  Male
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setOnboardingGender('female')}
+                  className={`flex-1 py-2 rounded-xl text-xs font-semibold border cursor-pointer transition-all ${
+                    onboardingGender === 'female'
+                      ? 'bg-pink-500 border-pink-500 text-white'
+                      : 'bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 text-slate-500 dark:text-slate-400'
+                  }`}
+                >
+                  Female
+                </button>
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-2">

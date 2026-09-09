@@ -19,6 +19,7 @@ export default function FastStylistOnboardingModal({ isOpen, onClose }) {
   const [selectedHostel, setSelectedHostel] = useState(availableHostels[0] || 'Hostel Block A');
   const [roomNumber, setRoomNumber] = useState('');
   const [handle, setHandle] = useState('');
+  const [gender, setGender] = useState('male');
 
   // Step 2 State
   const [specialty, setSpecialty] = useState('Barbering');
@@ -83,13 +84,14 @@ export default function FastStylistOnboardingModal({ isOpen, onClose }) {
       handle: (handle || name.toLowerCase().replace(/[^a-z0-9]/g, '')).replace(/^@/, ''),
       role: specialty === 'Barbering' ? 'Campus Barber' : specialty === 'Braids & Wigs' ? 'Braider & Wig Artist' : `${specialty} Specialist`,
       campus: selectedCampus,
-      dormLocation: `${selectedHostel}${roomNumber ? `, Room ${roomNumber}` : ''}`,
+      hostel: `${selectedHostel}${roomNumber ? `, Room ${roomNumber}` : ''}`,
       avatar: portfolioImage || DEFAULT_AVATAR,
       bio: bio.trim(),
       specialties: [specialty, serviceName],
       travelsToDorm,
       hasStudio,
       phone: phone.trim(),
+      gender,
       servicePayload: {
         name: serviceName.trim() || 'Campus Hair Styling',
         category: specialty,
@@ -195,6 +197,34 @@ export default function FastStylistOnboardingModal({ isOpen, onClose }) {
                         onChange={(e) => setHandle(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
                       />
                     </div>
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Gender:</label>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setGender('male')}
+                      className={`flex-1 py-2 rounded-xl text-xs font-semibold border cursor-pointer transition-all ${
+                        gender === 'male'
+                          ? 'bg-blue-500 border-blue-500 text-white'
+                          : 'bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 text-slate-500 dark:text-slate-400'
+                      }`}
+                    >
+                      Male
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setGender('female')}
+                      className={`flex-1 py-2 rounded-xl text-xs font-semibold border cursor-pointer transition-all ${
+                        gender === 'female'
+                          ? 'bg-pink-500 border-pink-500 text-white'
+                          : 'bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 text-slate-500 dark:text-slate-400'
+                      }`}
+                    >
+                      Female
+                    </button>
                   </div>
                 </div>
 

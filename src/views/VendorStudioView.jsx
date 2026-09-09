@@ -33,7 +33,7 @@ import {
   Package,
   Award
 } from 'lucide-react';
-import { useApp } from '../context/AppContext';
+import { useApp, getAvatarHaloClass } from '../context/AppContext';
 import { playSuccessChime } from '../lib/soundEffects';
 import { uploadImage } from '../lib/uploadImage';
 import { lusakaUniversities, campusHostels } from '../data/mockData';
@@ -156,6 +156,7 @@ export default function VendorStudioView() {
   const [editAvatar, setEditAvatar] = useState(vendorProfile.avatar || '');
   const [editCampus, setEditCampus] = useState(vendorProfile.campus || lusakaUniversities[0].name);
   const [editDormLocation, setEditDormLocation] = useState(vendorProfile.dormLocation || vendorProfile.dorm_location || '');
+  const [editGender, setEditGender] = useState(vendorProfile.gender || 'male');
   const [editIdDocument, setEditIdDocument] = useState(vendorProfile.idDocumentUrl || vendorProfile.id_document_url || '');
   const [editSpecialties, setEditSpecialties] = useState(vendorProfile.specialties || []);
   const [editSocialLinks, setEditSocialLinks] = useState(
@@ -423,6 +424,7 @@ export default function VendorStudioView() {
         avatar: editAvatar || vendorProfile.avatar,
         campus: editCampus,
         dormLocation: editDormLocation.trim(),
+        gender: editGender,
         idDocumentUrl: editIdDocument || null,
         specialties: editSpecialties,
         socialLink: editSocialLinks[0] || '',
@@ -496,7 +498,7 @@ export default function VendorStudioView() {
           <img
             src={vendorProfile.avatar}
             alt={vendorProfile.name}
-            className="w-16 h-16 rounded-3xl object-cover border-2 border-amber-400 shadow-apple-gold shrink-0"
+            className={`w-16 h-16 rounded-3xl object-cover border-2 border-amber-400 shadow-apple-gold shrink-0 ${getAvatarHaloClass(vendorProfile.gender)}`}
           />
           <div>
             <div className="flex items-center gap-2">
@@ -523,6 +525,7 @@ export default function VendorStudioView() {
               setEditAvatar(vendorProfile.avatar || '');
               setEditCampus(vendorProfile.campus || lusakaUniversities[0].name);
               setEditDormLocation(vendorProfile.dormLocation || vendorProfile.dorm_location || '');
+              setEditGender(vendorProfile.gender || 'male');
               setEditIdDocument(vendorProfile.idDocumentUrl || vendorProfile.id_document_url || '');
               setEditSpecialties(vendorProfile.specialties || []);
               setEditSocialLinks(
@@ -1565,6 +1568,34 @@ export default function VendorStudioView() {
                     onChange={(e) => setEditDormLocation(e.target.value)}
                   />
                 )}
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Gender:</label>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setEditGender('male')}
+                  className={`flex-1 py-2 rounded-xl text-xs font-semibold border cursor-pointer transition-all ${
+                    editGender === 'male'
+                      ? 'bg-blue-500 border-blue-500 text-white'
+                      : 'bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 text-slate-500 dark:text-slate-400'
+                  }`}
+                >
+                  Male
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditGender('female')}
+                  className={`flex-1 py-2 rounded-xl text-xs font-semibold border cursor-pointer transition-all ${
+                    editGender === 'female'
+                      ? 'bg-pink-500 border-pink-500 text-white'
+                      : 'bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 text-slate-500 dark:text-slate-400'
+                  }`}
+                >
+                  Female
+                </button>
               </div>
             </div>
 

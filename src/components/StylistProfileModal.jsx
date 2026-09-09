@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Star, ShieldCheck, Clock, MapPin, MessageCircle, Calendar, CheckCircle2, ChevronRight, Sparkles, Heart, Share2, Copy, Check, Link2, Flag } from 'lucide-react';
-import { useApp } from '../context/AppContext';
+import { useApp, getAvatarHaloClass } from '../context/AppContext';
 import ReportModal from './ReportModal';
 
 export default function StylistProfileModal() {
@@ -123,7 +123,7 @@ export default function StylistProfileModal() {
               <img
                 src={selectedStylist.avatar}
                 alt={selectedStylist.name}
-                className="w-24 h-24 rounded-3xl object-cover border-4 border-white dark:border-[#121217] shadow-xl bg-slate-800"
+                className={`w-24 h-24 rounded-3xl object-cover border-4 border-white dark:border-[#121217] shadow-xl bg-slate-800 ${getAvatarHaloClass(selectedStylist.gender)}`}
               />
               {stylistIsVerified && (
                 <div className="absolute -bottom-1 -right-1 bg-blue-500 text-white p-1 rounded-full border-2 border-white dark:border-[#121217]" title="Verified Campus Stylist">

@@ -19,6 +19,14 @@ const AppContext = createContext();
 // someone's actual picture.
 export const DEFAULT_AVATAR = '/images/avatar_placeholder.svg';
 
+// Gender-coded glow ring shown around a stylist's avatar — blue for male,
+// pink for female, nothing for unset/other.
+export function getAvatarHaloClass(gender) {
+  if (gender === 'male') return 'avatar-halo-male';
+  if (gender === 'female') return 'avatar-halo-female';
+  return '';
+}
+
 // Safe localStorage helpers
 function safeGetItem(key, fallback) {
   try {
@@ -163,6 +171,7 @@ export const AppProvider = ({ children }) => {
     campus: '',
     dormLocation: '',
     avatar: DEFAULT_AVATAR,
+    gender: '',
     isVerified: false,
     badge: 'Campus Stylist (Pending Verification)',
     travelsToDorm: true,
@@ -305,7 +314,7 @@ export const AppProvider = ({ children }) => {
         try {
           const { data: vendorData } = await supabase
             .from('vendor_profiles')
-            .select('id, name, is_verified, role, dorm_location, avatar, phone, bio, specialties, payout_accounts, social_link, social_links')
+            .select('id, name, is_verified, role, dorm_location, avatar, phone, bio, specialties, payout_accounts, social_link, social_links, gender')
             .eq('id', user.id)
             .maybeSingle();
           if (vendorData) {
@@ -322,7 +331,8 @@ export const AppProvider = ({ children }) => {
               specialties: vendorData.specialties || prev.specialties,
               payoutAccounts: vendorData.payout_accounts || prev.payoutAccounts,
               socialLink: vendorData.social_link || prev.socialLink,
-              socialLinks: vendorData.social_links?.length ? vendorData.social_links : (vendorData.social_link ? [vendorData.social_link] : prev.socialLinks)
+              socialLinks: vendorData.social_links?.length ? vendorData.social_links : (vendorData.social_link ? [vendorData.social_link] : prev.socialLinks),
+              gender: vendorData.gender || prev.gender
             }));
           } else {
             setVendorProfile((prev) => ({
@@ -356,7 +366,7 @@ export const AppProvider = ({ children }) => {
       try {
         const { data: vendorData } = await supabase
           .from('vendor_profiles')
-          .select('id, name, is_verified, role, dorm_location, avatar, phone, bio, specialties, payout_accounts, social_link')
+          .select('id, name, is_verified, role, dorm_location, avatar, phone, bio, specialties, payout_accounts, social_link, social_links, gender')
           .eq('id', user.id)
           .single();
 
@@ -388,7 +398,8 @@ export const AppProvider = ({ children }) => {
             specialties: vendorData.specialties || prev.specialties,
             payoutAccounts: vendorData.payout_accounts || prev.payoutAccounts,
             socialLink: vendorData.social_link || prev.socialLink,
-            socialLinks: vendorData.social_links?.length ? vendorData.social_links : (vendorData.social_link ? [vendorData.social_link] : prev.socialLinks)
+            socialLinks: vendorData.social_links?.length ? vendorData.social_links : (vendorData.social_link ? [vendorData.social_link] : prev.socialLinks),
+            gender: vendorData.gender || prev.gender
           }));
         }
       } catch (err) {
@@ -2055,7 +2066,8 @@ export const AppProvider = ({ children }) => {
       specialties: stylistData.specialty ? [stylistData.specialty] : [],
       payoutAccounts: [],
       socialLink: '',
-      socialLinks: []
+      socialLinks: [],
+      gender: stylistData.gender || ''
     };
 
     setVendorProfile(newVendor);
@@ -2080,7 +2092,8 @@ export const AppProvider = ({ children }) => {
           bio: newVendor.bio,
           payout_provider: newVendor.payoutProvider,
           payout_number: newVendor.payoutNumber,
-          specialties: newVendor.specialties
+          specialties: newVendor.specialties,
+          gender: newVendor.gender || null
         }]);
       } catch { /* ignore */ }
     }

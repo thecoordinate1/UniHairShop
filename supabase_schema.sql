@@ -80,6 +80,7 @@ ALTER TABLE public.vendor_profiles ADD COLUMN IF NOT EXISTS specialties JSONB DE
 ALTER TABLE public.vendor_profiles ADD COLUMN IF NOT EXISTS payout_accounts JSONB DEFAULT '[]'::jsonb;
 ALTER TABLE public.vendor_profiles ADD COLUMN IF NOT EXISTS social_link TEXT;
 ALTER TABLE public.vendor_profiles ADD COLUMN IF NOT EXISTS social_links JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE public.vendor_profiles ADD COLUMN IF NOT EXISTS gender TEXT;
 
 -- 3. SERVICES (Hairstyles & Grooming)
 CREATE TABLE IF NOT EXISTS public.services (
