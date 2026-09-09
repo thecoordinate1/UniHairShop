@@ -9,6 +9,14 @@ The interface is a prototype until this checklist is completed. Do not enable li
 5. Add a provider for transactional WhatsApp/SMS: booking requested, accepted, reminder, cancellation, arrival, and refund/support escalation.
 6. Publish a privacy policy, terms, cancellation/refund policy, and support contact. Show hostel/phone information only to the matched, accepted stylist.
 7. Run a single-campus pilot with real verified stylists. Review completion rate, repeat booking rate, cancellation/no-show rate, and per-booking contribution margin weekly.
+8. **[Built, needs a key]** Remote error monitoring is wired up (`src/lib/errorMonitoring.js`, loaded via Sentry's CDN bundle — no npm dependency, zero-cost until configured). Sign up free at sentry.io, create a browser/React project, and set `VITE_SENTRY_DSN` in your deployment env. Until then it's a harmless no-op and errors still only go to the browser console.
+9. **[Built]** Admins can suspend/reactivate any customer or vendor from the new "Customers" and "Reports" admin tabs (with a reason shown to the affected user), and users can file an in-app "Report" from a stylist's profile or chat header. Enforcement isn't just UI-deep: `is_user_suspended()` is checked inside `request_booking()`, `place_order()`, `submit_review()`, the messages-insert RLS policy, and the vendor-visibility RLS policy — a suspended account is blocked everywhere, not just hidden behind a screen. Requires re-applying the schema (new `reports` table, `profiles.is_suspended`/`suspended_reason`/`suspended_at` columns, new triggers/RPCs — see `supabase_schema.sql`).
+10. **[Built, needs a key]** Signup/login/password-reset CAPTCHA is wired up (Cloudflare Turnstile, `src/components/TurnstileWidget.jsx`) across both auth entry points. Create a free Turnstile widget at the Cloudflare dashboard, set `VITE_TURNSTILE_SITE_KEY`, then paste the matching secret key into Supabase Dashboard → Authentication → Attack Protection → Enable CAPTCHA protection. Until both sides are configured, auth works exactly as before (no CAPTCHA shown, no token required).
+11. **[Done]** Baseline security response headers (X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy, HSTS) are set in `vercel.json`. A Content-Security-Policy was deliberately left out — this app loads Google Fonts, Supabase, and PawaPay from JS at runtime, and a wrong CSP would silently break the live site; write and test one manually before adding it.
+12. Have a lawyer review `LegalView.jsx` before relying on it — it's explicitly marked "draft, not legally reviewed" in-app, and it's the only thing standing behind the commission, refund, and liability terms once real money and real disputes show up.
+13. **[Built]** Self-service "Download My Data" and "Delete My Account" are live in Account settings. Deletion anonymizes PII and permanently bans the login (via Supabase Auth's admin API) rather than hard-deleting — real bookings/orders/reviews referencing the account are kept for accounting/dispute history. Deploy the new Edge Function: `supabase functions deploy delete-account`.
+14. **[Done]** `robots.txt` and `sitemap.xml` were added under `public/`.
+15. Confirm Supabase's automatic daily backups / point-in-time recovery are actually enabled for this project's plan tier — this is a dashboard setting, not something in this repo.
 
 ## Required operational rules
 
@@ -16,3 +24,4 @@ The interface is a prototype until this checklist is completed. Do not enable li
 - Payment status changes only after a verified provider webhook.
 - Refunds and payouts are requests until a server-side provider result confirms them.
 - One loyalty point equals exactly K0.10. Ledger entries—not a client-side balance—are the source of truth.
+- A suspended account (`profiles.is_suspended`) is blocked at the database level in every booking/order/review/chat write path, not just hidden in the UI.

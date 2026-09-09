@@ -23,6 +23,7 @@ import {
   Building
 } from 'lucide-react';
 import { useApp, DEFAULT_AVATAR } from '../context/AppContext';
+import ReportModal from '../components/ReportModal';
 
 export default function MessagesView() {
   const {
@@ -42,6 +43,7 @@ export default function MessagesView() {
   const [inputMessage, setInputMessage] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [showChatSafetyModal, setShowChatSafetyModal] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
   const messagesEndRef = useRef(null);
 
@@ -300,6 +302,16 @@ export default function MessagesView() {
                   >
                     <ShieldCheck size={16} />
                   </button>
+
+                  {userMode !== 'vendor' && (
+                    <button
+                      onClick={() => setShowReportModal(true)}
+                      className="icon-btn text-slate-400 hover:text-rose-500 hover:bg-rose-500/10"
+                      title="Report this stylist"
+                    >
+                      <ShieldAlert size={16} />
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -456,6 +468,16 @@ export default function MessagesView() {
             </div>
           </div>
         </div>
+      )}
+
+      {showReportModal && activeConversation && (
+        <ReportModal
+          reportedUserId={activeConversation.stylistId}
+          reportedUserName={activeConversation.stylistName}
+          contextType="chat"
+          contextId={activeConversation.id}
+          onClose={() => setShowReportModal(false)}
+        />
       )}
     </div>
   );

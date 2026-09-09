@@ -14,6 +14,7 @@ import AuthModal from './components/AuthModal';
 import AuthGuard from './components/AuthGuard';
 import AuthWall from './components/AuthWall';
 import PostAuthScreen from './components/PostAuthScreen';
+import SuspendedAccountScreen from './components/SuspendedAccountScreen';
 
 // Auto-retrying dynamic import wrapper to survive post-deployment chunk hash rotations
 function lazyWithRetry(componentImport) {
@@ -154,6 +155,17 @@ export default function App() {
     return (
       <ErrorBoundary>
         <AuthWall />
+        <Toast />
+      </ErrorBoundary>
+    );
+  }
+
+  // Suspended accounts are blocked from the app entirely — a UI backstop on
+  // top of the server-side is_user_suspended() checks in every write path.
+  if (user?.isLoggedIn && user?.isSuspended) {
+    return (
+      <ErrorBoundary>
+        <SuspendedAccountScreen />
         <Toast />
       </ErrorBoundary>
     );

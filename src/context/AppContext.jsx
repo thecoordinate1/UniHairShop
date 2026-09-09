@@ -493,7 +493,9 @@ export const AppProvider = ({ children }) => {
                 referredBy: profile?.referred_by || '',
                 referralCount: validCount,
                 pointsHistory: validHistory,
-                favorites: []
+                favorites: [],
+                isSuspended: profile?.is_suspended || false,
+                suspendedReason: profile?.suspended_reason || ''
               });
               setUserMode((prevMode) => {
                 const validModes = validModesForRole(assignedRole);
@@ -546,7 +548,9 @@ export const AppProvider = ({ children }) => {
           referralCode: validCode,
           referredBy: profile?.referred_by || prev.referredBy || '',
           referralCount: validCount,
-          pointsHistory: validHistory
+          pointsHistory: validHistory,
+          isSuspended: profile?.is_suspended || false,
+          suspendedReason: profile?.suspended_reason || ''
         }));
 
         setUserMode((prevMode) => {
@@ -1522,13 +1526,17 @@ export const AppProvider = ({ children }) => {
   }, [addToast]);
 
   // Authentication & RBAC Functions
-  const signIn = useCallback(async (email, password) => {
+  const signIn = useCallback(async (email, password, captchaToken) => {
     if (!isSupabaseConfigured || !supabase) {
       setUser((prev) => ({ ...prev, isLoggedIn: true, email }));
       addToast('Signed in successfully!', 'success');
       return { success: true };
     }
-    const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: email.trim(),
+      password,
+      options: captchaToken ? { captchaToken } : undefined
+    });
     if (error) throw error;
     if (data?.session) {
       setSession(data.session);
@@ -1645,6 +1653,7 @@ export const AppProvider = ({ children }) => {
       password: userData.password,
       options: {
         emailRedirectTo: redirectUrl,
+        captchaToken: userData.captchaToken || undefined,
         data: {
           name: cleanName,
           phone: cleanPhone,
@@ -1844,6 +1853,108 @@ export const AppProvider = ({ children }) => {
     addToast('Student profile updated successfully!', 'success');
   }, [user.id, addToast]);
 
+  // Gathers everything RLS already lets this user read about themselves —
+  // no Edge Function needed, since ownership is exactly what the existing
+  // policies already check — and hands it back as a downloadable JSON file.
+  const exportMyData = useCallback(async () => {
+    if (!isSupabaseConfigured || !supabase || !user.id) {
+      addToast('Data export requires a connected account.', 'error');
+      return;
+    }
+    try {
+      const [profileRes, bookingsRes, ordersRes, reviewsRes, conversationsRes] = await Promise.all([
+        supabase.from('profiles').select('*').eq('id', user.id).single(),
+        supabase.from('bookings').select('*').eq('customer_id', user.id),
+        supabase.from('orders').select('*').eq('customer_id', user.id),
+        supabase.from('reviews').select('*').eq('customer_id', user.id),
+        supabase.from('conversations').select('*, messages(*)').eq('customer_id', user.id)
+      ]);
+
+      const exportPayload = {
+        exported_at: new Date().toISOString(),
+        profile: profileRes.data || null,
+        bookings: bookingsRes.data || [],
+        orders: ordersRes.data || [],
+        reviews: reviewsRes.data || [],
+        conversations: conversationsRes.data || []
+      };
+
+      if (user.role === 'vendor') {
+        const [vendorProfileRes, walletRes, payoutsRes] = await Promise.all([
+          supabase.from('vendor_profiles').select('*').eq('id', user.id).single(),
+          supabase.from('vendor_wallets').select('*').eq('vendor_id', user.id).maybeSingle(),
+          supabase.from('vendor_payouts').select('*').eq('vendor_id', user.id)
+        ]);
+        exportPayload.vendor_profile = vendorProfileRes.data || null;
+        exportPayload.vendor_wallet = walletRes.data || null;
+        exportPayload.vendor_payouts = payoutsRes.data || [];
+      }
+
+      const blob = new Blob([JSON.stringify(exportPayload, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `unihairshop-my-data-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      addToast('Your data export has downloaded.', 'success');
+    } catch (err) {
+      console.error('Data export error:', err);
+      addToast('Could not export your data. Please try again.', 'error');
+    }
+  }, [user.id, user.role, addToast]);
+
+  // Anonymizes PII and permanently bans the login via the delete-account Edge
+  // Function (see supabase/functions/delete-account) — real bookings/orders/
+  // reviews referencing this id are kept (accounting/dispute history), never
+  // hard-deleted. See that function's header comment for why.
+  const deleteAccount = useCallback(async () => {
+    if (!isSupabaseConfigured || !supabase) {
+      addToast('Account deletion requires a connected account.', 'error');
+      return { success: false };
+    }
+    try {
+      const { error } = await supabase.functions.invoke('delete-account', { body: {} });
+      if (error) throw error;
+      await supabase.auth.signOut().catch(() => {});
+      setSession(null);
+      setUser(defaultGuestUser);
+      setUserMode('customer');
+      addToast('Your account has been deleted. You will not be able to sign back in.', 'info');
+      return { success: true };
+    } catch (err) {
+      addToast(err.message || 'Could not delete your account. Please try again.', 'error');
+      return { success: false };
+    }
+  }, [addToast]);
+
+  // The only in-app safety escalation besides messaging support directly —
+  // flags a chat message, stylist profile, or booking for admin review.
+  const submitReport = useCallback(async (report) => {
+    if (!isSupabaseConfigured || !supabase || !user.id) {
+      addToast('Reporting requires a signed-in account.', 'error');
+      return { success: false };
+    }
+    try {
+      const { error } = await supabase.from('reports').insert([{
+        reporter_id: user.id,
+        reported_user_id: report.reportedUserId,
+        context_type: report.contextType,
+        context_id: report.contextId || null,
+        reason: report.reason,
+        details: report.details || null
+      }]);
+      if (error) throw error;
+      addToast('Report submitted. Our team will review it shortly.', 'success');
+      return { success: true };
+    } catch (err) {
+      addToast(err.message || 'Could not submit your report. Please try again.', 'error');
+      return { success: false };
+    }
+  }, [user.id, addToast]);
+
   const onboardAsStylist = useCallback(async (stylistData) => {
     setUser((prev) => ({ ...prev, role: 'vendor' }));
     // Not verified yet — an admin has to review this stylist (and, ideally, an
@@ -1925,6 +2036,56 @@ export const AppProvider = ({ children }) => {
     addToast(isVerified ? 'Stylist verification badge approved! 🛡️' : 'Stylist badge removed.', 'success');
   }, [addToast]);
 
+  // Suspending/reactivating writes straight to profiles.is_suspended — safe
+  // as a plain client update (not an RPC) because profiles_update RLS already
+  // lets an admin write any row, and the profiles_protect_sensitive_fields
+  // trigger only clamps this column back on a SELF-edit by a non-admin, so a
+  // suspended user can never PATCH their own way out of it. Every real write
+  // path (booking, order, review, chat) re-checks is_user_suspended() itself,
+  // so this is a UI-facing action, not the sole enforcement point.
+  const suspendUser = useCallback(async (targetId, reason, isVendor) => {
+    if (!isSupabaseConfigured || !supabase) {
+      addToast('Suspending accounts requires a connected database.', 'error');
+      return { success: false };
+    }
+    try {
+      const { error } = await supabase.from('profiles').update({
+        is_suspended: true,
+        suspended_reason: reason || 'Violation of campus safety guidelines',
+        suspended_at: new Date().toISOString()
+      }).eq('id', targetId);
+      if (error) throw error;
+      if (isVendor) {
+        setStaffList((prev) => prev.map((s) => (s.id === targetId ? { ...s, isSuspended: true } : s)));
+      }
+      addToast('Account suspended.', 'success');
+      return { success: true };
+    } catch (err) {
+      addToast(err.message || 'Could not suspend this account.', 'error');
+      return { success: false };
+    }
+  }, [addToast]);
+
+  const unsuspendUser = useCallback(async (targetId, isVendor) => {
+    if (!isSupabaseConfigured || !supabase) return { success: false };
+    try {
+      const { error } = await supabase.from('profiles').update({
+        is_suspended: false,
+        suspended_reason: null,
+        suspended_at: null
+      }).eq('id', targetId);
+      if (error) throw error;
+      if (isVendor) {
+        setStaffList((prev) => prev.map((s) => (s.id === targetId ? { ...s, isSuspended: false } : s)));
+      }
+      addToast('Account reactivated.', 'success');
+      return { success: true };
+    } catch (err) {
+      addToast(err.message || 'Could not reactivate this account.', 'error');
+      return { success: false };
+    }
+  }, [addToast]);
+
   const settleVendorPayout = useCallback(async (payoutId, reference) => {
     const txRef = reference || `SETTLED-AM-${Math.floor(100000 + Math.random() * 900000)}`;
 
@@ -1993,6 +2154,9 @@ export const AppProvider = ({ children }) => {
     pendingAuthCallback,
     setPendingAuthCallback,
     updateUserProfile,
+    exportMyData,
+    deleteAccount,
+    submitReport,
     pushEnabled,
     pushSupported,
     enablePushNotifications,
@@ -2049,6 +2213,8 @@ export const AppProvider = ({ children }) => {
     updateBookingStatus,
     verifyStylist,
     settleVendorPayout,
+    suspendUser,
+    unsuspendUser,
     filterCategory,
     setFilterCategory,
     serviceTypeFilter,
@@ -2069,8 +2235,9 @@ export const AppProvider = ({ children }) => {
     activeTab, currentCampus, session, authLoading, isGuestMode, continueAsGuest, exitGuestMode,
     pendingReferralCode, postAuthScreen, authWallDefaultMode, user,
     signIn, signUp, signOut, terminateAllSessions, requireAuth, pendingAuthCallback, updateUserProfile, onboardAsStylist,
+    exportMyData, deleteAccount, submitReport,
     pushEnabled, pushSupported, enablePushNotifications, disablePushNotifications,
-    verifyStylist, settleVendorPayout,
+    verifyStylist, settleVendorPayout, suspendUser, unsuspendUser,
     services, products, bundles, staffList, bookings, orders, cart,
     showAuthModal, isCartOpen, bookingService, selectedService, selectedProduct, selectedStylist,
     showSafetyModal, conversations, reviews, submitReview, trackEvent, activeChatStylistId,

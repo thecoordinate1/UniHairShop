@@ -1,5 +1,6 @@
 import React from 'react';
 import { AlertTriangle, RefreshCw, Trash2 } from 'lucide-react';
+import { captureError } from '../lib/errorMonitoring';
 
 export default class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -14,6 +15,7 @@ export default class ErrorBoundary extends React.Component {
   componentDidCatch(error, errorInfo) {
     this.setState({ errorInfo });
     console.error('[UniHairShop] Uncaught render error:', error, errorInfo);
+    captureError(error, { componentStack: errorInfo?.componentStack });
 
     // Auto-recover from stale chunks after a fresh deployment
     const isChunkError =

@@ -29,7 +29,11 @@ import {
   BadgeCheck,
   Ban,
   ArrowUpRight,
-  UploadCloud
+  UploadCloud,
+  Flag,
+  ShieldOff,
+  ShieldAlert,
+  Award
 } from 'lucide-react';
 import { useApp, DEFAULT_AVATAR } from '../context/AppContext';
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient';
@@ -50,12 +54,14 @@ export default function AdminDashboardView() {
     updateBookingStatus,
     verifyStylist,
     settleVendorPayout,
+    suspendUser,
+    unsuspendUser,
     lusakaUniversities,
     user,
     addToast
   } = useApp();
 
-  const [adminTab, setAdminTab] = useState('overview'); // 'overview' | 'vendors' | 'traffic' | 'payouts' | 'catalog'
+  const [adminTab, setAdminTab] = useState('overview'); // 'overview' | 'vendors' | 'traffic' | 'payouts' | 'catalog' | 'users' | 'reports'
   const [vendorSearch, setVendorSearch] = useState('');
   const [vendorCampusFilter, setVendorCampusFilter] = useState('All');
   const [vendorVerifyFilter, setVendorVerifyFilter] = useState('All'); // 'All' | 'Verified' | 'Pending'
@@ -64,6 +70,14 @@ export default function AdminDashboardView() {
   const [analyticsSummary, setAnalyticsSummary] = useState(null);
   const [loadingAnalytics, setLoadingAnalytics] = useState(false);
   const [totalUsersCount, setTotalUsersCount] = useState(null);
+  const [allCustomers, setAllCustomers] = useState([]);
+  const [loadingCustomers, setLoadingCustomers] = useState(false);
+  const [customerSearch, setCustomerSearch] = useState('');
+  const [reports, setReports] = useState([]);
+  const [loadingReports, setLoadingReports] = useState(false);
+  const [reportStatusFilter, setReportStatusFilter] = useState('open');
+  const [suspendTarget, setSuspendTarget] = useState(null); // { id, name, isVendor } while the suspend-reason modal is open
+  const [suspendReason, setSuspendReason] = useState('');
 
   // Modals
   const [showAddServiceModal, setShowAddServiceModal] = useState(false);
@@ -99,7 +113,7 @@ export default function AdminDashboardView() {
 
   // Lock body scroll on modal opens & handle Escape
   useEffect(() => {
-    const isAnyModalOpen = showAddServiceModal || showAddProductModal || showAddVendorModal || !!selectedStylistToVerify;
+    const isAnyModalOpen = showAddServiceModal || showAddProductModal || showAddVendorModal || !!selectedStylistToVerify || !!suspendTarget;
     if (isAnyModalOpen) {
       document.body.classList.add('modal-open');
     } else {
@@ -112,6 +126,7 @@ export default function AdminDashboardView() {
         setShowAddProductModal(false);
         setShowAddVendorModal(false);
         setSelectedStylistToVerify(null);
+        setSuspendTarget(null);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -120,7 +135,38 @@ export default function AdminDashboardView() {
       document.body.classList.remove('modal-open');
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [showAddServiceModal, showAddProductModal, showAddVendorModal, selectedStylistToVerify]);
+  }, [showAddServiceModal, showAddProductModal, showAddVendorModal, selectedStylistToVerify, suspendTarget]);
+
+  // Fetches every profile (customers, vendors, admins) once on mount — small
+  // enough at this scale to just cache, and the vendors tab below needs it
+  // too (vendor_profiles has no is_suspended column of its own; suspension
+  // always lives on profiles).
+  useEffect(() => {
+    if (!isSupabaseConfigured || !supabase) return;
+    setLoadingCustomers(true);
+    supabase
+      .from('profiles')
+      .select('id, name, phone, campus, hostel, role, loyalty_points, is_suspended, suspended_reason, created_at')
+      .order('created_at', { ascending: false })
+      .then(({ data }) => {
+        setAllCustomers(data || []);
+        setLoadingCustomers(false);
+      });
+  }, []);
+
+  // Lazy-fetch the report queue only when that tab is opened.
+  useEffect(() => {
+    if (adminTab !== 'reports' || !isSupabaseConfigured || !supabase) return;
+    setLoadingReports(true);
+    supabase
+      .from('reports')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .then(({ data }) => {
+        setReports(data || []);
+        setLoadingReports(false);
+      });
+  }, [adminTab]);
 
   // Total signed-up users (every role, not just vendors) — profiles isn't
   // part of the app-wide bulk fetch, so this is a lightweight admin-only count.
@@ -177,6 +223,49 @@ export default function AdminDashboardView() {
   const grossRetailGMV = orders.reduce((sum, o) => sum + (Number(o.totalAmount) || 0), 0);
   const totalPlatformGMV = grossBookingGMV + grossRetailGMV;
   const pendingVendorsCount = staffList.filter((s) => !(s.isVerified || s.is_verified)).length;
+
+  const filteredCustomers = allCustomers.filter((c) =>
+    !customerSearch.trim() ||
+    c.name?.toLowerCase().includes(customerSearch.toLowerCase()) ||
+    c.phone?.includes(customerSearch)
+  );
+
+  // Reports reference auth.users ids directly (not a PostgREST-embeddable
+  // relationship), so names are resolved client-side against whichever
+  // directories are already loaded — falls back to a truncated id.
+  const resolveUserName = (id) => {
+    const vendor = staffList.find((s) => s.id === id);
+    if (vendor) return vendor.name;
+    const customer = allCustomers.find((c) => c.id === id);
+    if (customer) return customer.name;
+    return `User ${String(id).slice(0, 8)}…`;
+  };
+
+  const filteredReports = reports.filter((r) => reportStatusFilter === 'All' || r.status === reportStatusFilter);
+
+  const handleOpenSuspend = (id, name, isVendor) => {
+    setSuspendTarget({ id, name, isVendor });
+    setSuspendReason('');
+  };
+
+  const handleConfirmSuspend = async () => {
+    if (!suspendTarget) return;
+    await suspendUser(suspendTarget.id, suspendReason.trim(), suspendTarget.isVendor);
+    setAllCustomers((prev) => prev.map((c) => (c.id === suspendTarget.id ? { ...c, is_suspended: true, suspended_reason: suspendReason.trim() } : c)));
+    setSuspendTarget(null);
+    setSuspendReason('');
+  };
+
+  const handleUnsuspend = async (id, isVendor) => {
+    await unsuspendUser(id, isVendor);
+    setAllCustomers((prev) => prev.map((c) => (c.id === id ? { ...c, is_suspended: false, suspended_reason: null } : c)));
+  };
+
+  const handleReportStatus = async (reportId, status) => {
+    if (!isSupabaseConfigured || !supabase) return;
+    await supabase.from('reports').update({ status, reviewed_by: user.id, reviewed_at: new Date().toISOString() }).eq('id', reportId);
+    setReports((prev) => prev.map((r) => (r.id === reportId ? { ...r, status } : r)));
+  };
 
   // Platform 10% take rate + K5 platform safety fee per confirmed booking
   const confirmedBookingsCount = bookings.filter((b) => b.status === 'Confirmed' || b.status === 'Completed').length;
@@ -353,7 +442,9 @@ export default function AdminDashboardView() {
           { id: 'traffic', label: '📅 Live Booking Stream', count: bookings.length },
           { id: 'payouts', label: '📱 Mobile Money Payouts', count: null },
           { id: 'catalog', label: '🛍️ Services & Inventory', count: services.length + products.length },
-          { id: 'analytics', label: '📈 Funnel Analytics', count: null }
+          { id: 'analytics', label: '📈 Funnel Analytics', count: null },
+          { id: 'users', label: '👥 Customers', count: totalUsersCount },
+          { id: 'reports', label: '🚩 Reports', count: reports.filter((r) => r.status === 'open').length || null }
         ].map((tab) => (
           <button
             key={tab.id}
@@ -522,6 +613,7 @@ export default function AdminDashboardView() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredVendors.map((vendor) => {
               const isVerified = vendor.isVerified || vendor.is_verified;
+              const isVendorSuspended = allCustomers.find((c) => c.id === vendor.id)?.is_suspended || false;
               const vendorBookings = bookings.filter((b) => b.staffName?.includes(vendor.name) || b.staffId === vendor.id);
 
               return (
@@ -613,6 +705,17 @@ export default function AdminDashboardView() {
                         {isVerified ? 'Revoke' : 'Quick Approve'}
                       </button>
                     </div>
+
+                    <button
+                      onClick={() => (isVendorSuspended ? handleUnsuspend(vendor.id, true) : handleOpenSuspend(vendor.id, vendor.name, true))}
+                      className={`w-full text-[11px] px-2.5 py-1.5 rounded-xl font-bold transition-colors border cursor-pointer flex items-center justify-center gap-1.5 ${
+                        isVendorSuspended
+                          ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20'
+                          : 'bg-slate-500/10 border-slate-500/30 text-slate-500 hover:bg-rose-500/10 hover:border-rose-500/30 hover:text-rose-500'
+                      }`}
+                    >
+                      {isVendorSuspended ? (<><ShieldAlert size={12} /><span>Reactivate Account</span></>) : (<><Ban size={12} /><span>Suspend Account</span></>)}
+                    </button>
                   </div>
                 </div>
               );
@@ -839,6 +942,175 @@ export default function AdminDashboardView() {
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* 7. CUSTOMER DIRECTORY TAB */}
+      {adminTab === 'users' && (
+        <div className="space-y-4">
+          <div className="relative max-w-sm">
+            <input
+              type="text"
+              placeholder="Search customers by name or phone..."
+              className="form-input pl-9 text-xs"
+              value={customerSearch}
+              onChange={(e) => setCustomerSearch(e.target.value)}
+            />
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          </div>
+
+          {loadingCustomers ? (
+            <div className="card p-8 text-center text-slate-400 text-xs">Loading customers…</div>
+          ) : filteredCustomers.length === 0 ? (
+            <div className="card p-8 text-center text-slate-400 text-xs">No customers found.</div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredCustomers.map((c) => (
+                <div key={c.id} className="card p-4 flex flex-col justify-between border border-black/10 dark:border-white/10">
+                  <div>
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <h4 className="text-sm font-bold text-slate-900 dark:text-white m-0 truncate">{c.name}</h4>
+                      {c.is_suspended ? (
+                        <span className="badge badge-out-of-stock text-[9px] py-0.5 px-2 font-bold shrink-0">Suspended</span>
+                      ) : (
+                        <span className="badge badge-in-stock text-[9px] py-0.5 px-2 font-bold shrink-0 capitalize">{c.role}</span>
+                      )}
+                    </div>
+                    <div className="space-y-1 text-xs text-slate-500 dark:text-slate-400 mb-3 bg-black/[0.02] dark:bg-white/[0.02] p-2.5 rounded-xl border border-black/5 dark:border-white/5">
+                      <div className="flex items-center gap-1.5"><Phone size={12} className="text-slate-400 shrink-0" /><span>{c.phone || 'No phone on file'}</span></div>
+                      <div className="flex items-center gap-1.5"><Building size={12} className="text-slate-400 shrink-0" /><span className="truncate">{c.campus}</span></div>
+                      <div className="flex items-center gap-1.5"><Award size={12} className="text-slate-400 shrink-0" /><span>{c.loyalty_points || 0} loyalty points</span></div>
+                    </div>
+                    {c.is_suspended && c.suspended_reason && (
+                      <p className="text-[11px] text-rose-500 bg-rose-500/10 border border-rose-500/25 rounded-xl p-2 mb-3">{c.suspended_reason}</p>
+                    )}
+                  </div>
+                  {c.role !== 'admin' && (
+                    <button
+                      onClick={() => (c.is_suspended ? handleUnsuspend(c.id, false) : handleOpenSuspend(c.id, c.name, false))}
+                      className={`w-full text-[11px] px-2.5 py-1.5 rounded-xl font-bold transition-colors border cursor-pointer flex items-center justify-center gap-1.5 ${
+                        c.is_suspended
+                          ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20'
+                          : 'bg-slate-500/10 border-slate-500/30 text-slate-500 hover:bg-rose-500/10 hover:border-rose-500/30 hover:text-rose-500'
+                      }`}
+                    >
+                      {c.is_suspended ? (<><ShieldAlert size={12} /><span>Reactivate Account</span></>) : (<><Ban size={12} /><span>Suspend Account</span></>)}
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 8. SAFETY REPORTS TAB */}
+      {adminTab === 'reports' && (
+        <div className="space-y-4">
+          <div className="flex gap-1.5 overflow-x-auto pb-1">
+            {['open', 'reviewed', 'actioned', 'dismissed', 'All'].map((s) => (
+              <button
+                key={s}
+                onClick={() => setReportStatusFilter(s)}
+                className={`py-1.5 px-3 rounded-full text-xs font-semibold capitalize transition-all border cursor-pointer ${
+                  reportStatusFilter === s
+                    ? 'bg-amber-400 text-slate-950 border-amber-400 font-bold shadow-sm'
+                    : 'bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 text-slate-600 dark:text-slate-300'
+                }`}
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+
+          {loadingReports ? (
+            <div className="card p-8 text-center text-slate-400 text-xs">Loading reports…</div>
+          ) : filteredReports.length === 0 ? (
+            <div className="card p-8 text-center text-slate-400">
+              <Flag size={28} className="mx-auto mb-2 opacity-50" />
+              <p className="text-sm font-bold text-slate-900 dark:text-white m-0">No reports here</p>
+              <p className="text-xs text-slate-400 mt-1">Chat and profile reports filed by students will show up here.</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {filteredReports.map((r) => (
+                <div key={r.id} className="card p-4 border border-black/10 dark:border-white/10">
+                  <div className="flex items-start justify-between gap-3 mb-2">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <Flag size={14} className="text-rose-500 shrink-0" />
+                        <h4 className="text-sm font-bold text-slate-900 dark:text-white m-0">{r.reason}</h4>
+                      </div>
+                      <p className="text-[11px] text-slate-400 mt-0.5">
+                        {resolveUserName(r.reporter_id)} reported {resolveUserName(r.reported_user_id)} · {r.context_type} · {new Date(r.created_at).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <span className={`badge text-[9px] py-0.5 px-2 font-bold shrink-0 capitalize ${
+                      r.status === 'open' ? 'badge-out-of-stock' : r.status === 'actioned' ? 'badge-verified' : 'badge-in-stock'
+                    }`}>
+                      {r.status}
+                    </span>
+                  </div>
+                  {r.details && (
+                    <p className="text-xs text-slate-600 dark:text-slate-300 bg-black/[0.02] dark:bg-white/[0.02] p-2.5 rounded-xl border border-black/5 dark:border-white/5 mb-3">{r.details}</p>
+                  )}
+                  {r.status === 'open' && (
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        onClick={() => handleOpenSuspend(r.reported_user_id, resolveUserName(r.reported_user_id), Boolean(staffList.find((s) => s.id === r.reported_user_id)))}
+                        className="text-[11px] px-2.5 py-1.5 rounded-xl font-bold border bg-rose-500/10 border-rose-500/30 text-rose-500 hover:bg-rose-500/20 cursor-pointer flex items-center gap-1"
+                      >
+                        <Ban size={12} /><span>Suspend Reported User</span>
+                      </button>
+                      <button
+                        onClick={() => handleReportStatus(r.id, 'reviewed')}
+                        className="text-[11px] px-2.5 py-1.5 rounded-xl font-bold border bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 text-slate-600 dark:text-slate-300 cursor-pointer"
+                      >
+                        Mark Reviewed
+                      </button>
+                      <button
+                        onClick={() => handleReportStatus(r.id, 'dismissed')}
+                        className="text-[11px] px-2.5 py-1.5 rounded-xl font-bold border bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 text-slate-600 dark:text-slate-300 cursor-pointer"
+                      >
+                        Dismiss
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* MODAL: SUSPEND ACCOUNT */}
+      {suspendTarget && (
+        <div className="modal-overlay" onClick={() => setSuspendTarget(null)}>
+          <div className="modal-card max-w-sm" onClick={(e) => e.stopPropagation()}>
+            <button className="modal-close" onClick={() => setSuspendTarget(null)}>
+              <X size={18} />
+            </button>
+            <div className="w-12 h-12 rounded-full bg-rose-500/15 text-rose-500 flex items-center justify-center mx-auto mb-3">
+              <ShieldOff size={24} />
+            </div>
+            <h3 className="text-base font-bold text-slate-900 dark:text-white mb-1 text-center">Suspend {suspendTarget.name}?</h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 text-center leading-relaxed">
+              They'll be signed out of all booking, ordering, and chat actions immediately, and will see this reason.
+            </p>
+            <div className="form-group">
+              <label className="form-label">Reason (shown to the user):</label>
+              <textarea
+                className="form-input text-xs"
+                rows={3}
+                placeholder="e.g. Repeated harassment reports from multiple students"
+                value={suspendReason}
+                onChange={(e) => setSuspendReason(e.target.value)}
+              />
+            </div>
+            <button onClick={handleConfirmSuspend} className="btn-danger w-full text-xs py-2.5 mt-2">
+              Suspend Account
+            </button>
+          </div>
         </div>
       )}
 

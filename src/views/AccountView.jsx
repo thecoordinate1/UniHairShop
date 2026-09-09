@@ -46,6 +46,8 @@ export default function AccountView() {
     signOut,
     terminateAllSessions,
     updateUserProfile,
+    exportMyData,
+    deleteAccount,
     setShowAuthModal,
     bookings,
     orders,
@@ -82,6 +84,9 @@ export default function AccountView() {
   const [editName, setEditName] = useState(user.name || '');
   const [editPhone, setEditPhone] = useState(user.phone || '');
   const [editHostel, setEditHostel] = useState(user.hostel || '');
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [deletingAccount, setDeletingAccount] = useState(false);
 
   const today = new Date().toISOString().split('T')[0];
 
@@ -1027,6 +1032,86 @@ export default function AccountView() {
                 Confirm
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Privacy & Data Controls */}
+      {user.isLoggedIn && (
+        <div className="card p-5">
+          <div className="flex items-center gap-2 mb-1">
+            <ShieldCheck size={18} className="text-amber-500" />
+            <h4 className="text-sm font-bold text-slate-900 dark:text-white m-0">Privacy & Your Data</h4>
+          </div>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
+            Download a copy of everything UniHairShop has on your account, or permanently delete your account.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={exportMyData}
+              className="apple-btn-secondary text-xs px-3.5 py-2 flex items-center gap-1.5"
+            >
+              <Download size={13} />
+              <span>Download My Data</span>
+            </button>
+            <button
+              onClick={() => setShowDeleteConfirm(true)}
+              className="apple-btn-secondary text-xs px-3.5 py-2 flex items-center gap-1.5 text-rose-500 hover:bg-rose-500/10 hover:border-rose-500/40"
+            >
+              <XCircle size={13} />
+              <span>Delete My Account</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Account Confirmation */}
+      {showDeleteConfirm && (
+        <div
+          className="modal-overlay"
+          onClick={(e) => { if (e.target === e.currentTarget && !deletingAccount) { setShowDeleteConfirm(false); setDeleteConfirmText(''); } }}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Confirm account deletion"
+        >
+          <div className="modal-card max-w-sm" onClick={(e) => e.stopPropagation()}>
+            {!deletingAccount && (
+              <button className="modal-close" onClick={() => { setShowDeleteConfirm(false); setDeleteConfirmText(''); }}>
+                <X size={18} />
+              </button>
+            )}
+            <div className="w-12 h-12 rounded-full bg-rose-500/15 text-rose-500 flex items-center justify-center mx-auto mb-3">
+              <XCircle size={24} />
+            </div>
+            <h3 className="text-base font-bold text-slate-900 dark:text-white mb-1 text-center">Delete Your Account?</h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 text-center leading-relaxed">
+              This permanently removes your name, phone, and hostel details and you'll never be able to sign back in. Past bookings/orders stay on record for accounting, but with your identity removed.
+            </p>
+            <div className="form-group">
+              <label className="form-label">Type <strong>DELETE</strong> to confirm:</label>
+              <input
+                type="text"
+                className="form-input text-xs"
+                value={deleteConfirmText}
+                onChange={(e) => setDeleteConfirmText(e.target.value)}
+                disabled={deletingAccount}
+              />
+            </div>
+            <button
+              disabled={deleteConfirmText !== 'DELETE' || deletingAccount}
+              onClick={async () => {
+                setDeletingAccount(true);
+                const result = await deleteAccount();
+                setDeletingAccount(false);
+                if (result.success) {
+                  setShowDeleteConfirm(false);
+                  setDeleteConfirmText('');
+                }
+              }}
+              className="btn-danger w-full text-xs py-2.5 mt-2 disabled:opacity-40"
+            >
+              {deletingAccount ? 'Deleting...' : 'Permanently Delete My Account'}
+            </button>
           </div>
         </div>
       )}

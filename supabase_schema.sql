@@ -33,6 +33,9 @@ ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS referred_by TEXT;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS referral_count INT DEFAULT 0;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS points_history JSONB DEFAULT '[]'::jsonb;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS email TEXT;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS is_suspended BOOLEAN DEFAULT false;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS suspended_reason TEXT;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS suspended_at TIMESTAMPTZ;
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_profiles_referral_code ON public.profiles(referral_code) WHERE referral_code IS NOT NULL;
 
@@ -261,6 +264,24 @@ CREATE TABLE IF NOT EXISTS public.audit_log (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- 10b. REPORTS — a user flagging another user's chat message, stylist
+-- profile, or booking for admin review (harassment, impersonation, unsafe
+-- behavior). The only in-app safety escalation path besides messaging
+-- support directly on WhatsApp.
+CREATE TABLE IF NOT EXISTS public.reports (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  reporter_id UUID NOT NULL REFERENCES auth.users(id),
+  reported_user_id UUID NOT NULL REFERENCES auth.users(id),
+  context_type TEXT NOT NULL CHECK (context_type IN ('chat', 'stylist_profile', 'booking')),
+  context_id TEXT,
+  reason TEXT NOT NULL,
+  details TEXT,
+  status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'reviewed', 'dismissed', 'actioned')),
+  reviewed_by UUID REFERENCES auth.users(id),
+  reviewed_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 -- 11. REVIEWS — one real review per completed booking, written only via
 -- submit_review() below so the vendor's rating/reviews_count can never be
 -- client-forged. This is what makes vendor_profiles.rating a real number.
@@ -352,6 +373,7 @@ ALTER TABLE public.analytics_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.product_sales ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.push_subscriptions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.platform_fees ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.reports ENABLE ROW LEVEL SECURITY;
 
 -- ==============================================================================
 -- Server-side functions (SECURITY DEFINER) — trusted business logic clients
@@ -361,6 +383,15 @@ ALTER TABLE public.platform_fees ENABLE ROW LEVEL SECURITY;
 CREATE OR REPLACE FUNCTION public.is_admin()
 RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
   SELECT EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin');
+$$;
+
+-- Shared by RLS policies and booking/order/review RPCs so a suspended
+-- customer or vendor can't act anywhere in the app through any single
+-- code path — the flag itself can only ever be set by suspend_user()/
+-- unsuspend_user() below, both admin-gated.
+CREATE OR REPLACE FUNCTION public.is_user_suspended(p_user_id UUID)
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+  SELECT COALESCE((SELECT is_suspended FROM public.profiles WHERE id = p_user_id), false);
 $$;
 
 -- Fires the send-push Edge Function for one user's registered devices. Reads
@@ -400,6 +431,9 @@ BEGIN
     NEW.loyalty_points := 0;
     NEW.referral_count := 0;
     NEW.points_history := '[]'::jsonb;
+    NEW.is_suspended := false;
+    NEW.suspended_reason := NULL;
+    NEW.suspended_at := NULL;
     RETURN NEW;
   END IF;
   IF auth.uid() = OLD.id AND NOT public.is_admin() THEN
@@ -408,6 +442,30 @@ BEGIN
     NEW.referral_code := OLD.referral_code;
     NEW.referral_count := OLD.referral_count;
     NEW.points_history := OLD.points_history;
+    -- Only suspend_user()/unsuspend_user() (both admin-gated) may change these —
+    -- otherwise a suspended user could simply PATCH their own row to lift it.
+    NEW.is_suspended := OLD.is_suspended;
+    NEW.suspended_reason := OLD.suspended_reason;
+    NEW.suspended_at := OLD.suspended_at;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+-- Logs every suspend/unsuspend as an audit trail entry, separate from the
+-- self-edit protection above so it fires regardless of who made the change.
+CREATE OR REPLACE FUNCTION public.log_profile_suspension_change()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+  IF NEW.is_suspended IS DISTINCT FROM OLD.is_suspended THEN
+    INSERT INTO public.audit_log (actor_id, action, entity_type, entity_id, metadata)
+    VALUES (
+      auth.uid(),
+      CASE WHEN NEW.is_suspended THEN 'user_suspended' ELSE 'user_unsuspended' END,
+      'profile',
+      NEW.id::text,
+      jsonb_build_object('reason', NEW.suspended_reason)
+    );
   END IF;
   RETURN NEW;
 END;
@@ -463,6 +521,8 @@ CREATE OR REPLACE FUNCTION public.request_booking(
 DECLARE v_profile public.profiles; v_booking public.bookings; v_vendor public.vendor_profiles;
 BEGIN
   IF auth.uid() IS NULL THEN RAISE EXCEPTION 'Authentication required'; END IF;
+  IF public.is_user_suspended(auth.uid()) THEN RAISE EXCEPTION 'Your account has been suspended. Contact support for help.'; END IF;
+  IF public.is_user_suspended(p_staff_id::uuid) THEN RAISE EXCEPTION 'This stylist is currently unavailable'; END IF;
   SELECT * INTO v_profile FROM public.profiles WHERE id = auth.uid();
   SELECT * INTO v_vendor FROM public.vendor_profiles WHERE id = p_staff_id AND is_verified = true;
   IF v_profile.id IS NULL OR v_vendor.id IS NULL THEN RAISE EXCEPTION 'Choose a verified stylist'; END IF;
@@ -573,6 +633,7 @@ RETURNS public.reviews LANGUAGE plpgsql SECURITY DEFINER SET search_path = publi
 DECLARE v_booking public.bookings; v_review public.reviews; v_avg NUMERIC; v_count INT;
 BEGIN
   IF auth.uid() IS NULL THEN RAISE EXCEPTION 'Authentication required'; END IF;
+  IF public.is_user_suspended(auth.uid()) THEN RAISE EXCEPTION 'Your account has been suspended. Contact support for help.'; END IF;
   IF p_rating < 1 OR p_rating > 5 THEN RAISE EXCEPTION 'Rating must be between 1 and 5'; END IF;
   SELECT * INTO v_booking FROM public.bookings WHERE id = p_booking_id;
   IF v_booking.id IS NULL THEN RAISE EXCEPTION 'Booking not found'; END IF;
@@ -649,6 +710,7 @@ DECLARE
   v_final_items JSONB := '[]'::jsonb;
 BEGIN
   IF auth.uid() IS NULL THEN RAISE EXCEPTION 'Authentication required'; END IF;
+  IF public.is_user_suspended(auth.uid()) THEN RAISE EXCEPTION 'Your account has been suspended. Contact support for help.'; END IF;
   SELECT * INTO v_profile FROM public.profiles WHERE id = auth.uid();
   IF v_profile.id IS NULL THEN RAISE EXCEPTION 'Profile not found'; END IF;
   IF p_items IS NULL OR jsonb_array_length(p_items) = 0 THEN RAISE EXCEPTION 'Cart is empty'; END IF;
@@ -728,6 +790,10 @@ DROP TRIGGER IF EXISTS profiles_protect_sensitive_fields ON public.profiles;
 CREATE TRIGGER profiles_protect_sensitive_fields BEFORE UPDATE ON public.profiles
 FOR EACH ROW EXECUTE FUNCTION public.protect_profile_fields();
 
+DROP TRIGGER IF EXISTS profiles_log_suspension_change ON public.profiles;
+CREATE TRIGGER profiles_log_suspension_change AFTER UPDATE ON public.profiles
+FOR EACH ROW EXECUTE FUNCTION public.log_profile_suspension_change();
+
 DROP TRIGGER IF EXISTS vendor_profiles_protect_verification ON public.vendor_profiles;
 CREATE TRIGGER vendor_profiles_protect_verification BEFORE INSERT OR UPDATE ON public.vendor_profiles
 FOR EACH ROW EXECUTE FUNCTION public.prevent_vendor_self_verification();
@@ -753,7 +819,7 @@ CREATE POLICY profiles_select ON public.profiles FOR SELECT TO authenticated USI
 CREATE POLICY profiles_insert ON public.profiles FOR INSERT TO authenticated WITH CHECK (id = auth.uid());
 CREATE POLICY profiles_update ON public.profiles FOR UPDATE TO authenticated USING (id = auth.uid() OR public.is_admin()) WITH CHECK (id = auth.uid() OR public.is_admin());
 
-CREATE POLICY vendors_public_read ON public.vendor_profiles FOR SELECT TO anon, authenticated USING (is_verified OR id = auth.uid()::text OR public.is_admin());
+CREATE POLICY vendors_public_read ON public.vendor_profiles FOR SELECT TO anon, authenticated USING ((is_verified AND NOT public.is_user_suspended(id::uuid)) OR id = auth.uid()::text OR public.is_admin());
 CREATE POLICY vendors_self_insert ON public.vendor_profiles FOR INSERT TO authenticated WITH CHECK (id = auth.uid()::text);
 CREATE POLICY vendors_self_update ON public.vendor_profiles FOR UPDATE TO authenticated USING (id = auth.uid()::text OR public.is_admin()) WITH CHECK (id = auth.uid()::text OR public.is_admin());
 
@@ -773,7 +839,7 @@ CREATE POLICY conversations_participant_read ON public.conversations FOR SELECT 
 CREATE POLICY conversations_participant_insert ON public.conversations FOR INSERT TO authenticated WITH CHECK (customer_id = auth.uid() OR stylist_id = auth.uid()::text);
 CREATE POLICY conversations_participant_update ON public.conversations FOR UPDATE TO authenticated USING (customer_id = auth.uid() OR stylist_id = auth.uid()::text OR public.is_admin()) WITH CHECK (customer_id = auth.uid() OR stylist_id = auth.uid()::text OR public.is_admin());
 CREATE POLICY messages_participant_read ON public.messages FOR SELECT TO authenticated USING (EXISTS (SELECT 1 FROM public.conversations c WHERE c.id = messages.conversation_id AND (c.customer_id = auth.uid() OR c.stylist_id = auth.uid()::text OR public.is_admin())));
-CREATE POLICY messages_participant_insert ON public.messages FOR INSERT TO authenticated WITH CHECK (EXISTS (SELECT 1 FROM public.conversations c WHERE c.id = messages.conversation_id AND (c.customer_id = auth.uid() OR c.stylist_id = auth.uid()::text)));
+CREATE POLICY messages_participant_insert ON public.messages FOR INSERT TO authenticated WITH CHECK (NOT public.is_user_suspended(auth.uid()) AND EXISTS (SELECT 1 FROM public.conversations c WHERE c.id = messages.conversation_id AND (c.customer_id = auth.uid() OR c.stylist_id = auth.uid()::text)));
 CREATE POLICY wallets_owner_read ON public.vendor_wallets FOR SELECT TO authenticated USING (vendor_id = auth.uid()::text OR public.is_admin());
 CREATE POLICY payouts_owner_read ON public.vendor_payouts FOR SELECT TO authenticated USING (vendor_id = auth.uid()::text OR public.is_admin());
 CREATE POLICY ledger_owner_read ON public.points_ledger FOR SELECT TO authenticated USING (profile_id = auth.uid() OR public.is_admin());
@@ -798,6 +864,12 @@ CREATE POLICY push_subscriptions_owner_all ON public.push_subscriptions FOR ALL 
 -- Platform fee deductions are only ever written by transition_booking()/
 -- confirm_paid_order() below — a vendor can see their own fee history, never write to it.
 CREATE POLICY platform_fees_vendor_read ON public.platform_fees FOR SELECT TO authenticated USING (vendor_id = auth.uid()::text OR public.is_admin());
+
+-- A reporter can file a report and see their own past reports; only admins
+-- see (and act on) the full queue.
+CREATE POLICY reports_insert ON public.reports FOR INSERT TO authenticated WITH CHECK (reporter_id = auth.uid() AND reported_user_id != auth.uid());
+CREATE POLICY reports_read ON public.reports FOR SELECT TO authenticated USING (reporter_id = auth.uid() OR public.is_admin());
+CREATE POLICY reports_admin_update ON public.reports FOR UPDATE TO authenticated USING (public.is_admin()) WITH CHECK (public.is_admin());
 
 -- Service-role functions/Edge Functions write financial and booking state. Clients
 -- have read-only access to those records, preventing balance/refund manipulation.

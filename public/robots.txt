@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+Disallow: /?tab=admin
+Disallow: /?tab=vendor
+Disallow: /?tab=account
+Disallow: /?tab=messages
+Disallow: /?tab=cart
+
+Sitemap: https://www.unihair.shop/sitemap.xml

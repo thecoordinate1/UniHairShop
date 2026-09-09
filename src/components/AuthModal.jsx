@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { X, Sparkles, Lock, Mail, Phone, MapPin, User, Building, Store, Scissors, ArrowRight, CheckCircle2, AlertCircle, KeyRound, HelpCircle, Eye, EyeOff } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient';
+import TurnstileWidget from './TurnstileWidget';
 
 // Deep-link into the webmail inbox for common providers; fall back to mailto:
 // (opens the device's default mail app) for anything else.
@@ -48,6 +49,8 @@ export default function AuthModal() {
   const [resetSuccess, setResetSuccess] = useState(false);
   const [verificationEmail, setVerificationEmail] = useState('');
   const [resendingVerification, setResendingVerification] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState('');
+  const turnstileRef = useRef(null);
 
   useEffect(() => {
     if (!showAuthModal) return;
@@ -78,7 +81,7 @@ export default function AuthModal() {
 
     setLoading(true);
     try {
-      await signIn(email.trim(), password);
+      await signIn(email.trim(), password, captchaToken);
       setShowAuthModal(false);
 
       // Execute any pending action that was blocked by auth
@@ -90,6 +93,8 @@ export default function AuthModal() {
       setErrorMsg(err.message || 'Failed to sign in. Please verify your credentials.');
     } finally {
       setLoading(false);
+      turnstileRef.current?.reset();
+      setCaptchaToken('');
     }
   };
 
@@ -123,7 +128,8 @@ export default function AuthModal() {
         campus,
         hostel: hostel.trim() || 'Campus Hostel',
         role: roleType === 'stylist' ? 'vendor' : 'customer',
-        referralCode: referralCode.trim().toUpperCase()
+        referralCode: referralCode.trim().toUpperCase(),
+        captchaToken
       });
 
       // A live session means either local/no-Supabase mode (always instant) or
@@ -145,6 +151,8 @@ export default function AuthModal() {
       setErrorMsg(err.message || 'Failed to create account.');
     } finally {
       setLoading(false);
+      turnstileRef.current?.reset();
+      setCaptchaToken('');
     }
   };
 
@@ -184,7 +192,8 @@ export default function AuthModal() {
           ? `${window.location.origin}/`
           : 'https://www.unihair.shop/';
         const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-          redirectTo: redirectUrl
+          redirectTo: redirectUrl,
+          captchaToken: captchaToken || undefined
         });
         if (error) throw error;
       }
@@ -194,6 +203,8 @@ export default function AuthModal() {
       setErrorMsg(err.message || 'Could not send reset email. Please verify the address.');
     } finally {
       setLoading(false);
+      turnstileRef.current?.reset();
+      setCaptchaToken('');
     }
   };
 
@@ -345,6 +356,8 @@ export default function AuthModal() {
               </div>
             </div>
 
+            <TurnstileWidget ref={turnstileRef} onVerify={setCaptchaToken} />
+
             <button
               type="submit"
               disabled={loading}
@@ -416,6 +429,8 @@ export default function AuthModal() {
                 </button>
               </div>
             </div>
+
+            <TurnstileWidget ref={turnstileRef} onVerify={setCaptchaToken} />
 
             <button
               type="submit"
@@ -585,6 +600,8 @@ export default function AuthModal() {
                 onChange={(e) => setReferralCode(e.target.value.trim().toUpperCase())}
               />
             </div>
+
+            <TurnstileWidget ref={turnstileRef} onVerify={setCaptchaToken} />
 
             <button
               type="submit"

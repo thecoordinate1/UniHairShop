@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import TurnstileWidget from './TurnstileWidget';
 import {
   Scissors,
   Lock,
@@ -70,6 +71,8 @@ export default function AuthWall() {
   const [resetSent, setResetSent] = useState(false);
   const [verificationEmail, setVerificationEmail] = useState('');
   const [resendingVerification, setResendingVerification] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState('');
+  const turnstileRef = useRef(null);
   const errorRef = useRef(null);
 
   // The error banner renders above a long, scrollable form — without this, a
@@ -93,12 +96,14 @@ export default function AuthWall() {
     setLoading(true);
     setErrorMsg('');
     try {
-      await signIn(email.trim(), password);
+      await signIn(email.trim(), password, captchaToken);
     } catch (err) {
       console.error('Login Error:', err);
       setErrorMsg(err.message || 'Invalid credentials. Please check your email and password.');
     } finally {
       setLoading(false);
+      turnstileRef.current?.reset();
+      setCaptchaToken('');
     }
   };
 
@@ -136,7 +141,8 @@ export default function AuthWall() {
         hostel: hostel.trim() || 'Campus Hostel Residence',
         password,
         role: roleType,
-        referralCode: referralCode.trim()
+        referralCode: referralCode.trim(),
+        captchaToken
       });
 
       // A live session means either local/no-Supabase mode (always instant) or
@@ -155,6 +161,8 @@ export default function AuthWall() {
       setErrorMsg(err.message || 'Registration failed. This email may already be in use.');
     } finally {
       setLoading(false);
+      turnstileRef.current?.reset();
+      setCaptchaToken('');
     }
   };
 
@@ -441,6 +449,8 @@ export default function AuthWall() {
                 </span>
               </label>
 
+              <TurnstileWidget ref={turnstileRef} onVerify={setCaptchaToken} />
+
               {/* Submit Button */}
               <button
                 type="submit"
@@ -556,6 +566,8 @@ export default function AuthWall() {
                 </div>
               </div>
 
+              <TurnstileWidget ref={turnstileRef} onVerify={setCaptchaToken} />
+
               {/* Submit Button */}
               <button
                 type="submit"
@@ -623,6 +635,8 @@ export default function AuthWall() {
                     />
                   </div>
 
+                  <TurnstileWidget ref={turnstileRef} onVerify={setCaptchaToken} />
+
                   <button
                     type="button"
                     disabled={loading}
@@ -639,7 +653,8 @@ export default function AuthWall() {
                             ? `${window.location.origin}/`
                             : 'https://www.unihair.shop/';
                           const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-                            redirectTo: redirectUrl
+                            redirectTo: redirectUrl,
+                            captchaToken: captchaToken || undefined
                           });
                           if (error) throw error;
                         }
@@ -649,6 +664,8 @@ export default function AuthWall() {
                         setErrorMsg(err.message || 'Failed to send reset email. Please verify your address.');
                       } finally {
                         setLoading(false);
+                        turnstileRef.current?.reset();
+                        setCaptchaToken('');
                       }
                     }}
                     className="apple-btn-primary w-full text-xs py-2.5 rounded-xl font-bold flex items-center justify-center gap-1.5 disabled:opacity-50"

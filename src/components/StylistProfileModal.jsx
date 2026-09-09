@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { X, Star, ShieldCheck, Clock, MapPin, MessageCircle, Calendar, CheckCircle2, ChevronRight, Sparkles, Heart, Share2, Copy, Check, Link2 } from 'lucide-react';
+import { X, Star, ShieldCheck, Clock, MapPin, MessageCircle, Calendar, CheckCircle2, ChevronRight, Sparkles, Heart, Share2, Copy, Check, Link2, Flag } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import ReportModal from './ReportModal';
 
 export default function StylistProfileModal() {
   const {
@@ -18,6 +19,7 @@ export default function StylistProfileModal() {
 
   const [activeTab, setActiveProfileTab] = useState('portfolio'); // 'portfolio' | 'services' | 'reviews'
   const [copiedLink, setCopiedLink] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
 
   useEffect(() => {
     if (!selectedStylist) return;
@@ -175,6 +177,16 @@ export default function StylistProfileModal() {
                   <Link2 size={12} />
                   <span>Social</span>
                 </a>
+              )}
+              {user?.isLoggedIn && user?.id !== selectedStylist.id && (
+                <button
+                  type="button"
+                  onClick={() => setShowReportModal(true)}
+                  className="inline-flex items-center gap-1 text-[11px] text-slate-400 hover:text-rose-500 font-semibold bg-transparent border-0 cursor-pointer p-0"
+                >
+                  <Flag size={11} />
+                  <span>Report</span>
+                </button>
               )}
             </div>
 
@@ -336,6 +348,16 @@ export default function StylistProfileModal() {
           )}
         </div>
       </div>
+
+      {showReportModal && (
+        <ReportModal
+          reportedUserId={selectedStylist.id}
+          reportedUserName={selectedStylist.name}
+          contextType="stylist_profile"
+          contextId={selectedStylist.id}
+          onClose={() => setShowReportModal(false)}
+        />
+      )}
     </div>
   );
 }
