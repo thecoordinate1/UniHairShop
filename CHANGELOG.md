@@ -4,6 +4,11 @@ All notable changes to UniHairShop are recorded here, newest first. Versions fol
 
 Each release is tagged in git as `vX.Y.Z` — refer to that tag instead of a commit hash when talking about "which version."
 
+## [0.10.0] — 2026-09-10
+
+### Added
+- Vendor Studio shows an "Account Completion Status" pill (e.g. "Profile 60% Complete"). Clicking it lists exactly which fields are missing — photo, bio, gender, location, specialties, payout account, ID document, at least one service — and clicking any missing item jumps straight to where it gets fixed.
+
 ## [0.9.9] — 2026-09-10
 
 ### Added

@@ -16,6 +16,7 @@ import {
   MessageCircle,
   Phone,
   ShieldCheck,
+  ShieldAlert,
   Tag,
   UploadCloud,
   ChevronRight,
@@ -33,7 +34,7 @@ import {
   Package,
   Award
 } from 'lucide-react';
-import { useApp, getAvatarHaloClass } from '../context/AppContext';
+import { useApp, getAvatarHaloClass, DEFAULT_AVATAR } from '../context/AppContext';
 import { playSuccessChime } from '../lib/soundEffects';
 import { uploadImage } from '../lib/uploadImage';
 import { lusakaUniversities, campusHostels } from '../data/mockData';
@@ -268,6 +269,45 @@ export default function VendorStudioView() {
 
   const bioHandle = vendorProfile.handle || myStylistObj.handle || vendorProfile.id || '';
   const bioUrl = `${window.location.origin}/?stylist=${bioHandle}`;
+
+  // Account Completion Status — each item knows how to open the exact place
+  // that fixes it, rather than just naming what's missing.
+  const [showCompletionPanel, setShowCompletionPanel] = useState(false);
+  const myServiceCount = services.filter((s) => (s.staffIds || s.staff_ids || []).includes(vendorProfile.id)).length;
+  const openEditProfileModal = () => {
+    setEditName(vendorProfile.name || '');
+    setEditBio(vendorProfile.bio || '');
+    setEditPhone(vendorProfile.phone || '');
+    setEditAvatar(vendorProfile.avatar || '');
+    setEditCampus(vendorProfile.campus || lusakaUniversities[0].name);
+    setEditDormLocation(vendorProfile.dormLocation || vendorProfile.dorm_location || '');
+    setEditGender(vendorProfile.gender || 'male');
+    setEditIdDocument(vendorProfile.idDocumentUrl || vendorProfile.id_document_url || '');
+    setEditSpecialties(vendorProfile.specialties || []);
+    setEditSocialLinks(
+      vendorProfile.socialLinks?.length
+        ? vendorProfile.socialLinks
+        : (vendorProfile.social_links?.length
+          ? vendorProfile.social_links
+          : ((vendorProfile.socialLink || vendorProfile.social_link) ? [vendorProfile.socialLink || vendorProfile.social_link] : []))
+    );
+    setNewSocialLinkInput('');
+    setEditPayoutAccounts(vendorProfile.payoutAccounts || vendorProfile.payout_accounts || []);
+    setShowEditProfileModal(true);
+    setShowCompletionPanel(false);
+  };
+  const completionItems = [
+    { label: 'Add a profile photo', done: !!vendorProfile.avatar && vendorProfile.avatar !== DEFAULT_AVATAR, action: openEditProfileModal },
+    { label: 'Write a short bio', done: !!vendorProfile.bio?.trim(), action: openEditProfileModal },
+    { label: 'Set your gender (for your profile halo)', done: !!vendorProfile.gender, action: openEditProfileModal },
+    { label: 'Confirm your hostel / studio location', done: !!(vendorProfile.dormLocation || vendorProfile.dorm_location), action: openEditProfileModal },
+    { label: 'Select at least one specialty', done: (vendorProfile.specialties || []).length > 0, action: openEditProfileModal },
+    { label: 'Add a mobile money payout account', done: (vendorProfile.payoutAccounts || vendorProfile.payout_accounts || []).length > 0, action: openEditProfileModal },
+    { label: 'Upload your student ID for verification', done: !!(vendorProfile.idDocumentUrl || vendorProfile.id_document_url), action: openEditProfileModal },
+    { label: 'Add at least one service to your menu', done: myServiceCount > 0, action: () => { setActiveTabLocal('services'); setShowCompletionPanel(false); } }
+  ];
+  const completionDoneCount = completionItems.filter((i) => i.done).length;
+  const completionPercent = Math.round((completionDoneCount / completionItems.length) * 100);
 
   const handleCopyBioUrl = () => {
     if (navigator.clipboard) {
@@ -518,32 +558,52 @@ export default function VendorStudioView() {
         <div className="flex flex-wrap items-center gap-2.5">
           {/* Edit Profile */}
           <button
-            onClick={() => {
-              setEditName(vendorProfile.name || '');
-              setEditBio(vendorProfile.bio || '');
-              setEditPhone(vendorProfile.phone || '');
-              setEditAvatar(vendorProfile.avatar || '');
-              setEditCampus(vendorProfile.campus || lusakaUniversities[0].name);
-              setEditDormLocation(vendorProfile.dormLocation || vendorProfile.dorm_location || '');
-              setEditGender(vendorProfile.gender || 'male');
-              setEditIdDocument(vendorProfile.idDocumentUrl || vendorProfile.id_document_url || '');
-              setEditSpecialties(vendorProfile.specialties || []);
-              setEditSocialLinks(
-                vendorProfile.socialLinks?.length
-                  ? vendorProfile.socialLinks
-                  : (vendorProfile.social_links?.length
-                    ? vendorProfile.social_links
-                    : ((vendorProfile.socialLink || vendorProfile.social_link) ? [vendorProfile.socialLink || vendorProfile.social_link] : []))
-              );
-              setNewSocialLinkInput('');
-              setEditPayoutAccounts(vendorProfile.payoutAccounts || vendorProfile.payout_accounts || []);
-              setShowEditProfileModal(true);
-            }}
+            onClick={openEditProfileModal}
             className="apple-btn-secondary text-xs px-3.5 py-2 flex items-center gap-2"
           >
             <Settings size={14} />
             <span>Edit Profile</span>
           </button>
+
+          {/* Account Completion Status */}
+          <div className="relative">
+            <button
+              onClick={() => setShowCompletionPanel((v) => !v)}
+              className={`text-xs px-3.5 py-2 rounded-2xl flex items-center gap-2 font-semibold border cursor-pointer transition-all ${
+                completionPercent === 100
+                  ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-600 dark:text-emerald-400'
+                  : 'bg-amber-400/15 border-amber-400/30 text-amber-600 dark:text-amber-400'
+              }`}
+            >
+              {completionPercent === 100 ? <CheckCircle2 size={14} /> : <ShieldAlert size={14} />}
+              <span>Profile {completionPercent}% Complete</span>
+            </button>
+
+            {showCompletionPanel && (
+              <div className="absolute top-11 left-0 z-50 w-72 bg-white dark:bg-[#1A1A22] border border-black/10 dark:border-white/15 rounded-3xl shadow-2xl p-3">
+                <p className="text-[11px] text-slate-400 font-semibold uppercase tracking-wide mb-2 px-1">
+                  {completionPercent === 100 ? 'Everything looks complete!' : 'Tap a missing item to fix it'}
+                </p>
+                <div className="flex flex-col gap-1 max-h-64 overflow-y-auto">
+                  {completionItems.map((item) => (
+                    <button
+                      key={item.label}
+                      onClick={item.done ? undefined : item.action}
+                      disabled={item.done}
+                      className={`w-full text-left p-2.5 rounded-xl text-xs flex items-center gap-2 border-0 cursor-pointer ${
+                        item.done
+                          ? 'text-slate-400 cursor-default'
+                          : 'bg-amber-400/10 hover:bg-amber-400/20 text-slate-700 dark:text-slate-200 font-semibold'
+                      }`}
+                    >
+                      {item.done ? <CheckCircle2 size={14} className="text-emerald-500 shrink-0" /> : <ShieldAlert size={14} className="text-amber-500 shrink-0" />}
+                      <span className={item.done ? 'line-through' : ''}>{item.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* Dorm Travel Availability Switch */}
           <button
