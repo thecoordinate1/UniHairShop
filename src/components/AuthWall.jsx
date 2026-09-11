@@ -25,7 +25,7 @@ import {
   ChevronRight
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
-import { supabase, isSupabaseConfigured } from '../lib/supabaseClient';
+import { supabase, isSupabaseConfigured, resetPasswordForEmailWithRetry } from '../lib/supabaseClient';
 
 // Deep-link into the webmail inbox for common providers; fall back to mailto:
 // (opens the device's default mail app) for anything else.
@@ -652,7 +652,7 @@ export default function AuthWall() {
                           const redirectUrl = typeof window !== 'undefined' && window.location.origin
                             ? `${window.location.origin}/`
                             : 'https://www.unihair.shop/';
-                          const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+                          const { error } = await resetPasswordForEmailWithRetry(email.trim(), {
                             redirectTo: redirectUrl,
                             captchaToken: captchaToken || undefined
                           });

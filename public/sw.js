@@ -76,8 +76,8 @@ self.addEventListener('fetch', (event) => {
   // 2. Navigation Requests (HTML) -> Network-First with Offline App-Shell Fallback
   if (event.request.mode === 'navigate') {
     event.respondWith(
-      fetch(event.request).catch(() => {
-        return caches.match('/index.html') || caches.match('/');
+      fetch(event.request).catch(async () => {
+        return (await caches.match('/index.html')) || (await caches.match('/'));
       })
     );
     return;

@@ -4,6 +4,12 @@ All notable changes to UniHairShop are recorded here, newest first. Versions fol
 
 Each release is tagged in git as `vX.Y.Z` — refer to that tag instead of a commit hash when talking about "which version."
 
+## [0.10.3] — 2026-09-11
+
+### Fixed
+- Password reset showing the browser's raw internal error ("Load failed" on Safari, "Failed to fetch" on Chrome) when the request to Supabase drops at the network layer — usually a transient mobile-data hiccup, not an account problem. Now retries once automatically, and if it still can't reach the server shows a plain "check your connection and try again" message instead of the browser's internal wording.
+- A service worker bug where the offline navigation fallback (`caches.match(...) || caches.match(...)`) always resolved to the first cache lookup regardless of whether it actually found anything, since both sides are Promises (always truthy) rather than awaited values.
+
 ## [0.10.2] — 2026-09-10
 
 ### Fixed

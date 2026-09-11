@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Sparkles, Lock, Mail, Phone, MapPin, User, Building, Store, Scissors, ArrowRight, CheckCircle2, AlertCircle, KeyRound, HelpCircle, Eye, EyeOff } from 'lucide-react';
 import { useApp } from '../context/AppContext';
-import { supabase, isSupabaseConfigured } from '../lib/supabaseClient';
+import { supabase, isSupabaseConfigured, resetPasswordForEmailWithRetry } from '../lib/supabaseClient';
 import TurnstileWidget from './TurnstileWidget';
 
 // Deep-link into the webmail inbox for common providers; fall back to mailto:
@@ -191,7 +191,7 @@ export default function AuthModal() {
         const redirectUrl = typeof window !== 'undefined' && window.location.origin
           ? `${window.location.origin}/`
           : 'https://www.unihair.shop/';
-        const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        const { error } = await resetPasswordForEmailWithRetry(email.trim(), {
           redirectTo: redirectUrl,
           captchaToken: captchaToken || undefined
         });
