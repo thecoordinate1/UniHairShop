@@ -108,6 +108,7 @@ export default function VendorStudioView() {
     requestVendorPayout,
     acceptBooking,
     completeBooking,
+    cancelBooking,
     addVendorPortfolioItem,
     addService,
     services,
@@ -351,7 +352,8 @@ export default function VendorStudioView() {
     return sId === vendorProfile.id || (vendorProfile.name && sName.includes(vendorProfile.name));
   });
 
-  const activeConfirmedBookings = myBookings.filter((b) => b.status === 'Confirmed');
+  const requestedBookings = myBookings.filter((b) => b.status === 'Requested');
+  const activeConfirmedBookings = [...requestedBookings, ...myBookings.filter((b) => b.status === 'Confirmed')];
   const completedBookings = myBookings.filter((b) => b.status === 'Completed');
 
   const handleAddTempAddOn = () => {
@@ -719,7 +721,9 @@ export default function VendorStudioView() {
                 {activeConfirmedBookings.slice(0, 2).map((b) => (
                   <div key={b.id} className="p-4 rounded-2xl border border-black/10 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.04] flex flex-wrap justify-between items-center gap-3">
                     <div>
-                      <span className="badge badge-in-stock text-[10px] mb-1">{b.serviceType || 'Travel to Dorm'}</span>
+                      <span className={`badge text-[10px] mb-1 ${b.status === 'Requested' ? 'badge-out-of-stock' : 'badge-in-stock'}`}>
+                        {b.status === 'Requested' ? 'Needs Your Response' : (b.serviceType || 'Travel to Dorm')}
+                      </span>
                       <h4 className="text-sm font-bold text-slate-900 dark:text-white m-0">{b.serviceName}</h4>
                       <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 mb-0">
                         Client: <strong className="text-slate-900 dark:text-white">{b.customerName}</strong> ({b.customerPhone}) • <span className="text-amber-500">{b.date} at {b.time}</span>
@@ -744,13 +748,32 @@ export default function VendorStudioView() {
                         <MessageSquare size={13} />
                         <span>WhatsApp Client</span>
                       </a>
-                      <button
-                        className="apple-btn-primary text-xs px-3 py-1.5"
-                        onClick={() => completeBooking(b.id)}
-                      >
-                        <Check size={13} />
-                        <span>Mark Done</span>
-                      </button>
+                      {b.status === 'Requested' ? (
+                        <>
+                          <button
+                            className="apple-btn-secondary text-xs px-3 py-1.5 text-rose-500 hover:text-rose-400"
+                            onClick={() => cancelBooking(b.id)}
+                          >
+                            <XCircle size={13} />
+                            <span>Decline</span>
+                          </button>
+                          <button
+                            className="apple-btn-primary text-xs px-3 py-1.5"
+                            onClick={() => acceptBooking(b.id)}
+                          >
+                            <Check size={13} />
+                            <span>Accept</span>
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          className="apple-btn-primary text-xs px-3 py-1.5"
+                          onClick={() => completeBooking(b.id)}
+                        >
+                          <Check size={13} />
+                          <span>Mark Done</span>
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -950,6 +973,25 @@ export default function VendorStudioView() {
                           <MessageSquare size={13} />
                           <span>WhatsApp Client</span>
                         </a>
+
+                        {b.status === 'Requested' && (
+                          <>
+                            <button
+                              className="apple-btn-secondary text-xs px-3.5 py-1.5 text-rose-500 hover:text-rose-400"
+                              onClick={() => cancelBooking(b.id)}
+                            >
+                              <XCircle size={13} />
+                              <span>Decline</span>
+                            </button>
+                            <button
+                              className="apple-btn-primary text-xs px-3.5 py-1.5"
+                              onClick={() => acceptBooking(b.id)}
+                            >
+                              <Check size={13} />
+                              <span>Accept Booking</span>
+                            </button>
+                          </>
+                        )}
 
                         {b.status === 'Confirmed' && (
                           <button

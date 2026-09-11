@@ -4,6 +4,16 @@ All notable changes to UniHairShop are recorded here, newest first. Versions fol
 
 Each release is tagged in git as `vX.Y.Z` — refer to that tag instead of a commit hash when talking about "which version."
 
+## [0.11.0] — 2026-09-11
+
+### Fixed
+- **The vendor "Accept Booking" action didn't exist, and every booking status change except "Complete" was a silent no-op.** `bookings` has no RLS policy allowing a direct client-side `UPDATE` — status changes are only supposed to go through the protected `transition_booking()` RPC, which is what `completeBooking` correctly did, but `acceptBooking`, `cancelBooking`, `rescheduleBooking`, and the admin dashboard's `updateBookingStatus` all wrote directly to the table instead. Under RLS this matched zero rows and returned success either way, so the app showed "Booking accepted!" while the database silently stayed on "Requested" forever — and there was no "Accept" button anywhere in Vendor Studio to begin with, so a booking could never actually reach "Confirmed". All four now go through `transition_booking()`, with local state rolled back and a real error shown on failure, and Vendor Studio has an Accept/Decline action for incoming requests in both the dashboard quick-view and the full schedule list.
+
+### Known gaps (not fixed this pass)
+- No-show handling (`claimNoShowRefund` / `claimClientNoShow`) has the same silent-no-op root cause but needs a real dedicated server-side function, not just a rewire — it moves wallet money using statuses `transition_booking()` doesn't support. Flagged for a follow-up pass.
+- No vendor UI or RLS policy exists for updating a shop order's fulfillment status (`updateOrderStatus` is unused dead code); vendors currently have no way to mark an order shipped/delivered.
+- **Nothing is deployed to production yet for payments, account deletion, or push notifications.** `supabase functions list` and `secrets list` both come back empty — `initiate-payment`, `payment-webhook`, `delete-account`, and `send-push` all exist as source but none are deployed, and no secrets (`PAWAPAY_API_TOKEN`, etc.) are set. Each of these fails gracefully with an error toast rather than crashing, but none of them work yet.
+
 ## [0.10.3] — 2026-09-11
 
 ### Fixed

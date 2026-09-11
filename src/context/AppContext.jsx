@@ -1047,14 +1047,28 @@ export const AppProvider = ({ children }) => {
   }, [addToast]);
 
   const cancelBooking = useCallback(async (bookingId) => {
+    const targetBooking = bookings.find((b) => b.id === bookingId);
+    const previousStatus = targetBooking?.status;
     setBookings((prev) =>
       prev.map((b) => (b.id === bookingId ? { ...b, status: 'Cancelled' } : b))
     );
     if (isSupabaseConfigured && supabase) {
-      supabase.from('bookings').update({ status: 'Cancelled' }).eq('id', bookingId).then(null, () => {});
+      const { error } = await supabase.rpc('transition_booking', {
+        p_booking_id: bookingId,
+        p_status: 'Cancelled',
+        p_date: null,
+        p_time: null
+      });
+      if (error) {
+        setBookings((prev) =>
+          prev.map((b) => (b.id === bookingId ? { ...b, status: previousStatus || b.status } : b))
+        );
+        addToast(error.message || 'Unable to cancel this booking.', 'error');
+        return;
+      }
     }
     addToast(`Booking ${bookingId} has been cancelled.`, 'info');
-  }, [addToast]);
+  }, [bookings, addToast]);
 
   const claimNoShowRefund = useCallback(async (bookingId) => {
     const target = bookings.find((b) => b.id === bookingId);
@@ -1093,14 +1107,29 @@ export const AppProvider = ({ children }) => {
   }, [addToast]);
 
   const rescheduleBooking = useCallback(async (bookingId, newDate, newTime) => {
+    const targetBooking = bookings.find((b) => b.id === bookingId);
+    const previousDate = targetBooking?.date;
+    const previousTime = targetBooking?.time;
     setBookings((prev) =>
       prev.map((b) => (b.id === bookingId ? { ...b, date: newDate, time: newTime } : b))
     );
     if (isSupabaseConfigured && supabase) {
-      supabase.from('bookings').update({ date: newDate, time: newTime }).eq('id', bookingId).then(null, () => {});
+      const { error } = await supabase.rpc('transition_booking', {
+        p_booking_id: bookingId,
+        p_status: targetBooking?.status || 'Requested',
+        p_date: newDate,
+        p_time: newTime
+      });
+      if (error) {
+        setBookings((prev) =>
+          prev.map((b) => (b.id === bookingId ? { ...b, date: previousDate ?? b.date, time: previousTime ?? b.time } : b))
+        );
+        addToast(error.message || 'Unable to reschedule this booking.', 'error');
+        return;
+      }
     }
     addToast(`Booking ${bookingId} rescheduled to ${newDate} at ${newTime}`, 'success');
-  }, [addToast]);
+  }, [bookings, addToast]);
 
   // Calendar .ics generator & download
   const exportToCalendar = useCallback((booking) => {
@@ -1300,14 +1329,28 @@ export const AppProvider = ({ children }) => {
   }, [addToast]);
 
   const acceptBooking = useCallback(async (bookingId) => {
+    const targetBooking = bookings.find((b) => b.id === bookingId);
+    const previousStatus = targetBooking?.status;
     setBookings((prev) =>
       prev.map((b) => (b.id === bookingId ? { ...b, status: 'Confirmed' } : b))
     );
     if (isSupabaseConfigured && supabase) {
-      supabase.from('bookings').update({ status: 'Confirmed' }).eq('id', bookingId).then(null, () => {});
+      const { error } = await supabase.rpc('transition_booking', {
+        p_booking_id: bookingId,
+        p_status: 'Confirmed',
+        p_date: null,
+        p_time: null
+      });
+      if (error) {
+        setBookings((prev) =>
+          prev.map((b) => (b.id === bookingId ? { ...b, status: previousStatus || b.status } : b))
+        );
+        addToast(error.message || 'Unable to accept this booking.', 'error');
+        return;
+      }
     }
     addToast(`Booking ${bookingId} accepted!`, 'success');
-  }, [addToast]);
+  }, [bookings, addToast]);
 
   // The wallet shown in Vendor Studio is server-authoritative: transition_booking
   // and place_order are the only things that credit it (on a completed job or a
@@ -1601,15 +1644,29 @@ export const AppProvider = ({ children }) => {
     addToast(`Order ${orderId} updated to "${newStatus}"`, 'success');
   }, [addToast]);
 
-  const updateBookingStatus = useCallback((bookingId, newStatus) => {
+  const updateBookingStatus = useCallback(async (bookingId, newStatus) => {
+    const targetBooking = bookings.find((b) => b.id === bookingId);
+    const previousStatus = targetBooking?.status;
     setBookings((prev) =>
       prev.map((b) => (b.id === bookingId ? { ...b, status: newStatus } : b))
     );
     if (isSupabaseConfigured && supabase) {
-      supabase.from('bookings').update({ status: newStatus }).eq('id', bookingId).then(null, () => {});
+      const { error } = await supabase.rpc('transition_booking', {
+        p_booking_id: bookingId,
+        p_status: newStatus,
+        p_date: null,
+        p_time: null
+      });
+      if (error) {
+        setBookings((prev) =>
+          prev.map((b) => (b.id === bookingId ? { ...b, status: previousStatus || b.status } : b))
+        );
+        addToast(error.message || `Unable to mark booking as "${newStatus}".`, 'error');
+        return;
+      }
     }
     addToast(`Booking ${bookingId} marked as "${newStatus}"`, 'success');
-  }, [addToast]);
+  }, [bookings, addToast]);
 
   // Authentication & RBAC Functions
   const signIn = useCallback(async (email, password, captchaToken) => {
