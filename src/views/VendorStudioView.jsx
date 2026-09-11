@@ -105,6 +105,7 @@ export default function VendorStudioView() {
     toggleVendorDormTravel,
     vendorWallet,
     vendorSales,
+    updateSaleFulfillmentStatus,
     requestVendorPayout,
     acceptBooking,
     completeBooking,
@@ -1201,7 +1202,7 @@ export default function VendorStudioView() {
             ) : (
               <div className="flex flex-col gap-2">
                 {vendorSales.map((sale) => (
-                  <div key={sale.id} className="card p-3.5 flex items-center justify-between gap-3 text-xs">
+                  <div key={sale.id} className="card p-3.5 flex flex-wrap items-center justify-between gap-3 text-xs">
                     <div>
                       <span className="font-bold text-slate-900 dark:text-white">{sale.productName}</span>
                       <span className="text-slate-400"> × {sale.quantity}</span>
@@ -1210,7 +1211,20 @@ export default function VendorStudioView() {
                         {new Date(sale.createdAt).toLocaleDateString()} • Ref: {sale.orderId}
                       </p>
                     </div>
-                    <span className="price-tag text-sm shrink-0">K {sale.totalAmount}</span>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="price-tag text-sm">K {sale.totalAmount}</span>
+                      <select
+                        value={sale.fulfillmentStatus}
+                        onChange={(e) => updateSaleFulfillmentStatus(sale.id, e.target.value)}
+                        className={`form-input text-[11px] py-1 px-2 w-auto font-bold ${
+                          sale.fulfillmentStatus === 'Delivered' ? 'text-emerald-500' : sale.fulfillmentStatus === 'Shipped' ? 'text-sky-500' : 'text-amber-500'
+                        }`}
+                      >
+                        <option value="Processing">Processing</option>
+                        <option value="Shipped">Shipped</option>
+                        <option value="Delivered">Delivered</option>
+                      </select>
+                    </div>
                   </div>
                 ))}
               </div>

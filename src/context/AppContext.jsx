@@ -1070,41 +1070,76 @@ export const AppProvider = ({ children }) => {
     addToast(`Booking ${bookingId} has been cancelled.`, 'info');
   }, [bookings, addToast]);
 
+  // A stylist no-show can't be auto-refunded to the customer's real mobile
+  // money yet -- that needs a live PawaPay refund call, which isn't wired up
+  // -- so this reports the no-show and compensates with points immediately;
+  // the actual MoMo refund is a manual follow-up (payment_status flips to
+  // "Refund Pending" server-side, visible to admins).
   const claimNoShowRefund = useCallback(async (bookingId) => {
     const target = bookings.find((b) => b.id === bookingId);
-    const targetDeposit = target?.depositAmount ?? target?.deposit_amount ?? 0;
-    const refundAmount = targetDeposit > 0 ? targetDeposit : (target?.totalPrice || target?.total_price || 25);
+    const previousStatus = target?.status;
+    const previousPaymentStatus = target?.paymentStatus;
 
     setBookings((prev) =>
-      prev.map((b) => (b.id === bookingId ? { ...b, status: 'Refunded (Stylist No-Show)', paymentStatus: 'Refunded to MoMo' } : b))
+      prev.map((b) => (b.id === bookingId ? { ...b, status: 'Refunded (Stylist No-Show)', paymentStatus: 'Refund Pending' } : b))
     );
 
-    setVendorWallet((prev) => ({
-      ...prev,
-      availableBalance: Math.max(0, prev.availableBalance - refundAmount)
-    }));
-
-    setUser((prev) => ({
-      ...prev,
-      loyaltyPoints: prev.loyaltyPoints + 15
-    }));
-
     if (isSupabaseConfigured && supabase) {
-      supabase.from('bookings').update({ status: 'Refunded (Stylist No-Show)', payment_status: 'Refunded to MoMo' }).eq('id', bookingId).then(null, () => {});
+      const { error } = await supabase.rpc('transition_booking', {
+        p_booking_id: bookingId,
+        p_status: 'Refunded (Stylist No-Show)',
+        p_date: null,
+        p_time: null
+      });
+      if (error) {
+        setBookings((prev) =>
+          prev.map((b) => (b.id === bookingId ? { ...b, status: previousStatus || b.status, paymentStatus: previousPaymentStatus } : b))
+        );
+        addToast(error.message || 'Unable to report this no-show.', 'error');
+        return;
+      }
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('loyalty_points, points_history')
+        .eq('id', user.id)
+        .single();
+      if (profile) {
+        setUser((prev) => ({ ...prev, loyaltyPoints: profile.loyalty_points || 0, pointsHistory: profile.points_history || [] }));
+      }
+    } else {
+      setUser((prev) => ({ ...prev, loyaltyPoints: prev.loyaltyPoints + 15 }));
     }
 
-    addToast(`Escrow refund of K${refundAmount} credited back to your MoMo account!`, 'success');
-  }, [bookings, addToast]);
+    addToast('No-show reported. +15 points credited now; the deposit refund will be processed by support.', 'success');
+  }, [bookings, user.id, addToast]);
 
   const claimClientNoShow = useCallback(async (bookingId) => {
+    const target = bookings.find((b) => b.id === bookingId);
+    const previousStatus = target?.status;
+    const previousPaymentStatus = target?.paymentStatus;
+
     setBookings((prev) =>
-      prev.map((b) => (b.id === bookingId ? { ...b, status: 'Client No-Show', paymentStatus: 'Disbursed to Stylist' } : b))
+      prev.map((b) => (b.id === bookingId ? { ...b, status: 'Client No-Show', paymentStatus: 'Forfeited to Stylist' } : b))
     );
+
     if (isSupabaseConfigured && supabase) {
-      supabase.from('bookings').update({ status: 'Client No-Show', payment_status: 'Disbursed to Stylist' }).eq('id', bookingId).then(null, () => {});
+      const { error } = await supabase.rpc('transition_booking', {
+        p_booking_id: bookingId,
+        p_status: 'Client No-Show',
+        p_date: null,
+        p_time: null
+      });
+      if (error) {
+        setBookings((prev) =>
+          prev.map((b) => (b.id === bookingId ? { ...b, status: previousStatus || b.status, paymentStatus: previousPaymentStatus } : b))
+        );
+        addToast(error.message || 'Unable to report this no-show.', 'error');
+        return;
+      }
+      await refreshVendorWallet(vendorProfile.id);
     }
-    addToast('Client No-Show logged. Deposit fee credited to your wallet for travel compensation.', 'info');
-  }, [addToast]);
+    addToast('Client No-Show logged. Any deposit already collected has been credited to your wallet.', 'info');
+  }, [bookings, vendorProfile.id, addToast, refreshVendorWallet]);
 
   const rescheduleBooking = useCallback(async (bookingId, newDate, newTime) => {
     const targetBooking = bookings.find((b) => b.id === bookingId);
@@ -1403,7 +1438,8 @@ export const AppProvider = ({ children }) => {
       unitPrice: Number(s.unit_price),
       totalAmount: Number(s.total_amount),
       customerName: s.customer_name,
-      createdAt: s.created_at
+      createdAt: s.created_at,
+      fulfillmentStatus: s.fulfillment_status || 'Processing'
     })));
   }, []);
 
@@ -1412,6 +1448,22 @@ export const AppProvider = ({ children }) => {
     refreshVendorWallet(vendorProfile.id);
     refreshVendorSales(vendorProfile.id);
   }, [userMode, vendorProfile.id, refreshVendorWallet, refreshVendorSales]);
+
+  // fulfillment_status is the only column a vendor is allowed to move on
+  // their own product_sales row (protect_product_sales_fields() clamps
+  // everything else back to OLD, since confirm_paid_order() trusts
+  // unit_price/total_amount when crediting a wallet).
+  const updateSaleFulfillmentStatus = useCallback(async (saleId, newStatus) => {
+    setVendorSales((prev) => prev.map((s) => (s.id === saleId ? { ...s, fulfillmentStatus: newStatus } : s)));
+    if (isSupabaseConfigured && supabase) {
+      const { error } = await supabase.from('product_sales').update({ fulfillment_status: newStatus }).eq('id', saleId);
+      if (error) {
+        addToast(error.message || 'Unable to update this order status.', 'error');
+        return;
+      }
+    }
+    addToast(`Order marked as "${newStatus}"`, 'success');
+  }, [addToast]);
 
   const completeBooking = useCallback(async (bookingId) => {
     const targetBooking = bookings.find((b) => b.id === bookingId);
@@ -2276,6 +2328,7 @@ export const AppProvider = ({ children }) => {
     toggleVendorDormTravel,
     vendorWallet,
     vendorSales,
+    updateSaleFulfillmentStatus,
     requestVendorPayout,
     acceptBooking,
     completeBooking,
@@ -2386,6 +2439,7 @@ export const AppProvider = ({ children }) => {
   }), [
     theme, toggleTheme, userMode, toggleUserMode, switchViewMode, availableViewModes, vendorTab,
     vendorProfile, updateVendorProfile, toggleVendorDormTravel, vendorWallet, vendorSales,
+    updateSaleFulfillmentStatus,
     requestVendorPayout, acceptBooking, completeBooking, addVendorPortfolioItem,
     activeTab, currentCampus, session, authLoading, isGuestMode, continueAsGuest, exitGuestMode,
     pendingReferralCode, postAuthScreen, authWallDefaultMode, user,

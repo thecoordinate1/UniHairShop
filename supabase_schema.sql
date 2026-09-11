@@ -340,6 +340,13 @@ CREATE TABLE IF NOT EXISTS public.product_sales (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- Per-vendor fulfillment tracking. A single order can hold products from
+-- several different vendors (place_order() loops the whole cart regardless
+-- of vendor), so fulfillment can't live on orders.status without one
+-- vendor's update stomping on another's -- it belongs on the vendor's own
+-- line item instead.
+ALTER TABLE public.product_sales ADD COLUMN IF NOT EXISTS fulfillment_status TEXT DEFAULT 'Processing';
+
 -- 14. PUSH SUBSCRIPTIONS — one row per browser/device a user has enabled push
 -- notifications on (new messages, booking updates). Holds only the public Web
 -- Push endpoint/keys for that device, so a user managing their own rows here
@@ -490,6 +497,29 @@ BEGIN
 END;
 $$;
 
+-- Lets a vendor move only their own line item's fulfillment_status; every
+-- other column (including unit_price/total_amount, which confirm_paid_order()
+-- trusts when crediting a wallet) is clamped back to OLD so RLS can stay a
+-- simple row-level "is this your sale" check without opening a way to
+-- self-inflate a payout.
+CREATE OR REPLACE FUNCTION public.protect_product_sales_fields()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+  IF TG_OP = 'UPDATE' AND NOT public.is_admin() THEN
+    NEW.order_id := OLD.order_id;
+    NEW.product_id := OLD.product_id;
+    NEW.vendor_id := OLD.vendor_id;
+    NEW.product_name := OLD.product_name;
+    NEW.quantity := OLD.quantity;
+    NEW.unit_price := OLD.unit_price;
+    NEW.total_amount := OLD.total_amount;
+    NEW.customer_name := OLD.customer_name;
+    NEW.created_at := OLD.created_at;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
 -- Logs every suspend/unsuspend as an audit trail entry, separate from the
 -- self-edit protection above so it fires regardless of who made the change.
 CREATE OR REPLACE FUNCTION public.log_profile_suspension_change()
@@ -586,8 +616,17 @@ BEGIN
   IF auth.uid() IS NULL OR NOT (v_booking.customer_id = auth.uid() OR v_booking.staff_id = auth.uid()::text OR public.is_admin()) THEN RAISE EXCEPTION 'Not allowed'; END IF;
   IF p_status = 'Confirmed' AND NOT (v_booking.staff_id = auth.uid()::text OR public.is_admin()) THEN RAISE EXCEPTION 'Only the stylist can accept'; END IF;
   IF p_status = 'Completed' AND NOT (v_booking.staff_id = auth.uid()::text OR public.is_admin()) THEN RAISE EXCEPTION 'Only the stylist can complete'; END IF;
-  IF p_status NOT IN ('Cancelled','Confirmed','Completed','Requested') THEN RAISE EXCEPTION 'Unsupported booking status'; END IF;
-  UPDATE public.bookings SET status = p_status, date = COALESCE(p_date, date), time = COALESCE(p_time, time) WHERE id = p_booking_id RETURNING * INTO v_booking;
+  IF p_status = 'Refunded (Stylist No-Show)' AND NOT (v_booking.customer_id = auth.uid() OR public.is_admin()) THEN RAISE EXCEPTION 'Only the customer can report a stylist no-show'; END IF;
+  IF p_status = 'Client No-Show' AND NOT (v_booking.staff_id = auth.uid()::text OR public.is_admin()) THEN RAISE EXCEPTION 'Only the stylist can report a client no-show'; END IF;
+  IF p_status IN ('Refunded (Stylist No-Show)', 'Client No-Show') AND v_booking.status <> 'Confirmed' THEN RAISE EXCEPTION 'Only a confirmed appointment can be marked as a no-show'; END IF;
+  IF p_status NOT IN ('Cancelled','Confirmed','Completed','Requested','Refunded (Stylist No-Show)','Client No-Show') THEN RAISE EXCEPTION 'Unsupported booking status'; END IF;
+  UPDATE public.bookings SET status = p_status, date = COALESCE(p_date, date), time = COALESCE(p_time, time),
+    payment_status = CASE
+      WHEN p_status = 'Refunded (Stylist No-Show)' THEN 'Refund Pending'
+      WHEN p_status = 'Client No-Show' THEN 'Forfeited to Stylist'
+      ELSE payment_status
+    END
+  WHERE id = p_booking_id RETURNING * INTO v_booking;
   IF p_status = 'Completed' AND NOT EXISTS (SELECT 1 FROM public.points_ledger WHERE booking_id = p_booking_id AND reason = 'Completed booking reward') THEN
     v_points := GREATEST(5, floor(v_booking.total_price / 10));
     PERFORM public.apply_points(v_booking.customer_id, v_points, 'Completed booking reward', p_booking_id);
@@ -619,6 +658,38 @@ BEGIN
       END IF;
     END IF;
   END IF;
+
+  -- A stylist no-show can't be auto-refunded to the customer's mobile money
+  -- yet -- that needs a real PawaPay refund call an admin has to trigger
+  -- manually for now -- so this only flags it (payment_status above) and
+  -- compensates the customer with points immediately; nothing is debited
+  -- from the vendor's wallet because nothing was ever credited to it for a
+  -- booking that never reached "Completed".
+  IF p_status = 'Refunded (Stylist No-Show)' AND NOT EXISTS (SELECT 1 FROM public.points_ledger WHERE booking_id = p_booking_id AND reason = 'Stylist no-show compensation') THEN
+    PERFORM public.apply_points(v_booking.customer_id, 15, 'Stylist no-show compensation', p_booking_id);
+  END IF;
+
+  -- A client no-show forfeits whatever was actually collected through the
+  -- platform (never a Pay-on-Arrival booking's cash, since the platform
+  -- never touched that) to the stylist as compensation for the wasted trip,
+  -- net of the same commission a completed job would have paid.
+  IF p_status = 'Client No-Show' AND v_booking.staff_id IS NOT NULL
+     AND NOT EXISTS (SELECT 1 FROM public.platform_fees WHERE source_type = 'booking_no_show' AND source_id = p_booking_id) THEN
+    SELECT COALESCE(SUM(amount), 0) INTO v_collected FROM public.payment_transactions WHERE booking_id = p_booking_id AND status = 'paid';
+    IF v_collected > 0 THEN
+      v_fee := round(v_collected * 0.10 + 5, 2);
+      v_net := v_collected - v_fee;
+      INSERT INTO public.vendor_wallets (id, vendor_id, available_balance, total_earned, updated_at)
+      VALUES (v_booking.staff_id, v_booking.staff_id, v_net, v_net, now())
+      ON CONFLICT (vendor_id) DO UPDATE SET
+        available_balance = public.vendor_wallets.available_balance + v_net,
+        total_earned = public.vendor_wallets.total_earned + v_net,
+        updated_at = now();
+      INSERT INTO public.platform_fees (source_type, source_id, vendor_id, gross_amount, fee_amount, net_amount)
+      VALUES ('booking_no_show', p_booking_id, v_booking.staff_id, v_collected, v_fee, v_net);
+    END IF;
+  END IF;
+
   INSERT INTO public.audit_log (actor_id, action, entity_type, entity_id, metadata) VALUES (auth.uid(), lower(replace(p_status, ' ', '_')), 'booking', p_booking_id, jsonb_build_object('status', p_status));
   IF p_status = 'Confirmed' THEN
     PERFORM public.notify_push(v_booking.customer_id, 'Appointment Confirmed', v_booking.service_name || ' on ' || v_booking.date || ' at ' || v_booking.time, '/?tab=account');
@@ -626,6 +697,10 @@ BEGIN
     PERFORM public.notify_push(v_booking.customer_id, 'Appointment Completed', 'Rate your stylist for ' || v_booking.service_name, '/?tab=account');
   ELSIF p_status = 'Cancelled' THEN
     PERFORM public.notify_push(v_booking.customer_id, 'Appointment Cancelled', v_booking.service_name || ' was cancelled', '/?tab=account');
+  ELSIF p_status = 'Refunded (Stylist No-Show)' THEN
+    PERFORM public.notify_push(v_booking.staff_id::uuid, 'No-Show Reported', v_booking.customer_name || ' reported you as a no-show for ' || v_booking.service_name, '/?tab=vendor');
+  ELSIF p_status = 'Client No-Show' THEN
+    PERFORM public.notify_push(v_booking.customer_id, 'No-Show Reported', 'Your stylist reported you as a no-show for ' || v_booking.service_name, '/?tab=account');
   END IF;
   RETURN v_booking;
 END;
@@ -875,6 +950,10 @@ DROP TRIGGER IF EXISTS vendor_profiles_protect_verification ON public.vendor_pro
 CREATE TRIGGER vendor_profiles_protect_verification BEFORE INSERT OR UPDATE ON public.vendor_profiles
 FOR EACH ROW EXECUTE FUNCTION public.prevent_vendor_self_verification();
 
+DROP TRIGGER IF EXISTS product_sales_protect_fields ON public.product_sales;
+CREATE TRIGGER product_sales_protect_fields BEFORE UPDATE ON public.product_sales
+FOR EACH ROW EXECUTE FUNCTION public.protect_product_sales_fields();
+
 DROP TRIGGER IF EXISTS messages_notify_push ON public.messages;
 CREATE TRIGGER messages_notify_push AFTER INSERT ON public.messages
 FOR EACH ROW EXECUTE FUNCTION public.notify_new_message();
@@ -940,6 +1019,10 @@ CREATE POLICY analytics_admin_read ON public.analytics_events FOR SELECT TO auth
 -- Product sales are only ever written by place_order() below — a vendor can
 -- read their own sales history but never write to it directly.
 CREATE POLICY product_sales_vendor_read ON public.product_sales FOR SELECT TO authenticated USING (vendor_id = auth.uid()::text OR public.is_admin());
+-- Column-level write is enforced by protect_product_sales_fields() below: a
+-- non-admin vendor can only ever move their own fulfillment_status, never
+-- the money fields confirm_paid_order() trusts (unit_price/total_amount).
+CREATE POLICY product_sales_vendor_update ON public.product_sales FOR UPDATE TO authenticated USING (vendor_id = auth.uid()::text OR public.is_admin()) WITH CHECK (vendor_id = auth.uid()::text OR public.is_admin());
 
 -- Each user manages only their own device push subscriptions.
 CREATE POLICY push_subscriptions_owner_all ON public.push_subscriptions FOR ALL TO authenticated USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid());

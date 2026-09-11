@@ -4,6 +4,18 @@ All notable changes to UniHairShop are recorded here, newest first. Versions fol
 
 Each release is tagged in git as `vX.Y.Z` — refer to that tag instead of a commit hash when talking about "which version."
 
+## [0.12.0] — 2026-09-12
+
+### Added
+- **Real server-side no-show handling.** Reporting a stylist no-show now credits the customer 15 points immediately through `transition_booking()` and flags `payment_status` as "Refund Pending" — the actual mobile money refund still needs a manual PawaPay refund until that API is wired up, but it's no longer a fake instant "refunded" that never happened. Reporting a client no-show now correctly forfeits whatever deposit was actually collected (via `payment_transactions`) to the stylist's real wallet, net of the usual commission — not a client-side number that never touched the database. Both are locked to bookings actually in "Confirmed" status and to the correct party (customer vs. stylist) server-side.
+- **Vendors can now mark a shop order Processing / Shipped / Delivered.** Added `product_sales.fulfillment_status`, since a single order can hold items from multiple vendors — fulfillment has to live on each vendor's own line item, not the shared order record, so one vendor's update can't stomp on another's. A new `protect_product_sales_fields()` trigger clamps every other column back to its prior value for non-admins, so a vendor can move their own status but can never touch the money fields `confirm_paid_order()` trusts when crediting a wallet.
+- Deployed `delete-account` and `send-push` Edge Functions to production (both were built earlier this session but never actually deployed). Generated and configured a real VAPID key pair for push notifications (the previous public key had no matching private key on file, so push could never have worked).
+
+### Known gaps (still open)
+- Push notifications need one more manual step: Postgres needs `app.settings.push_function_url` and `app.settings.service_role_key` set so `notify_push()` actually calls the deployed function — the Management API refused this (`permission denied to set parameter`), so it has to be done from the Supabase Dashboard directly.
+- The new VAPID public key needs to replace the old one in Vercel's environment variables (redeploy required) to match what's now configured server-side.
+- Real PawaPay payments remain undeployed — waiting on PawaPay account access.
+
 ## [0.11.0] — 2026-09-11
 
 ### Fixed

@@ -301,7 +301,7 @@ export default function BookingDetailModal({ booking, onClose, onReschedule, onC
             <span>Sync (.ics)</span>
           </button>
 
-          {!isCancelled && !isCompleted && userMode === 'customer' && (
+          {booking.status === 'Confirmed' && userMode === 'customer' && (
             <button
               onClick={() => {
                 claimNoShowRefund(booking.id);
@@ -315,7 +315,7 @@ export default function BookingDetailModal({ booking, onClose, onReschedule, onC
             </button>
           )}
 
-          {!isCancelled && !isCompleted && userMode === 'vendor' && (
+          {booking.status === 'Confirmed' && userMode === 'vendor' && (
             <button
               onClick={() => {
                 claimClientNoShow(booking.id);
