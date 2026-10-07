@@ -4,6 +4,12 @@ All notable changes to UniHairShop are recorded here, newest first. Versions fol
 
 Each release is tagged in git as `vX.Y.Z` — refer to that tag instead of a commit hash when talking about "which version."
 
+## [0.12.1] — 2026-10-07
+
+### Fixed
+- **Blank screen for every visitor since v0.12.0.** `claimClientNoShow` listed `refreshVendorWallet` in its hook dependency array, but `refreshVendorWallet` was declared ~280 lines further down the provider. Dependency arrays are evaluated during render, so the first render threw `ReferenceError: Cannot access 'refreshVendorWallet' before initialization` (minified: `'it'`). Because `AppProvider` sat above every `ErrorBoundary`, React unmounted the whole root — the splash faded out onto an empty page. The build succeeded because this only fails at runtime. Moved `refreshVendorWallet` above its dependents and scanned all of `src/` for any other hook deps referencing a later-declared `const` (none).
+- Wrapped `AppProvider` in an `ErrorBoundary` in `main.jsx`, so any future crash inside the provider shows the "Something Went Wrong / Reload App" screen instead of a blank page. Verified by temporarily forcing a provider crash in a local production build.
+
 ## [0.12.0] — 2026-09-12
 
 ### Added

@@ -2,17 +2,23 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App.jsx';
 import { AppProvider } from './context/AppContext.jsx';
+import ErrorBoundary from './components/ErrorBoundary.jsx';
 import { registerSW } from './registerSW.js';
 import { initErrorMonitoring } from './lib/errorMonitoring.js';
 import './index.css';
 
 initErrorMonitoring();
 
+// The outer boundary catches crashes inside AppProvider itself, which the
+// boundaries in App.jsx sit below and can't see -- without it, any provider
+// render error unmounts the whole root and leaves a blank screen.
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <AppProvider>
-      <App />
-    </AppProvider>
+    <ErrorBoundary>
+      <AppProvider>
+        <App />
+      </AppProvider>
+    </ErrorBoundary>
   </React.StrictMode>
 );
 

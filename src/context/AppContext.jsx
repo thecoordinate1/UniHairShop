@@ -1070,6 +1070,43 @@ export const AppProvider = ({ children }) => {
     addToast(`Booking ${bookingId} has been cancelled.`, 'info');
   }, [bookings, addToast]);
 
+  // The wallet shown in Vendor Studio is server-authoritative: transition_booking
+  // and place_order are the only things that credit it (on a completed job or a
+  // product sale) and request_vendor_payout the only thing that debits it, so
+  // we always pull real numbers here rather than trust a locally-mutated balance.
+  // Must stay declared above every hook that lists it as a dependency: deps
+  // arrays are evaluated during render, so a later `const` throws a TDZ
+  // ReferenceError that blanks the whole app (this provider sits above the
+  // ErrorBoundary).
+  const refreshVendorWallet = useCallback(async (vendorId) => {
+    if (!isSupabaseConfigured || !supabase || !vendorId) return;
+    const { data: walletRow } = await supabase
+      .from('vendor_wallets')
+      .select('*')
+      .eq('vendor_id', vendorId)
+      .maybeSingle();
+    const { data: payoutRows } = await supabase
+      .from('vendor_payouts')
+      .select('*')
+      .eq('vendor_id', vendorId)
+      .order('created_at', { ascending: false });
+    setVendorWallet({
+      availableBalance: Number(walletRow?.available_balance || 0),
+      pendingBalance: Number(walletRow?.pending_balance || 0),
+      totalEarned: Number(walletRow?.total_earned || 0),
+      completedJobsCount: walletRow?.completed_jobs_count || 0,
+      payouts: (payoutRows || []).map((p) => ({
+        id: p.id,
+        date: p.date,
+        amount: Number(p.amount),
+        provider: p.provider,
+        number: p.number,
+        status: p.status,
+        ref: p.reference
+      }))
+    });
+  }, []);
+
   // A stylist no-show can't be auto-refunded to the customer's real mobile
   // money yet -- that needs a live PawaPay refund call, which isn't wired up
   // -- so this reports the no-show and compensates with points immediately;
@@ -1386,39 +1423,6 @@ export const AppProvider = ({ children }) => {
     }
     addToast(`Booking ${bookingId} accepted!`, 'success');
   }, [bookings, addToast]);
-
-  // The wallet shown in Vendor Studio is server-authoritative: transition_booking
-  // and place_order are the only things that credit it (on a completed job or a
-  // product sale) and request_vendor_payout the only thing that debits it, so
-  // we always pull real numbers here rather than trust a locally-mutated balance.
-  const refreshVendorWallet = useCallback(async (vendorId) => {
-    if (!isSupabaseConfigured || !supabase || !vendorId) return;
-    const { data: walletRow } = await supabase
-      .from('vendor_wallets')
-      .select('*')
-      .eq('vendor_id', vendorId)
-      .maybeSingle();
-    const { data: payoutRows } = await supabase
-      .from('vendor_payouts')
-      .select('*')
-      .eq('vendor_id', vendorId)
-      .order('created_at', { ascending: false });
-    setVendorWallet({
-      availableBalance: Number(walletRow?.available_balance || 0),
-      pendingBalance: Number(walletRow?.pending_balance || 0),
-      totalEarned: Number(walletRow?.total_earned || 0),
-      completedJobsCount: walletRow?.completed_jobs_count || 0,
-      payouts: (payoutRows || []).map((p) => ({
-        id: p.id,
-        date: p.date,
-        amount: Number(p.amount),
-        provider: p.provider,
-        number: p.number,
-        status: p.status,
-        ref: p.reference
-      }))
-    });
-  }, []);
 
   // Real per-product sales history for the "My Shop" tab — written only by
   // place_order(), never client-forgeable.
