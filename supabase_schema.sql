@@ -663,15 +663,11 @@ BEGIN
     END IF;
   END IF;
 
-  -- A stylist no-show can't be auto-refunded to the customer's mobile money
-  -- yet -- that needs a real PawaPay refund call an admin has to trigger
-  -- manually for now -- so this only flags it (payment_status above) and
-  -- compensates the customer with points immediately; nothing is debited
-  -- from the vendor's wallet because nothing was ever credited to it for a
+  -- A customer's stylist no-show report only flags the booking ('Refund
+  -- Pending' above). It's the customer's word alone, so compensation points
+  -- wait for an admin to confirm it (resolve_stylist_no_show). Nothing is
+  -- debited from the vendor's wallet: nothing was ever credited to it for a
   -- booking that never reached "Completed".
-  IF p_status = 'Refunded (Stylist No-Show)' AND NOT EXISTS (SELECT 1 FROM public.points_ledger WHERE booking_id = p_booking_id AND reason = 'Stylist no-show compensation') THEN
-    PERFORM public.apply_points(v_booking.customer_id, 15, 'Stylist no-show compensation', p_booking_id);
-  END IF;
 
   -- A client no-show forfeits whatever was actually collected through the
   -- platform (never a Pay-on-Arrival booking's cash, since the platform
@@ -709,6 +705,48 @@ BEGIN
   RETURN v_booking;
 END;
 $$;
+
+-- Admin-only ruling on a customer's stylist no-show report. Upheld: the
+-- customer gets the 15 compensation points (the only way they're earned) and,
+-- if a deposit was actually collected, the refund is approved for an admin to
+-- send. Not upheld: the booking returns to Confirmed so the stylist can
+-- complete it as normal.
+CREATE OR REPLACE FUNCTION public.resolve_stylist_no_show(p_booking_id TEXT, p_approve BOOLEAN)
+RETURNS public.bookings LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE v_booking public.bookings; v_paid BOOLEAN; v_service TEXT;
+BEGIN
+  IF auth.uid() IS NULL OR NOT public.is_admin() THEN RAISE EXCEPTION 'Only an admin can review a no-show report'; END IF;
+  SELECT * INTO v_booking FROM public.bookings WHERE id = p_booking_id FOR UPDATE;
+  IF v_booking.id IS NULL THEN RAISE EXCEPTION 'Booking not found'; END IF;
+  IF v_booking.status <> 'Refunded (Stylist No-Show)' OR v_booking.payment_status <> 'Refund Pending' THEN
+    RAISE EXCEPTION 'This booking has no open no-show report';
+  END IF;
+  v_paid := EXISTS (SELECT 1 FROM public.payment_transactions t WHERE t.booking_id = p_booking_id AND t.status = 'paid');
+  v_service := COALESCE(v_booking.service_name, 'your appointment');
+
+  IF p_approve THEN
+    UPDATE public.bookings
+       SET payment_status = CASE WHEN v_paid THEN 'Refund Approved' ELSE 'No-Show Confirmed' END
+     WHERE id = p_booking_id RETURNING * INTO v_booking;
+    IF NOT EXISTS (SELECT 1 FROM public.points_ledger WHERE booking_id = p_booking_id AND reason = 'Stylist no-show compensation') THEN
+      PERFORM public.apply_points(v_booking.customer_id, 15, 'Stylist no-show compensation', p_booking_id);
+    END IF;
+    PERFORM public.notify_push(v_booking.customer_id, 'No-Show Confirmed', 'We confirmed your stylist no-show for ' || v_service || '. +15 points added.', '/?tab=account');
+  ELSE
+    UPDATE public.bookings
+       SET status = 'Confirmed', payment_status = CASE WHEN v_paid THEN 'Paid' ELSE 'Pending' END
+     WHERE id = p_booking_id RETURNING * INTO v_booking;
+    PERFORM public.notify_push(v_booking.customer_id, 'No-Show Report Reviewed', 'We could not confirm the no-show for ' || v_service || '. Contact support if you need help.', '/?tab=account');
+  END IF;
+
+  INSERT INTO public.audit_log (actor_id, action, entity_type, entity_id, metadata)
+  VALUES (auth.uid(), CASE WHEN p_approve THEN 'no_show_upheld' ELSE 'no_show_declined' END, 'booking', p_booking_id, jsonb_build_object('approve', p_approve));
+  RETURN v_booking;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.resolve_stylist_no_show(TEXT, BOOLEAN) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.resolve_stylist_no_show(TEXT, BOOLEAN) TO authenticated;
 
 CREATE OR REPLACE FUNCTION public.prevent_vendor_self_verification()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$

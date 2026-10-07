@@ -4,6 +4,17 @@ All notable changes to UniHairShop are recorded here, newest first. Versions fol
 
 Each release is tagged in git as `vX.Y.Z` — refer to that tag instead of a commit hash when talking about "which version."
 
+## [0.13.1] — 2026-10-07
+
+### Changed
+- **Stylist no-show compensation now waits for an admin to confirm it.** Reporting a stylist no-show used to award the customer 15 points instantly, on their word alone. Now the report only flags the booking ("Refund Pending"). An admin rules on it from the admin dashboard's booking stream (new banner, filter, and **Uphold / Decline** buttons) via a new admin-only `resolve_stylist_no_show()`.
+  - **Upheld:** the customer gets the 15 points once ('Stylist no-show compensation'). If a deposit was actually collected, the booking becomes "Refund Approved" and shows the amount to send; otherwise it becomes "No-Show Confirmed".
+  - **Declined:** the booking goes back to Confirmed (payment status recomputed from real payments), so the stylist can complete it as normal.
+
+### Fixed
+- **Real bookings showed a blank service, client name and phone.** Bookings from the database keep snake_case columns (`service_name`, `customer_name`...), but Vendor Studio, the admin booking stream and the customer's bookings list read camelCase. The bug was latent only because production has no bookings yet. Bookings are now normalized wherever they enter the app (startup load, the realtime channel, a new booking request, and the browser's saved copy), keeping both spellings.
+- The realtime DELETE handler for bookings kept only the deleted booking and dropped every other one (`===` instead of `!==`).
+
 ## [0.13.0] — 2026-10-07
 
 ### Added

@@ -51,6 +51,7 @@ export default function AdminDashboardView() {
     addProduct,
     updateProductStock,
     markOrderDelivered,
+    resolveStylistNoShow,
     updateBookingStatus,
     verifyStylist,
     settleVendorPayout,
@@ -69,6 +70,7 @@ export default function AdminDashboardView() {
   const [trafficCampusFilter, setTrafficCampusFilter] = useState('All');
   const [trafficStatusFilter, setTrafficStatusFilter] = useState('All');
   const [deliveringOrderId, setDeliveringOrderId] = useState(null);
+  const [reviewingNoShowId, setReviewingNoShowId] = useState(null);
   const [analyticsSummary, setAnalyticsSummary] = useState(null);
   const [loadingAnalytics, setLoadingAnalytics] = useState(false);
   const [totalUsersCount, setTotalUsersCount] = useState(null);
@@ -302,6 +304,18 @@ export default function AdminDashboardView() {
   });
 
   // Filtered Traffic Bookings
+  const isOpenNoShowReport = (b) => b.status === 'Refunded (Stylist No-Show)' && b.paymentStatus === 'Refund Pending';
+  const openNoShowReports = bookings.filter(isOpenNoShowReport).length;
+
+  const handleResolveNoShow = async (bookingId, approve) => {
+    setReviewingNoShowId(bookingId);
+    try {
+      await resolveStylistNoShow(bookingId, approve);
+    } finally {
+      setReviewingNoShowId(null);
+    }
+  };
+
   const filteredTraffic = bookings.filter((b) => {
     const matchesCampus = trafficCampusFilter === 'All' || b.campus === trafficCampusFilter;
     const matchesStatus = trafficStatusFilter === 'All' || b.status === trafficStatusFilter;
@@ -446,7 +460,7 @@ export default function AdminDashboardView() {
         {[
           { id: 'overview', label: '📊 Platform Financials & Traffic', count: null },
           { id: 'vendors', label: '✂️ All Campus Vendors', count: staffList.length },
-          { id: 'traffic', label: '📅 Live Booking Stream', count: bookings.length },
+          { id: 'traffic', label: openNoShowReports ? `📅 Live Booking Stream (⚠ ${openNoShowReports} to review)` : '📅 Live Booking Stream', count: bookings.length },
           { id: 'orders', label: '📦 Shop Orders', count: orders.filter((o) => o.status !== 'Delivered' && o.status !== 'Cancelled').length || null },
           { id: 'payouts', label: '📱 Mobile Money Payouts', count: null },
           { id: 'catalog', label: '🛍️ Services & Inventory', count: services.length + products.length },
@@ -763,9 +777,17 @@ export default function AdminDashboardView() {
                 <option value="Completed">Completed</option>
                 <option value="Pending">Pending</option>
                 <option value="Cancelled">Cancelled</option>
+                <option value="Refunded (Stylist No-Show)">Stylist No-Show Reports</option>
               </select>
             </div>
           </div>
+
+          {openNoShowReports > 0 && (
+            <div className="card p-3.5 border border-amber-400/40 bg-amber-400/10 text-xs text-slate-700 dark:text-amber-200">
+              <strong>{openNoShowReports} stylist no-show report{openNoShowReports === 1 ? '' : 's'} need your review.</strong>{' '}
+              Upholding one gives the customer their 15 compensation points (and approves any deposit refund); declining puts the booking back to Confirmed.
+            </div>
+          )}
 
           <div className="space-y-3">
             {filteredTraffic.map((booking) => (
@@ -793,25 +815,52 @@ export default function AdminDashboardView() {
                   </p>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <span className="price-tag text-base mr-2">K {booking.price || booking.totalPrice}</span>
 
-                  {booking.status !== 'Completed' && (
-                    <button
-                      onClick={() => updateBookingStatus(booking.id, 'Completed')}
-                      className="apple-btn-secondary text-xs px-3 py-1.5 text-emerald-500 hover:border-emerald-500/30"
-                    >
-                      Complete
-                    </button>
-                  )}
+                  {isOpenNoShowReport(booking) ? (
+                    <>
+                      <button
+                        disabled={reviewingNoShowId === booking.id}
+                        onClick={() => handleResolveNoShow(booking.id, true)}
+                        className="apple-btn-secondary text-xs px-3 py-1.5 text-emerald-500 hover:border-emerald-500/30 disabled:opacity-50"
+                      >
+                        Uphold No-Show (+15 pts)
+                      </button>
+                      <button
+                        disabled={reviewingNoShowId === booking.id}
+                        onClick={() => handleResolveNoShow(booking.id, false)}
+                        className="apple-btn-secondary text-xs px-3 py-1.5 text-rose-500 hover:border-rose-500/30 disabled:opacity-50"
+                      >
+                        Decline
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      {booking.paymentStatus === 'Refund Approved' && (
+                        <span className="text-[11px] font-semibold text-amber-500">
+                          Refund to send: K{booking.depositAmount || booking.totalPrice}
+                        </span>
+                      )}
 
-                  {booking.status !== 'Cancelled' && (
-                    <button
-                      onClick={() => updateBookingStatus(booking.id, 'Cancelled')}
-                      className="apple-btn-secondary text-xs px-3 py-1.5 text-rose-500 hover:border-rose-500/30"
-                    >
-                      Cancel
-                    </button>
+                      {booking.status !== 'Completed' && (
+                        <button
+                          onClick={() => updateBookingStatus(booking.id, 'Completed')}
+                          className="apple-btn-secondary text-xs px-3 py-1.5 text-emerald-500 hover:border-emerald-500/30"
+                        >
+                          Complete
+                        </button>
+                      )}
+
+                      {booking.status !== 'Cancelled' && (
+                        <button
+                          onClick={() => updateBookingStatus(booking.id, 'Cancelled')}
+                          className="apple-btn-secondary text-xs px-3 py-1.5 text-rose-500 hover:border-rose-500/30"
+                        >
+                          Cancel
+                        </button>
+                      )}
+                    </>
                   )}
                 </div>
               </div>

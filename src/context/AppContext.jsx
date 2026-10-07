@@ -19,6 +19,33 @@ const AppContext = createContext();
 // someone's actual picture.
 export const DEFAULT_AVATAR = '/images/avatar_placeholder.svg';
 
+// Bookings arrive from the database (fetch, realtime, request_booking) with
+// snake_case columns, but every screen reads camelCase (serviceName,
+// customerName...), which rendered blank for real bookings. Adds the camelCase
+// names alongside the originals so existing dual reads keep working.
+function normalizeBooking(b) {
+  if (!b) return b;
+  return {
+    ...b,
+    serviceId: b.serviceId ?? b.service_id,
+    serviceName: b.serviceName ?? b.service_name,
+    staffId: b.staffId ?? b.staff_id,
+    staffName: b.staffName ?? b.staff_name,
+    customerId: b.customerId ?? b.customer_id,
+    customerName: b.customerName ?? b.customer_name,
+    customerPhone: b.customerPhone ?? b.customer_phone,
+    serviceType: b.serviceType ?? b.service_type,
+    selectedAddOns: b.selectedAddOns ?? b.selected_add_ons,
+    totalPrice: b.totalPrice ?? b.total_price,
+    depositAmount: b.depositAmount ?? b.deposit_amount,
+    balanceDue: b.balanceDue ?? b.balance_due,
+    paymentMethod: b.paymentMethod ?? b.payment_method,
+    paymentStatus: b.paymentStatus ?? b.payment_status,
+    locationLink: b.locationLink ?? b.location_link,
+    createdAt: b.createdAt ?? b.created_at
+  };
+}
+
 // Gender-coded glow ring shown around a stylist's avatar — blue for male,
 // pink for female, nothing for unset/other.
 export function getAvatarHaloClass(gender) {
@@ -202,7 +229,10 @@ export const AppProvider = ({ children }) => {
   const [products, setProducts] = useState(() => safeGetItem('unihair_products', initialProducts));
   const [bundles] = useState(initialBundles);
   const [staffList, setStaffList] = useState(() => safeGetItem('unihair_staff', initialStaff));
-  const [bookings, setBookings] = useState(() => safeGetItem('unihair_bookings', initialBookings));
+  const [bookings, setBookings] = useState(() => {
+    const saved = safeGetItem('unihair_bookings', initialBookings);
+    return Array.isArray(saved) ? saved.map(normalizeBooking) : initialBookings;
+  });
   const [orders, setOrders] = useState(() => safeGetItem('unihair_orders', initialOrders));
   const [cart, setCart] = useState(() => safeGetItem('unihair_cart', []));
   const [conversations, setConversations] = useState(() => safeGetItem('unihair_conversations', initialConversations));
@@ -602,7 +632,7 @@ export const AppProvider = ({ children }) => {
 
         const { data: bData } = await supabase.from('bookings').select('*').order('created_at', { ascending: false });
         if (bData && bData.length > 0) {
-          setBookings(bData);
+          setBookings(bData.map(normalizeBooking));
         }
 
         const { data: vProfiles } = await supabase.from('vendor_profiles').select('*');
@@ -660,12 +690,12 @@ export const AppProvider = ({ children }) => {
         if (payload.eventType === 'INSERT') {
           setBookings((prev) => {
             const exists = prev.some((b) => b.id === payload.new.id);
-            return exists ? prev : [payload.new, ...prev];
+            return exists ? prev : [normalizeBooking(payload.new), ...prev];
           });
         } else if (payload.eventType === 'UPDATE') {
-          setBookings((prev) => prev.map((b) => (b.id === payload.new.id ? payload.new : b)));
+          setBookings((prev) => prev.map((b) => (b.id === payload.new.id ? normalizeBooking(payload.new) : b)));
         } else if (payload.eventType === 'DELETE') {
-          setBookings((prev) => prev.filter((b) => b.id === payload.old.id));
+          setBookings((prev) => prev.filter((b) => b.id !== payload.old.id));
         }
       })
       .subscribe();
@@ -994,7 +1024,7 @@ export const AppProvider = ({ children }) => {
         });
         if (error) throw error;
         if (remoteBooking) {
-          setBookings((prev) => [remoteBooking, ...prev.filter((booking) => booking.id !== bookingId)]);
+          setBookings((prev) => [normalizeBooking(remoteBooking), ...prev.filter((booking) => booking.id !== bookingId)]);
         }
       } catch (err) {
         setBookings((prev) => prev.filter((booking) => booking.id !== bookingId));
@@ -1112,11 +1142,9 @@ export const AppProvider = ({ children }) => {
     });
   }, []);
 
-  // A stylist no-show can't be auto-refunded to the customer's real mobile
-  // money yet -- that needs a live PawaPay refund call, which isn't wired up
-  // -- so this reports the no-show and compensates with points immediately;
-  // the actual MoMo refund is a manual follow-up (payment_status flips to
-  // "Refund Pending" server-side, visible to admins).
+  // A report is only the customer's word, so it just flags the booking
+  // ("Refund Pending"); the 15 compensation points and any deposit refund wait
+  // for an admin to confirm it (resolveStylistNoShow).
   const claimNoShowRefund = useCallback(async (bookingId) => {
     const target = bookings.find((b) => b.id === bookingId);
     const previousStatus = target?.status;
@@ -1140,20 +1168,10 @@ export const AppProvider = ({ children }) => {
         addToast(error.message || 'Unable to report this no-show.', 'error');
         return;
       }
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('loyalty_points, points_history')
-        .eq('id', user.id)
-        .single();
-      if (profile) {
-        setUser((prev) => ({ ...prev, loyaltyPoints: profile.loyalty_points || 0, pointsHistory: profile.points_history || [] }));
-      }
-    } else {
-      setUser((prev) => ({ ...prev, loyaltyPoints: prev.loyaltyPoints + 15 }));
     }
 
-    addToast('No-show reported. +15 points credited now; the deposit refund will be processed by support.', 'success');
-  }, [bookings, user.id, addToast]);
+    addToast("No-show reported. We'll review it, and if it's confirmed you'll get 15 points plus a refund of any deposit you paid.", 'success');
+  }, [bookings, addToast]);
 
   const claimClientNoShow = useCallback(async (bookingId) => {
     const target = bookings.find((b) => b.id === bookingId);
@@ -1761,6 +1779,25 @@ export const AppProvider = ({ children }) => {
     }
     addToast(`Booking ${bookingId} marked as "${newStatus}"`, 'success');
   }, [bookings, addToast]);
+
+  // Admin ruling on a customer's stylist no-show report -- the only way the 15
+  // compensation points are awarded (resolve_stylist_no_show).
+  const resolveStylistNoShow = useCallback(async (bookingId, approve) => {
+    if (isSupabaseConfigured && supabase) {
+      const { data, error } = await supabase.rpc('resolve_stylist_no_show', { p_booking_id: bookingId, p_approve: approve });
+      if (error) {
+        addToast(error.message || 'Unable to review this no-show report.', 'error');
+        return;
+      }
+      if (data) {
+        setBookings((prev) => prev.map((b) => (b.id === bookingId ? normalizeBooking(data) : b)));
+      }
+    }
+    addToast(
+      approve ? 'No-show upheld. The customer got 15 points.' : 'No-show report declined. The booking is back to Confirmed.',
+      approve ? 'success' : 'info'
+    );
+  }, [addToast]);
 
   // Authentication & RBAC Functions
   const signIn = useCallback(async (email, password, captchaToken) => {
@@ -2460,6 +2497,7 @@ export const AppProvider = ({ children }) => {
     updateProductStock,
     deleteProduct,
     markOrderDelivered,
+    resolveStylistNoShow,
     updateBookingStatus,
     verifyStylist,
     settleVendorPayout,
@@ -2498,7 +2536,7 @@ export const AppProvider = ({ children }) => {
     toggleFavorite, sendMessage, createBooking, cancelBooking, rescheduleBooking,
     claimNoShowRefund, claimClientNoShow,
     updateVendorSchedule, exportToCalendar, createOrder, confirmArrivalOrder, addService, updateService, addProduct,
-    updateProductStock, deleteProduct, markOrderDelivered, updateBookingStatus,
+    updateProductStock, deleteProduct, markOrderDelivered, resolveStylistNoShow, updateBookingStatus,
     addToast, dismissToast
   ]);
 
