@@ -103,7 +103,14 @@ export async function handleBridge(
         await rpc('pamp_bridge_balance', { p_profile: body.profile_id, p_pamp_user: body.pamp_user })
       );
       if (row.outcome !== 'ok') return refuse(row.outcome ?? 'bad_request');
-      return reply(200, { ok: true, balance: row.balance, point_value_ngwee: row.point_value_ngwee });
+      // transferable: how many may move to PAMP (earned points only, see
+      // pamp_transferable). balance: everything the account holds in UniHair.
+      return reply(200, {
+        ok: true,
+        balance: row.balance,
+        transferable: row.transferable,
+        point_value_ngwee: row.point_value_ngwee,
+      });
     }
 
     case 'take': {
@@ -121,6 +128,7 @@ export async function handleBridge(
         })
       );
       if (row.outcome !== 'ok') return refuse(row.outcome ?? 'bad_request');
+      // How many may still move to PAMP after this debit.
       return reply(200, { ok: true, balance: row.balance });
     }
 

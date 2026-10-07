@@ -1227,7 +1227,6 @@ VALUES
 ('prd-3', '24H Max Edge Taming Gel (150g)', 'Hair Care Products', 60, 35, '/images/hair_product.jpg', 0, 0, 'Non-flaking, non-greasy extreme hold edge control formulated for all-day Lusaka campus weather.'),
 ('prd-4', 'Professional Cordless T-Blade Trimmer', 'Hair Care Products', 350, 8, '/images/hair_product.jpg', 0, 0, 'Zero-gap stainless steel blades, rechargeable USB-C battery. Perfect for personal dorm grooming.')
 ON CONFLICT (id) DO NOTHING;
-
 -- ==============================================================================
 -- PAMP points link (added 2026-10-07, v0.13.0)
 --
@@ -1244,7 +1243,11 @@ ON CONFLICT (id) DO NOTHING;
 -- wrong guesses are throttled per PAMP account and slowed down site-wide.
 --
 -- Moving points: only ever OUT of UniHair, and only when PAMP asks for a
--- specific amount under a ref (pamp_bridge_take). The profile row is locked and
+-- specific amount under a ref (pamp_bridge_take). Only points someone earned by
+-- using UniHair can move: completed bookings, delivered orders and
+-- admin-confirmed no-shows. Sign-up and referral bonuses stay in UniHair, so a
+-- stream of throwaway sign-ups is worth nothing on PAMP. pamp_transferable()
+-- says how many may move. The profile row is locked and
 -- the balance checked BEFORE apply_points is called, because apply_points
 -- floors the balance at 0 and would otherwise absorb an overdraft. The ref is
 -- recorded in the same transaction, so a retried request never debits twice,
@@ -1293,6 +1296,15 @@ CREATE TABLE IF NOT EXISTS public.pamp_link_failures (
 CREATE INDEX IF NOT EXISTS pamp_link_failures_at_idx ON public.pamp_link_failures (at);
 CREATE INDEX IF NOT EXISTS pamp_link_failures_user_idx ON public.pamp_link_failures (pamp_user_id, at);
 
+-- Every link ever made, so a PAMP account cannot hop between UniHair accounts.
+CREATE TABLE IF NOT EXISTS public.pamp_link_history (
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  pamp_user_id UUID NOT NULL,
+  profile_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  linked_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS pamp_link_history_user_idx ON public.pamp_link_history (pamp_user_id, linked_at);
+
 CREATE TABLE IF NOT EXISTS public.pamp_transfers (
   ref UUID PRIMARY KEY,
   profile_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
@@ -1301,18 +1313,42 @@ CREATE TABLE IF NOT EXISTS public.pamp_transfers (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS pamp_transfers_profile_idx ON public.pamp_transfers (profile_id, created_at);
+CREATE INDEX IF NOT EXISTS pamp_transfers_pamp_user_idx ON public.pamp_transfers (pamp_user_id, created_at);
 
 -- No policies: browsers cannot see or touch these tables at all.
 ALTER TABLE public.pamp_link_codes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.pamp_link_failures ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.pamp_transfers ENABLE ROW LEVEL SECURITY;
-REVOKE ALL ON public.pamp_link_codes, public.pamp_link_failures, public.pamp_transfers FROM anon, authenticated;
+ALTER TABLE public.pamp_link_history ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.pamp_link_codes, public.pamp_link_failures, public.pamp_transfers, public.pamp_link_history FROM anon, authenticated;
 
 -- What one UniHair point is worth, in ngwee. Must match points_ledger.value_zmw
 -- (points * 0.10). PAMP refuses to move points if its own value differs.
 CREATE OR REPLACE FUNCTION public.pamp_point_value_ngwee()
 RETURNS integer LANGUAGE sql IMMUTABLE SET search_path = '' AS $$
   SELECT 10
+$$;
+
+-- A profile that may take part: not suspended, and not banned in Auth, which is
+-- what delete-account does to a deleted account.
+CREATE OR REPLACE FUNCTION public.pamp_profile_usable(p_profile UUID)
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = '' AS $$
+  SELECT EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = p_profile AND NOT coalesce(p.is_suspended, false))
+     AND NOT EXISTS (SELECT 1 FROM auth.users u WHERE u.id = p_profile AND u.banned_until > now())
+$$;
+
+-- How many of a profile's points may move to PAMP: what it earned through
+-- provider-confirmed activity, less what has already moved, and never more than
+-- its balance.
+CREATE OR REPLACE FUNCTION public.pamp_transferable(p_profile UUID)
+RETURNS integer LANGUAGE sql STABLE SECURITY DEFINER SET search_path = '' AS $$
+  SELECT GREATEST(0, LEAST(
+    coalesce((SELECT p.loyalty_points FROM public.profiles p WHERE p.id = p_profile), 0),
+    coalesce((SELECT sum(l.points) FROM public.points_ledger l
+               WHERE l.profile_id = p_profile
+                 AND l.reason IN ('Completed booking reward', 'Order delivered reward', 'Stylist no-show compensation')), 0)
+    - coalesce((SELECT sum(t.points) FROM public.pamp_transfers t WHERE t.profile_id = p_profile), 0)
+  ))::integer
 $$;
 
 -- Browser: a fresh code for the signed-in person, replacing any earlier one.
@@ -1405,8 +1441,15 @@ BEGIN
     RETURN QUERY SELECT 'already_linked'::TEXT, NULL::UUID, NULL::TEXT;
     RETURN;
   END IF;
-  IF coalesce(v_profile.is_suspended, false) THEN
+  IF NOT public.pamp_profile_usable(v_profile.id) THEN
     RETURN QUERY SELECT 'suspended'::TEXT, NULL::UUID, NULL::TEXT;
+    RETURN;
+  END IF;
+  -- A PAMP account links a different UniHair account at most once a week.
+  IF EXISTS (SELECT 1 FROM public.pamp_link_history h
+              WHERE h.pamp_user_id = p_pamp_user AND h.profile_id <> v_profile.id
+                AND h.linked_at > now() - interval '7 days') THEN
+    RETURN QUERY SELECT 'relink_cooldown'::TEXT, NULL::UUID, NULL::TEXT;
     RETURN;
   END IF;
 
@@ -1418,25 +1461,30 @@ BEGIN
   UPDATE public.profiles SET pamp_user_id = p_pamp_user WHERE id = v_profile.id;
   -- Single use, in the same transaction as the link.
   DELETE FROM public.pamp_link_codes WHERE code = v_code.code;
+  INSERT INTO public.pamp_link_history (pamp_user_id, profile_id) VALUES (p_pamp_user, v_profile.id);
 
   RETURN QUERY SELECT 'ok'::TEXT, v_profile.id, v_profile.name;
 END;
 $$;
 
--- Bridge: the linked profile's balance. 'not_linked' unless the profile is
--- linked to exactly this PAMP account.
+-- Bridge: the linked profile's balance, and how much of it may move to PAMP.
+-- 'not_linked' unless the profile is linked to exactly this PAMP account and is
+-- still usable (a deleted or suspended account drops out).
+DROP FUNCTION IF EXISTS public.pamp_bridge_balance(UUID, UUID);
 CREATE OR REPLACE FUNCTION public.pamp_bridge_balance(p_profile UUID, p_pamp_user UUID)
-RETURNS TABLE (outcome TEXT, balance INTEGER, point_value_ngwee INTEGER)
+RETURNS TABLE (outcome TEXT, balance INTEGER, transferable INTEGER, point_value_ngwee INTEGER)
 LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = '' AS $$
 DECLARE
   v_profile public.profiles;
 BEGIN
   SELECT * INTO v_profile FROM public.profiles p WHERE p.id = p_profile;
-  IF v_profile.id IS NULL OR v_profile.pamp_user_id IS DISTINCT FROM p_pamp_user THEN
-    RETURN QUERY SELECT 'not_linked'::TEXT, NULL::INTEGER, NULL::INTEGER;
+  IF v_profile.id IS NULL OR v_profile.pamp_user_id IS DISTINCT FROM p_pamp_user
+     OR NOT public.pamp_profile_usable(v_profile.id) THEN
+    RETURN QUERY SELECT 'not_linked'::TEXT, NULL::INTEGER, NULL::INTEGER, NULL::INTEGER;
     RETURN;
   END IF;
-  RETURN QUERY SELECT 'ok'::TEXT, coalesce(v_profile.loyalty_points, 0), public.pamp_point_value_ngwee();
+  RETURN QUERY SELECT 'ok'::TEXT, coalesce(v_profile.loyalty_points, 0),
+    public.pamp_transferable(v_profile.id), public.pamp_point_value_ngwee();
 END;
 $$;
 
@@ -1458,7 +1506,7 @@ BEGIN
   SELECT * INTO v_done FROM public.pamp_transfers t WHERE t.ref = p_ref;
   IF v_done.ref IS NOT NULL THEN
     IF v_done.profile_id = p_profile AND v_done.points = p_points THEN
-      RETURN QUERY SELECT 'ok'::TEXT, coalesce(v_profile.loyalty_points, 0);
+      RETURN QUERY SELECT 'ok'::TEXT, public.pamp_transferable(p_profile);
     ELSE
       RETURN QUERY SELECT 'bad_request'::TEXT, NULL::INTEGER;
     END IF;
@@ -1469,7 +1517,7 @@ BEGIN
     RETURN QUERY SELECT 'not_linked'::TEXT, NULL::INTEGER;
     RETURN;
   END IF;
-  IF coalesce(v_profile.is_suspended, false) THEN
+  IF NOT public.pamp_profile_usable(v_profile.id) THEN
     RETURN QUERY SELECT 'suspended'::TEXT, NULL::INTEGER;
     RETURN;
   END IF;
@@ -1483,17 +1531,25 @@ BEGIN
     RETURN QUERY SELECT 'expired'::TEXT, NULL::INTEGER;
     RETURN;
   END IF;
-  -- At most 2,000 points (K200) a day leave an account, which caps what any
-  -- mistake or abuse can cost.
+  -- At most 2,000 points (K200) a day leave a UniHair account, and at most
+  -- 2,000 a day reach any one PAMP account, which caps what any mistake or abuse
+  -- can cost.
   SELECT coalesce(sum(t.points), 0) INTO v_today FROM public.pamp_transfers t
    WHERE t.profile_id = p_profile AND t.created_at > now() - interval '24 hours';
   IF v_today + p_points > 2000 THEN
     RETURN QUERY SELECT 'daily_limit'::TEXT, NULL::INTEGER;
     RETURN;
   END IF;
-  -- Checked here, under the lock: apply_points would floor at 0 instead.
-  IF coalesce(v_profile.loyalty_points, 0) < p_points THEN
-    RETURN QUERY SELECT 'insufficient'::TEXT, coalesce(v_profile.loyalty_points, 0);
+  SELECT coalesce(sum(t.points), 0) INTO v_today FROM public.pamp_transfers t
+   WHERE t.pamp_user_id = p_pamp_user AND t.created_at > now() - interval '24 hours';
+  IF v_today + p_points > 2000 THEN
+    RETURN QUERY SELECT 'daily_limit'::TEXT, NULL::INTEGER;
+    RETURN;
+  END IF;
+  -- Checked here, under the lock: apply_points would floor at 0 instead. Only
+  -- earned points count (pamp_transferable), not sign-up or referral bonuses.
+  IF public.pamp_transferable(p_profile) < p_points THEN
+    RETURN QUERY SELECT 'insufficient'::TEXT, public.pamp_transferable(p_profile);
     RETURN;
   END IF;
 
@@ -1501,7 +1557,7 @@ BEGIN
   VALUES (p_ref, p_profile, p_pamp_user, p_points);
   PERFORM public.apply_points(p_profile, -p_points, 'Used on PAMP');
 
-  RETURN QUERY SELECT 'ok'::TEXT, (SELECT p.loyalty_points FROM public.profiles p WHERE p.id = p_profile);
+  RETURN QUERY SELECT 'ok'::TEXT, public.pamp_transferable(p_profile);
 END;
 $$;
 
@@ -1523,6 +1579,8 @@ END;
 $$;
 
 REVOKE EXECUTE ON FUNCTION public.protect_pamp_link() FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.pamp_profile_usable(UUID) FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.pamp_transferable(UUID) FROM PUBLIC, anon, authenticated;
 REVOKE EXECUTE ON FUNCTION public.pamp_bridge_claim(TEXT, UUID) FROM PUBLIC, anon, authenticated;
 REVOKE EXECUTE ON FUNCTION public.pamp_bridge_balance(UUID, UUID) FROM PUBLIC, anon, authenticated;
 REVOKE EXECUTE ON FUNCTION public.pamp_bridge_take(UUID, UUID, INTEGER, UUID, TIMESTAMPTZ) FROM PUBLIC, anon, authenticated;
