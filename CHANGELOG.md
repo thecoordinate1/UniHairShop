@@ -4,6 +4,14 @@ All notable changes to UniHairShop are recorded here, newest first. Versions fol
 
 Each release is tagged in git as `vX.Y.Z` — refer to that tag instead of a commit hash when talking about "which version."
 
+## [0.13.2] — 2026-10-07
+
+### Fixed
+- **Free points could have been farmed onto PAMP** (caught in review, before the link was ever switched on). Every sign-up gets 50 points and referrals 25, so one PAMP account could have linked a stream of throwaway UniHair accounts and spent each one's bonus as money on PAMP. Now only points earned by using UniHair can move: `pamp_transferable()` counts 'Completed booking reward', 'Order delivered reward' and admin-confirmed 'Stylist no-show compensation', less what has already moved, never more than the balance. Sign-up and referral bonuses stay in UniHair.
+- On top of the 2,000-point daily cap per UniHair account, any one PAMP account can now receive at most 2,000 points a day in total, and can link a different UniHair account at most once a week (`pamp_link_history`).
+- A deleted account (banned in Auth by `delete-account`) or a suspended one now counts as not linked, so its points cannot move.
+- `pamp-bridge`'s balance answer adds `transferable` next to `balance`. `pamp_bridge_balance` is dropped and recreated because its result columns changed, and its grants are re-applied.
+
 ## [0.13.0] — 2026-10-07
 
 ### Added
