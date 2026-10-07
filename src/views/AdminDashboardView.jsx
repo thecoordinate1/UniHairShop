@@ -50,7 +50,7 @@ export default function AdminDashboardView() {
     updateService,
     addProduct,
     updateProductStock,
-    updateOrderStatus,
+    markOrderDelivered,
     updateBookingStatus,
     verifyStylist,
     settleVendorPayout,
@@ -68,6 +68,7 @@ export default function AdminDashboardView() {
   const [vendorVerifyFilter, setVendorVerifyFilter] = useState('All'); // 'All' | 'Verified' | 'Pending'
   const [trafficCampusFilter, setTrafficCampusFilter] = useState('All');
   const [trafficStatusFilter, setTrafficStatusFilter] = useState('All');
+  const [deliveringOrderId, setDeliveringOrderId] = useState(null);
   const [analyticsSummary, setAnalyticsSummary] = useState(null);
   const [loadingAnalytics, setLoadingAnalytics] = useState(false);
   const [totalUsersCount, setTotalUsersCount] = useState(null);
@@ -446,6 +447,7 @@ export default function AdminDashboardView() {
           { id: 'overview', label: '📊 Platform Financials & Traffic', count: null },
           { id: 'vendors', label: '✂️ All Campus Vendors', count: staffList.length },
           { id: 'traffic', label: '📅 Live Booking Stream', count: bookings.length },
+          { id: 'orders', label: '📦 Shop Orders', count: orders.filter((o) => o.status !== 'Delivered' && o.status !== 'Cancelled').length || null },
           { id: 'payouts', label: '📱 Mobile Money Payouts', count: null },
           { id: 'catalog', label: '🛍️ Services & Inventory', count: services.length + products.length },
           { id: 'analytics', label: '📈 Funnel Analytics', count: null },
@@ -815,6 +817,71 @@ export default function AdminDashboardView() {
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* SHOP ORDERS: admin-listed products have no vendor to confirm delivery, so the admin does */}
+      {adminTab === 'orders' && (
+        <div className="space-y-4">
+          <div>
+            <h3 className="text-sm font-bold text-slate-900 dark:text-white m-0">Shop Orders</h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 m-0 mt-0.5">
+              Marking an order delivered awards the customer's loyalty points. That's the only time order points are earned.
+            </p>
+          </div>
+
+          {orders.length === 0 ? (
+            <div className="card p-8 text-center text-slate-400 text-xs">No shop orders yet.</div>
+          ) : (
+            <div className="space-y-3">
+              {orders.map((order) => {
+                const isClosed = order.status === 'Delivered' || order.status === 'Cancelled';
+                return (
+                  <div key={order.id} className="card p-4 flex flex-wrap justify-between items-center gap-3 border border-black/10 dark:border-white/10">
+                    <div className="space-y-1 min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-xs font-mono font-bold text-slate-400">#{order.id}</span>
+                        <span className={`badge text-[10px] py-0.2 px-2 ${
+                          order.status === 'Delivered' ? 'badge-in-stock' : order.status === 'Cancelled' ? 'badge-out-of-stock' : 'badge-verified'
+                        }`}>
+                          {order.status || 'Pending'}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 m-0">
+                        Customer: <strong className="text-slate-900 dark:text-white">{order.customerName}</strong> ({order.customerPhone}) • {order.deliveryType}
+                      </p>
+                      <p className="text-xs text-slate-400 m-0">
+                        {order.campus}{order.hostelDetails ? ` • ${order.hostelDetails}` : ''} • {order.createdAt} • Payment: {order.paymentStatus || 'Pending'}
+                      </p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 m-0">
+                        Items: {(order.items || []).map((i) => `${i.name} (x${i.quantity})`).join(', ')}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <span className="price-tag text-base mr-2">K {order.totalAmount}</span>
+                      {!isClosed && (
+                        <button
+                          disabled={deliveringOrderId === order.id}
+                          onClick={async () => {
+                            setDeliveringOrderId(order.id);
+                            try {
+                              await markOrderDelivered(order.id);
+                            } finally {
+                              setDeliveringOrderId(null);
+                            }
+                          }}
+                          className="apple-btn-secondary text-xs px-3 py-1.5 text-emerald-500 hover:border-emerald-500/30 disabled:opacity-50"
+                        >
+                          {deliveringOrderId === order.id ? 'Marking…' : 'Mark Delivered'}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 

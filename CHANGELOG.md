@@ -4,6 +4,25 @@ All notable changes to UniHairShop are recorded here, newest first. Versions fol
 
 Each release is tagged in git as `vX.Y.Z` — refer to that tag instead of a commit hash when talking about "which version."
 
+## [0.12.3] — 2026-10-07
+
+### Changed
+- **Shop-order loyalty points are now earned only on delivery.** This matches the rule that customers earn points when they're "marked in attendance", as PAMP does; bookings already only award points when the stylist marks them Completed. Previously, choosing Pay on Arrival awarded points immediately, before any money changed hands, and they were never reversed if the order wasn't collected. That meant points could be farmed with orders nobody paid for. Now `confirm_arrival_order` and `confirm_paid_order` award nothing. A new internal `award_order_points()` awards `GREATEST(5, floor(total/10))` exactly once, under the ledger reason `'Order delivered reward'`, when an order is confirmed Delivered:
+  - **by the admin**, via a new `mark_order_delivered()` RPC and a new **Shop Orders** tab in the admin dashboard (all current products are admin-listed, so there's no vendor to confirm them);
+  - **automatically**, once every item in an order is a vendor item marked Delivered (new `product_sales_complete_order` trigger). Orders that also contain admin-listed items wait for the admin.
+- Booking and order confirmation messages no longer imply points were earned at checkout (production showed "Booking confirmed! +0 loyalty points earned" for a booking that was only requested). The in-app tour now explains when points arrive.
+
+### Fixed
+- **Orders were never loaded from the server.** The order list only came from the browser's local storage, so the admin couldn't see orders placed on other devices and customers never saw status changes made elsewhere. Orders now load from the server whenever someone is signed in. Customers get their own orders; the admin gets all of them.
+- Removed the unused `updateOrderStatus`. It wrote straight to `orders`, which has no client update policy, so it could only ever silently fail.
+
+Verified in production inside a rolled-back transaction:
+- a customer account is rejected;
+- the admin marking the real order delivered awards +24 points exactly once, even if repeated;
+- a vendor-only order auto-completes with +12;
+- a mixed order waits for the admin;
+- a Pay on Arrival commitment awards nothing.
+
 ## [0.12.2] — 2026-10-07
 
 ### Security

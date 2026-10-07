@@ -1033,7 +1033,12 @@ export const AppProvider = ({ children }) => {
       };
     });
 
-    addToast(`Booking ${bookingId} confirmed at ${currentCampus}! +${pointsEarned} loyalty points earned 💎`, 'success');
+    addToast(
+      pointsEarned > 0
+        ? `Booking ${bookingId} confirmed at ${currentCampus}! +${pointsEarned} loyalty points earned 💎`
+        : `Booking ${bookingId} requested! You'll earn loyalty points once your stylist marks it completed.`,
+      'success'
+    );
     trackEvent('booking_created', { bookingId, serviceName: newBookingData.serviceName, totalPrice });
     return newBooking;
   }, [currentCampus, user.name, user.phone, addToast, trackEvent]);
@@ -1282,18 +1287,16 @@ export const AppProvider = ({ children }) => {
       const { data: freshProducts } = await supabase.from('products').select('*');
       if (freshProducts) setProducts(freshProducts);
 
-      // Loyalty points are credited by confirm_paid_order() only once PawaPay
-      // actually confirms the payment — never here at placement — so an
-      // abandoned or failed mobile money payment can't be farmed for free
-      // points. The profile's points_history/loyalty_points will simply
-      // reflect the reward once the webhook fires; nothing to do client-side.
+      // Order points are credited server-side by award_order_points() only once
+      // the order is confirmed Delivered -- never at placement, payment, or a
+      // Pay-on-Arrival commitment -- so nothing to do client-side here.
 
       // Cart is cleared here (the order now owns these items), but the cart
       // drawer/page itself stays open — the caller is about to show a
       // payment wizard against this order and closes it only once payment
       // actually succeeds.
       clearCart();
-      addToast(`Order ${newOrder.id} placed for ${currentCampus}! Complete payment to confirm and earn points.`, 'success');
+      addToast(`Order ${newOrder.id} placed for ${currentCampus}! You'll earn loyalty points once it's delivered.`, 'success');
       trackEvent('order_placed', { orderId: newOrder.id, totalAmount: newOrder.totalAmount, itemCount: currentCart.length });
       return newOrder;
     }
@@ -1690,15 +1693,50 @@ export const AppProvider = ({ children }) => {
     addToast('Product removed from shop', 'info');
   }, [addToast]);
 
-  const updateOrderStatus = useCallback((orderId, newStatus) => {
-    setOrders((prev) =>
-      prev.map((o) => (o.id === orderId ? { ...o, status: newStatus } : o))
-    );
+  // Admin confirms delivery through mark_order_delivered(), which is also what
+  // awards the customer's order points -- orders has no client UPDATE policy.
+  const markOrderDelivered = useCallback(async (orderId) => {
     if (isSupabaseConfigured && supabase) {
-      supabase.from('orders').update({ status: newStatus }).eq('id', orderId).then(null, () => {});
+      const { error } = await supabase.rpc('mark_order_delivered', { p_order_id: orderId });
+      if (error) {
+        addToast(error.message || 'Unable to mark this order delivered.', 'error');
+        return;
+      }
     }
-    addToast(`Order ${orderId} updated to "${newStatus}"`, 'success');
+    setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, status: 'Delivered' } : o)));
+    addToast(`Order ${orderId} marked delivered. The customer's points have been awarded.`, 'success');
   }, [addToast]);
+
+  // Orders live server-side (place_order), so load them whenever someone is
+  // signed in -- RLS returns a customer's own orders, or every order for an
+  // admin -- instead of trusting the copy cached in this browser, which never
+  // sees delivery updates made elsewhere.
+  useEffect(() => {
+    if (!isSupabaseConfigured || !supabase || !user.isLoggedIn || !user.id) return undefined;
+    let cancelled = false;
+    supabase
+      .from('orders')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .then(({ data, error }) => {
+        if (cancelled || error || !data) return;
+        setOrders(data.map((o) => ({
+          id: o.id,
+          items: Array.isArray(o.items) ? o.items : [],
+          campus: o.campus,
+          totalAmount: Number(o.total_amount) || 0,
+          customerName: o.customer_name,
+          customerPhone: o.customer_phone,
+          deliveryType: o.delivery_type,
+          hostelDetails: o.hostel_details,
+          paymentMethod: o.payment_method,
+          paymentStatus: o.payment_status,
+          status: o.status,
+          createdAt: o.created_at ? String(o.created_at).split('T')[0] : ''
+        })));
+      });
+    return () => { cancelled = true; };
+  }, [user.isLoggedIn, user.id]);
 
   const updateBookingStatus = useCallback(async (bookingId, newStatus) => {
     const targetBooking = bookings.find((b) => b.id === bookingId);
@@ -2421,7 +2459,7 @@ export const AppProvider = ({ children }) => {
     addProduct,
     updateProductStock,
     deleteProduct,
-    updateOrderStatus,
+    markOrderDelivered,
     updateBookingStatus,
     verifyStylist,
     settleVendorPayout,
@@ -2460,7 +2498,7 @@ export const AppProvider = ({ children }) => {
     toggleFavorite, sendMessage, createBooking, cancelBooking, rescheduleBooking,
     claimNoShowRefund, claimClientNoShow,
     updateVendorSchedule, exportToCalendar, createOrder, confirmArrivalOrder, addService, updateService, addProduct,
-    updateProductStock, deleteProduct, updateOrderStatus, updateBookingStatus,
+    updateProductStock, deleteProduct, markOrderDelivered, updateBookingStatus,
     addToast, dismissToast
   ]);
 

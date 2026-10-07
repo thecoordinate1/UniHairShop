@@ -880,11 +880,11 @@ GRANT EXECUTE ON FUNCTION public.place_order(JSONB, TEXT, TEXT, TEXT, TEXT) TO a
 -- fires for those), so COD orders never touch the wallet at all.
 CREATE OR REPLACE FUNCTION public.confirm_paid_order(p_order_id TEXT)
 RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
-DECLARE v_sale RECORD; v_fee NUMERIC; v_net NUMERIC; v_order public.orders; v_points INTEGER;
+DECLARE v_sale RECORD; v_fee NUMERIC; v_net NUMERIC; v_order public.orders;
 BEGIN
   SELECT * INTO v_order FROM public.orders WHERE id = p_order_id FOR UPDATE;
   -- Idempotency: PawaPay (or any webhook) can retry the same delivery, and this
-  -- must never double-credit a vendor's wallet or a customer's loyalty points.
+  -- must never double-credit a vendor's wallet.
   IF v_order.id IS NULL OR v_order.payment_status = 'Paid' THEN RETURN; END IF;
 
   FOR v_sale IN SELECT * FROM public.product_sales WHERE order_id = p_order_id LOOP
@@ -901,14 +901,9 @@ BEGIN
   END LOOP;
 
   UPDATE public.orders SET payment_status = 'Paid' WHERE id = p_order_id;
-
-  -- Loyalty points are only ever earned once the payment is actually
-  -- confirmed here -- never at checkout/place_order() time, so an abandoned
-  -- or failed mobile money payment can't be farmed for free points.
-  IF v_order.customer_id IS NOT NULL THEN
-    v_points := GREATEST(5, floor(v_order.total_amount / 10));
-    PERFORM public.apply_points(v_order.customer_id, v_points, 'Order payment reward', NULL, p_order_id);
-  END IF;
+  -- No loyalty points here: order points are earned only once the order is
+  -- confirmed Delivered (award_order_points), the shop equivalent of a
+  -- customer being marked in attendance.
 END;
 $$;
 
@@ -916,28 +911,89 @@ REVOKE ALL ON FUNCTION public.confirm_paid_order(TEXT) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.confirm_paid_order(TEXT) TO service_role;
 
 -- Cash-on-pickup orders never trigger a PawaPay webhook (no online payment
--- was ever attempted), so this is confirm_paid_order()'s equivalent for that
--- path: called by the customer themselves once they commit to "Pay on
--- Arrival" in the checkout wizard. Safe to let the customer call directly
--- (unlike confirm_paid_order) because there's no payment amount to trust or
--- forge here -- it only ever touches the caller's own order.
+-- was ever attempted), so this records the customer's "Pay on Arrival" choice.
+-- Safe to let the customer call directly (unlike confirm_paid_order): it only
+-- ever touches the caller's own order and awards nothing -- a commitment to pay
+-- later proves nothing, so points wait for delivery (award_order_points).
 CREATE OR REPLACE FUNCTION public.confirm_arrival_order(p_order_id TEXT)
 RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
-DECLARE v_order public.orders; v_points INTEGER;
+DECLARE v_order public.orders;
 BEGIN
   SELECT * INTO v_order FROM public.orders WHERE id = p_order_id AND customer_id = auth.uid() FOR UPDATE;
   IF v_order.id IS NULL THEN RAISE EXCEPTION 'Order not found'; END IF;
   IF v_order.payment_status IN ('Paid', 'Pending (Pay on Arrival)') THEN RETURN; END IF;
 
   UPDATE public.orders SET payment_status = 'Pending (Pay on Arrival)', payment_method = 'Pay on Arrival / Pickup' WHERE id = p_order_id;
-
-  v_points := GREATEST(5, floor(v_order.total_amount / 10));
-  PERFORM public.apply_points(v_order.customer_id, v_points, 'Order payment reward', NULL, p_order_id);
 END;
 $$;
 
 REVOKE ALL ON FUNCTION public.confirm_arrival_order(TEXT) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.confirm_arrival_order(TEXT) TO authenticated;
+
+-- Order loyalty points are earned exactly once, only when the order is
+-- confirmed Delivered by whoever fulfilled it -- the shop equivalent of a
+-- customer being marked in attendance. Checkout, payment, and a Pay-on-Arrival
+-- commitment all prove nothing was actually received. Internal only.
+CREATE OR REPLACE FUNCTION public.award_order_points(p_order_id TEXT)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE v_order public.orders; v_points INTEGER;
+BEGIN
+  -- Row lock serializes the admin path and the vendor trigger for one order,
+  -- so the ledger check below can't race into a double award.
+  SELECT * INTO v_order FROM public.orders WHERE id = p_order_id FOR UPDATE;
+  IF v_order.id IS NULL OR v_order.customer_id IS NULL THEN RETURN; END IF;
+  IF EXISTS (SELECT 1 FROM public.points_ledger WHERE order_id = p_order_id AND reason IN ('Order delivered reward', 'Order payment reward')) THEN RETURN; END IF;
+  v_points := GREATEST(5, floor(v_order.total_amount / 10));
+  PERFORM public.apply_points(v_order.customer_id, v_points, 'Order delivered reward', NULL, p_order_id);
+END;
+$$;
+
+-- Admin-only: confirm a whole order was delivered/collected. Admin-listed
+-- products have no vendor line item (product_sales) a vendor could mark, so
+-- the admin is the one who confirms those.
+CREATE OR REPLACE FUNCTION public.mark_order_delivered(p_order_id TEXT)
+RETURNS public.orders LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE v_order public.orders;
+BEGIN
+  IF auth.uid() IS NULL OR NOT public.is_admin() THEN RAISE EXCEPTION 'Only an admin can mark an order delivered'; END IF;
+  SELECT * INTO v_order FROM public.orders WHERE id = p_order_id FOR UPDATE;
+  IF v_order.id IS NULL THEN RAISE EXCEPTION 'Order not found'; END IF;
+  IF v_order.status = 'Cancelled' THEN RAISE EXCEPTION 'A cancelled order cannot be marked delivered'; END IF;
+  IF v_order.status = 'Delivered' THEN RETURN v_order; END IF;
+  -- Order first, so the product_sales trigger below sees it already Delivered
+  -- and doesn't send a second notification.
+  UPDATE public.orders SET status = 'Delivered' WHERE id = p_order_id RETURNING * INTO v_order;
+  UPDATE public.product_sales SET fulfillment_status = 'Delivered' WHERE order_id = p_order_id AND fulfillment_status IS DISTINCT FROM 'Delivered';
+  PERFORM public.award_order_points(p_order_id);
+  INSERT INTO public.audit_log (actor_id, action, entity_type, entity_id) VALUES (auth.uid(), 'order_delivered', 'order', p_order_id);
+  PERFORM public.notify_push(v_order.customer_id, 'Order Delivered', 'Your order ' || p_order_id || ' has been delivered.', '/?tab=account');
+  RETURN v_order;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.mark_order_delivered(TEXT) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.mark_order_delivered(TEXT) TO authenticated;
+
+-- Vendor path: once every item in an order is a vendor item and all of them
+-- are marked Delivered, the order is complete. Orders that also contain
+-- admin-listed items (no product_sales row) wait for mark_order_delivered().
+CREATE OR REPLACE FUNCTION public.complete_order_if_fully_delivered()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE v_order public.orders; v_lines INTEGER; v_delivered INTEGER;
+BEGIN
+  SELECT * INTO v_order FROM public.orders WHERE id = NEW.order_id FOR UPDATE;
+  IF v_order.id IS NULL OR v_order.status IN ('Delivered', 'Cancelled') THEN RETURN NEW; END IF;
+  SELECT count(*), count(*) FILTER (WHERE fulfillment_status = 'Delivered')
+    INTO v_lines, v_delivered
+    FROM public.product_sales WHERE order_id = NEW.order_id;
+  IF v_delivered = v_lines AND v_lines = jsonb_array_length(v_order.items) THEN
+    UPDATE public.orders SET status = 'Delivered' WHERE id = NEW.order_id;
+    PERFORM public.award_order_points(NEW.order_id);
+    PERFORM public.notify_push(v_order.customer_id, 'Order Delivered', 'Your order ' || NEW.order_id || ' has been delivered.', '/?tab=account');
+  END IF;
+  RETURN NEW;
+END;
+$$;
 
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created AFTER INSERT ON auth.users FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
@@ -957,6 +1013,11 @@ FOR EACH ROW EXECUTE FUNCTION public.prevent_vendor_self_verification();
 DROP TRIGGER IF EXISTS product_sales_protect_fields ON public.product_sales;
 CREATE TRIGGER product_sales_protect_fields BEFORE UPDATE ON public.product_sales
 FOR EACH ROW EXECUTE FUNCTION public.protect_product_sales_fields();
+
+DROP TRIGGER IF EXISTS product_sales_complete_order ON public.product_sales;
+CREATE TRIGGER product_sales_complete_order AFTER UPDATE OF fulfillment_status ON public.product_sales
+FOR EACH ROW WHEN (NEW.fulfillment_status = 'Delivered' AND OLD.fulfillment_status IS DISTINCT FROM 'Delivered')
+EXECUTE FUNCTION public.complete_order_if_fully_delivered();
 
 DROP TRIGGER IF EXISTS messages_notify_push ON public.messages;
 CREATE TRIGGER messages_notify_push AFTER INSERT ON public.messages
@@ -1052,6 +1113,7 @@ REVOKE ALL ON public.points_ledger, public.payment_transactions, public.audit_lo
 REVOKE ALL ON FUNCTION public.apply_points(UUID, INTEGER, TEXT, TEXT, TEXT) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.confirm_paid_order(TEXT) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.notify_push(UUID, TEXT, TEXT, TEXT) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.award_order_points(TEXT) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.request_booking(TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, NUMERIC, NUMERIC, JSONB, NUMERIC, TEXT) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.transition_booking(TEXT, TEXT, TEXT, TEXT) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.request_booking(TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, NUMERIC, NUMERIC, JSONB, NUMERIC, TEXT) TO authenticated;

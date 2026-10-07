@@ -70,7 +70,7 @@ export default function AppTutorial({ isOpen, onClose }) {
     {
       icon: Trophy,
       title: 'Loyalty Points & Ambassador Program',
-      description: "Every booking and order earns loyalty points (redeemable for discounts). Head to Account to see your points, your 7-digit referral code, and the Campus Ambassador program — share your link and earn cash once a friend you refer completes their first appointment.",
+      description: "Every booking earns loyalty points once your stylist marks it completed, and every shop order once it's delivered (redeemable for discounts). Head to Account to see your points, your 7-digit referral code, and the Campus Ambassador program — share your link and earn cash once a friend you refer completes their first appointment.",
       tab: 'account'
     },
     ...(isVendorOrAdmin ? [{
