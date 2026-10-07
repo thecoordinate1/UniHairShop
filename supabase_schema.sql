@@ -581,6 +581,10 @@ BEGIN
 END;
 $$;
 
+-- Adding parameters made CREATE OR REPLACE create a second overload instead of
+-- replacing the old 11-arg one, which lacks the suspension/deposit checks and
+-- stayed callable. Drop it so only the current signature exists.
+DROP FUNCTION IF EXISTS public.request_booking(TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, NUMERIC, NUMERIC, JSONB);
 CREATE OR REPLACE FUNCTION public.request_booking(
   p_service_id TEXT, p_service_name TEXT, p_category TEXT, p_staff_id TEXT, p_date TEXT, p_time TEXT,
   p_hostel TEXT, p_service_type TEXT, p_price NUMERIC, p_total_price NUMERIC, p_add_ons JSONB DEFAULT '[]'::jsonb,
@@ -1039,11 +1043,18 @@ CREATE POLICY reports_admin_update ON public.reports FOR UPDATE TO authenticated
 
 -- Service-role functions/Edge Functions write financial and booking state. Clients
 -- have read-only access to those records, preventing balance/refund manipulation.
+-- REVOKE ... FROM PUBLIC alone is not enough on Supabase: default privileges grant
+-- EXECUTE on every new public function to anon and authenticated by name, so
+-- internal-only SECURITY DEFINER functions must be revoked from those roles too.
+-- (They stay callable from other SECURITY DEFINER functions, which run as owner.)
+-- Never revoke is_admin()/is_user_suspended(): RLS policies evaluate them as the caller.
 REVOKE ALL ON public.points_ledger, public.payment_transactions, public.audit_log FROM anon, authenticated;
-REVOKE ALL ON FUNCTION public.apply_points(UUID, INTEGER, TEXT, TEXT, TEXT) FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.request_booking(TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, NUMERIC, NUMERIC, JSONB) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.apply_points(UUID, INTEGER, TEXT, TEXT, TEXT) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.confirm_paid_order(TEXT) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.notify_push(UUID, TEXT, TEXT, TEXT) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.request_booking(TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, NUMERIC, NUMERIC, JSONB, NUMERIC, TEXT) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.transition_booking(TEXT, TEXT, TEXT, TEXT) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.request_booking(TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, NUMERIC, NUMERIC, JSONB) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.request_booking(TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, NUMERIC, NUMERIC, JSONB, NUMERIC, TEXT) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.transition_booking(TEXT, TEXT, TEXT, TEXT) TO authenticated;
 
 -- Provision administrators by SQL only; never by email or password logic in the client:

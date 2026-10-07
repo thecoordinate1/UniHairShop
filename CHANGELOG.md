@@ -4,6 +4,13 @@ All notable changes to UniHairShop are recorded here, newest first. Versions fol
 
 Each release is tagged in git as `vX.Y.Z` — refer to that tag instead of a commit hash when talking about "which version."
 
+## [0.12.2] — 2026-10-07
+
+### Security
+- **Anyone could mint loyalty points or mark orders paid.** `apply_points` (SECURITY DEFINER, takes any profile id) and `confirm_paid_order` (marks an order Paid and credits vendor wallets) were callable by `anon` and `authenticated` through the public REST API, even when logged out. The schema only ran `REVOKE ... FROM PUBLIC`, but on Supabase, default privileges grant EXECUTE on every new `public` function to `anon` and `authenticated` by name, so that revoke didn't stop them. Both functions, plus `notify_push` (which would have let anyone send push notifications to any user once push is configured), are now revoked from `anon`/`authenticated`. They remain callable from other SECURITY DEFINER functions, and `confirm_paid_order` remains callable by `service_role` for the payment webhook. Verified with `has_function_privilege` and by calling each through the public API (all now `42501 permission denied`).
+- Dropped a stale 11-argument `request_booking` overload. Adding parameters had made `CREATE OR REPLACE` create a second function instead of replacing the old one, so the old version (without the suspension and deposit checks) was still callable. Booking permissions now point at the current signature.
+- Not yet fixed (product decision): `confirm_arrival_order` awards order points as soon as a customer commits to Pay on Arrival, before any money changes hands, and never reverses them if the order isn't collected.
+
 ## [0.12.1] — 2026-10-07
 
 ### Fixed
