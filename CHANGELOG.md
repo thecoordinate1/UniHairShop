@@ -18,6 +18,7 @@ Each release is tagged in git as `vX.Y.Z` — refer to that tag instead of a com
 - Only the bridge functions can set or clear `profiles.pamp_user_id` (`protect_pamp_link` trigger); browsers cannot see the new tables at all.
 
 ### Not switched on yet
+- The card renders only in a build with `VITE_PAMP_LINK_ENABLED=true` (see `.env.example`), so applying the schema, which every `db:migrate` now does, cannot make it appear early. To switch on, set the variable in Vercel and redeploy.
 - Needs, with the user's approval: `npm run db:migrate` (or this section applied), `POINTS_BRIDGE_SECRET` set in **both** projects (same value), and `supabase functions deploy pamp-bridge --no-verify-jwt`. PAMP's half ships as PAMP v0.22.0. Until the secret is set the function answers "not_configured" and nothing can move.
 - Points move one way for now, UniHair → PAMP. Spending PAMP points at UniHair is not built.
 ## [0.12.3] — 2026-10-07

@@ -14,7 +14,16 @@ import { useApp } from '../context/AppContext';
 
 const formatCode = (code) => `${code.slice(0, 4)}-${code.slice(4)}`;
 
+// Off unless VITE_PAMP_LINK_ENABLED=true at build time, so the schema can be
+// applied before PAMP's side, the shared secret and pamp-bridge are all live.
+// Switching on: set it in Vercel and redeploy.
+const ENABLED = import.meta.env.VITE_PAMP_LINK_ENABLED === 'true';
+
 export default function LinkPamp() {
+  return ENABLED ? <LinkPampCard /> : null;
+}
+
+function LinkPampCard() {
   const { user } = useApp();
   const [status, setStatus] = useState({ ready: false, linked: false });
   const [issued, setIssued] = useState(null); // { code, expiresAt }
