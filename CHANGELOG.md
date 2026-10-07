@@ -4,6 +4,22 @@ All notable changes to UniHairShop are recorded here, newest first. Versions fol
 
 Each release is tagged in git as `vX.Y.Z` — refer to that tag instead of a commit hash when talking about "which version."
 
+## [0.13.0] — 2026-10-07
+
+### Added
+- **Use UniHair points on PAMP.** A UniHair account can be linked to the person's PAMP account (PAMP: events in Zambia), so UniHair points take money off PAMP passes. A point is worth K0.10 in both apps. Rewards tab → **Link PAMP** shows an 8-character code (`XXXX-XXXX`, five minutes, single use) to type into PAMP's profile; the card turns to "Linked to PAMP" by itself once PAMP uses it, and can be unlinked.
+- New `pamp-bridge` Edge Function, the only thing PAMP's server can talk to. Every request is signed (HMAC-SHA256 with `POINTS_BRIDGE_SECRET`, held by both apps' servers only) and refused unsigned, before anything is read. It can link an account, read a linked account's balance, debit points PAMP is moving to the linked PAMP account, check whether an earlier debit happened, and unlink. It can never add UniHair points.
+- New "PAMP points link" section at the end of `supabase_schema.sql`: `profiles.pamp_user_id`, `pamp_link_codes`, `pamp_link_failures`, `pamp_transfers`, the browser functions `create_pamp_link_code()` / `unlink_pamp()`, and the service-role-only `pamp_bridge_*` functions.
+
+### Safeguards
+- A debit locks the profile row and checks the balance **before** calling `apply_points`, which floors balances at 0 and would otherwise absorb an overdraft. Each debit is recorded under PAMP's ref in the same transaction, so a retried request never debits twice.
+- At most 2,000 points (K200) a day can leave an account for PAMP. A debit PAMP issued more than 90 seconds earlier is refused, so PAMP can safely give up on one it never heard back about.
+- Wrong codes: a PAMP account is stopped for an hour after five; many wrong codes site-wide slow every claim down rather than switching linking off. With about 10^12 possible codes, guessing one is not a way to reach a stranger's points.
+- Only the bridge functions can set or clear `profiles.pamp_user_id` (`protect_pamp_link` trigger); browsers cannot see the new tables at all.
+
+### Not switched on yet
+- Needs, with the user's approval: `npm run db:migrate` (or this section applied), `POINTS_BRIDGE_SECRET` set in **both** projects (same value), and `supabase functions deploy pamp-bridge --no-verify-jwt`. PAMP's half ships as PAMP v0.22.0. Until the secret is set the function answers "not_configured" and nothing can move.
+- Points move one way for now, UniHair → PAMP. Spending PAMP points at UniHair is not built.
 ## [0.12.3] — 2026-10-07
 
 ### Changed

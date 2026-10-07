@@ -39,6 +39,7 @@ import {
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import BookingDetailModal from '../components/BookingDetailModal';
+import LinkPamp from '../components/LinkPamp';
 
 export default function AccountView() {
   const {
@@ -929,6 +930,9 @@ export default function AccountView() {
               </div>
             </div>
           </div>
+
+          {/* Link to PAMP, so UniHair points count towards PAMP passes */}
+          <LinkPamp />
 
           {/* Points Activity & Tracking History Card */}
           <div className="card p-5">

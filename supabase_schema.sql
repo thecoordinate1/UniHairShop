@@ -1189,3 +1189,313 @@ VALUES
 ('prd-3', '24H Max Edge Taming Gel (150g)', 'Hair Care Products', 60, 35, '/images/hair_product.jpg', 0, 0, 'Non-flaking, non-greasy extreme hold edge control formulated for all-day Lusaka campus weather.'),
 ('prd-4', 'Professional Cordless T-Blade Trimmer', 'Hair Care Products', 350, 8, '/images/hair_product.jpg', 0, 0, 'Zero-gap stainless steel blades, rechargeable USB-C battery. Perfect for personal dorm grooming.')
 ON CONFLICT (id) DO NOTHING;
+
+-- ==============================================================================
+-- PAMP points link (added 2026-10-07, v0.13.0)
+--
+-- Someone with both a UniHair and a PAMP account can link them once, so their
+-- UniHair points count towards PAMP passes. A point is worth K0.10 in both apps
+-- (points_ledger.value_zmw = points * 0.10 here; platform_settings in PAMP).
+--
+-- Linking: the person asks UniHair for a code while signed in here
+-- (create_pamp_link_code), and types it into PAMP while signed in there. PAMP's
+-- server hands the code to the pamp-bridge Edge Function, which calls
+-- pamp_bridge_claim. Being signed in to both apps within the code's five
+-- minutes is the proof that the two accounts are one person. Codes are 8
+-- characters from a 32-letter alphabet (about 10^12 of them), single use, and
+-- wrong guesses are throttled per PAMP account and slowed down site-wide.
+--
+-- Moving points: only ever OUT of UniHair, and only when PAMP asks for a
+-- specific amount under a ref (pamp_bridge_take). The profile row is locked and
+-- the balance checked BEFORE apply_points is called, because apply_points
+-- floors the balance at 0 and would otherwise absorb an overdraft. The ref is
+-- recorded in the same transaction, so a retried request never debits twice,
+-- and PAMP can ask afterwards whether a debit happened (pamp_bridge_check).
+-- Nothing here adds points to UniHair from PAMP.
+--
+-- The pamp_bridge_* functions are for the service role only (the Edge
+-- Function). Browsers get create_pamp_link_code and unlink_pamp.
+-- ==============================================================================
+
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS pamp_user_id UUID;
+CREATE UNIQUE INDEX IF NOT EXISTS profiles_pamp_user_id_key ON public.profiles (pamp_user_id) WHERE pamp_user_id IS NOT NULL;
+
+-- Only the bridge functions below (which set app.unihair_trusted) may set or
+-- clear the link: not the person, not an admin through the API.
+CREATE OR REPLACE FUNCTION public.protect_pamp_link()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
+BEGIN
+  IF current_setting('app.unihair_trusted', true) = 'on' THEN
+    RETURN NEW;
+  END IF;
+  IF TG_OP = 'INSERT' THEN
+    NEW.pamp_user_id := NULL;
+  ELSE
+    NEW.pamp_user_id := OLD.pamp_user_id;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS profiles_protect_pamp_link ON public.profiles;
+CREATE TRIGGER profiles_protect_pamp_link BEFORE INSERT OR UPDATE ON public.profiles
+  FOR EACH ROW EXECUTE FUNCTION public.protect_pamp_link();
+
+CREATE TABLE IF NOT EXISTS public.pamp_link_codes (
+  code TEXT PRIMARY KEY CHECK (code ~ '^[A-HJ-NP-Z2-9]{8}$'),
+  profile_id UUID NOT NULL UNIQUE REFERENCES public.profiles(id) ON DELETE CASCADE,
+  expires_at TIMESTAMPTZ NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS public.pamp_link_failures (
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  pamp_user_id UUID NOT NULL,
+  at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS pamp_link_failures_at_idx ON public.pamp_link_failures (at);
+CREATE INDEX IF NOT EXISTS pamp_link_failures_user_idx ON public.pamp_link_failures (pamp_user_id, at);
+
+CREATE TABLE IF NOT EXISTS public.pamp_transfers (
+  ref UUID PRIMARY KEY,
+  profile_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  pamp_user_id UUID NOT NULL,
+  points INTEGER NOT NULL CHECK (points > 0),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS pamp_transfers_profile_idx ON public.pamp_transfers (profile_id, created_at);
+
+-- No policies: browsers cannot see or touch these tables at all.
+ALTER TABLE public.pamp_link_codes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.pamp_link_failures ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.pamp_transfers ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.pamp_link_codes, public.pamp_link_failures, public.pamp_transfers FROM anon, authenticated;
+
+-- What one UniHair point is worth, in ngwee. Must match points_ledger.value_zmw
+-- (points * 0.10). PAMP refuses to move points if its own value differs.
+CREATE OR REPLACE FUNCTION public.pamp_point_value_ngwee()
+RETURNS integer LANGUAGE sql IMMUTABLE SET search_path = '' AS $$
+  SELECT 10
+$$;
+
+-- Browser: a fresh code for the signed-in person, replacing any earlier one.
+CREATE OR REPLACE FUNCTION public.create_pamp_link_code()
+RETURNS TABLE (code TEXT, expires_at TIMESTAMPTZ)
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = '' AS $$
+DECLARE
+  v_user UUID := auth.uid();
+  v_alphabet CONSTANT TEXT := 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  v_bytes BYTEA;
+  v_code TEXT;
+  v_expires TIMESTAMPTZ := now() + interval '5 minutes';
+BEGIN
+  IF v_user IS NULL THEN
+    RAISE EXCEPTION 'Sign in first' USING ERRCODE = '42501';
+  END IF;
+  IF public.is_user_suspended(v_user) THEN
+    RAISE EXCEPTION 'Your account is suspended' USING ERRCODE = '42501';
+  END IF;
+  IF EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = v_user AND p.pamp_user_id IS NOT NULL) THEN
+    RAISE EXCEPTION 'Already linked to PAMP. Unlink it first to link another account.' USING ERRCODE = '22023';
+  END IF;
+
+  DELETE FROM public.pamp_link_codes c WHERE c.profile_id = v_user OR c.expires_at < now();
+  LOOP
+    -- 256 is a multiple of 32, so every letter is equally likely.
+    v_bytes := extensions.gen_random_bytes(8);
+    v_code := '';
+    FOR i IN 0..7 LOOP
+      v_code := v_code || substr(v_alphabet, 1 + (get_byte(v_bytes, i) % 32), 1);
+    END LOOP;
+    EXIT WHEN NOT EXISTS (SELECT 1 FROM public.pamp_link_codes c WHERE c.code = v_code);
+  END LOOP;
+
+  INSERT INTO public.pamp_link_codes (code, profile_id, expires_at) VALUES (v_code, v_user, v_expires);
+  RETURN QUERY SELECT v_code, v_expires;
+END;
+$$;
+
+-- Browser: stop UniHair points being used on PAMP. Points already moved stay
+-- where they are.
+CREATE OR REPLACE FUNCTION public.unlink_pamp()
+RETURNS void LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = '' AS $$
+BEGIN
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'Sign in first' USING ERRCODE = '42501';
+  END IF;
+  PERFORM set_config('app.unihair_trusted', 'on', true);
+  UPDATE public.profiles SET pamp_user_id = NULL WHERE id = auth.uid();
+  DELETE FROM public.pamp_link_codes WHERE profile_id = auth.uid();
+END;
+$$;
+
+-- Bridge: link the profile that owns p_code to PAMP account p_pamp_user.
+-- Returns an outcome rather than raising, so a failed guess can be recorded.
+CREATE OR REPLACE FUNCTION public.pamp_bridge_claim(p_code TEXT, p_pamp_user UUID)
+RETURNS TABLE (outcome TEXT, profile_id UUID, name TEXT)
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = '' AS $$
+DECLARE
+  v_code public.pamp_link_codes;
+  v_profile public.profiles;
+BEGIN
+  IF p_pamp_user IS NULL THEN
+    RETURN QUERY SELECT 'bad_request'::TEXT, NULL::UUID, NULL::TEXT;
+    RETURN;
+  END IF;
+
+  -- A PAMP account that keeps guessing is stopped for an hour.
+  IF (SELECT count(*) FROM public.pamp_link_failures f
+       WHERE f.pamp_user_id = p_pamp_user AND f.at > now() - interval '1 hour') >= 5 THEN
+    RETURN QUERY SELECT 'too_many_attempts'::TEXT, NULL::UUID, NULL::TEXT;
+    RETURN;
+  END IF;
+  -- Many wrong guesses site-wide (many PAMP accounts guessing) slow every claim
+  -- down rather than refusing them, so an attacker cannot switch linking off.
+  IF (SELECT count(*) FROM public.pamp_link_failures f WHERE f.at > now() - interval '5 minutes') >= 20 THEN
+    PERFORM pg_sleep(3);
+  END IF;
+
+  SELECT * INTO v_code FROM public.pamp_link_codes c
+   WHERE c.code = upper(btrim(coalesce(p_code, ''))) FOR UPDATE;
+  IF v_code.code IS NULL OR v_code.expires_at < now() THEN
+    INSERT INTO public.pamp_link_failures (pamp_user_id) VALUES (p_pamp_user);
+    RETURN QUERY SELECT 'invalid_code'::TEXT, NULL::UUID, NULL::TEXT;
+    RETURN;
+  END IF;
+
+  SELECT * INTO v_profile FROM public.profiles p WHERE p.id = v_code.profile_id FOR UPDATE;
+  IF v_profile.pamp_user_id IS NOT NULL AND v_profile.pamp_user_id <> p_pamp_user THEN
+    RETURN QUERY SELECT 'already_linked'::TEXT, NULL::UUID, NULL::TEXT;
+    RETURN;
+  END IF;
+  IF coalesce(v_profile.is_suspended, false) THEN
+    RETURN QUERY SELECT 'suspended'::TEXT, NULL::UUID, NULL::TEXT;
+    RETURN;
+  END IF;
+
+  PERFORM set_config('app.unihair_trusted', 'on', true);
+  -- PAMP links one UniHair account at a time: an older link to this PAMP
+  -- account (one PAMP could not clear when it unlinked) gives way.
+  UPDATE public.profiles SET pamp_user_id = NULL
+   WHERE pamp_user_id = p_pamp_user AND id <> v_profile.id;
+  UPDATE public.profiles SET pamp_user_id = p_pamp_user WHERE id = v_profile.id;
+  -- Single use, in the same transaction as the link.
+  DELETE FROM public.pamp_link_codes WHERE code = v_code.code;
+
+  RETURN QUERY SELECT 'ok'::TEXT, v_profile.id, v_profile.name;
+END;
+$$;
+
+-- Bridge: the linked profile's balance. 'not_linked' unless the profile is
+-- linked to exactly this PAMP account.
+CREATE OR REPLACE FUNCTION public.pamp_bridge_balance(p_profile UUID, p_pamp_user UUID)
+RETURNS TABLE (outcome TEXT, balance INTEGER, point_value_ngwee INTEGER)
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = '' AS $$
+DECLARE
+  v_profile public.profiles;
+BEGIN
+  SELECT * INTO v_profile FROM public.profiles p WHERE p.id = p_profile;
+  IF v_profile.id IS NULL OR v_profile.pamp_user_id IS DISTINCT FROM p_pamp_user THEN
+    RETURN QUERY SELECT 'not_linked'::TEXT, NULL::INTEGER, NULL::INTEGER;
+    RETURN;
+  END IF;
+  RETURN QUERY SELECT 'ok'::TEXT, coalesce(v_profile.loyalty_points, 0), public.pamp_point_value_ngwee();
+END;
+$$;
+
+-- Bridge: debit points PAMP is moving to the linked PAMP account. Safe to call
+-- again with the same ref: the second call reports the first one's result.
+CREATE OR REPLACE FUNCTION public.pamp_bridge_take(
+  p_profile UUID, p_pamp_user UUID, p_points INTEGER, p_ref UUID, p_issued_at TIMESTAMPTZ
+)
+RETURNS TABLE (outcome TEXT, balance INTEGER)
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = '' AS $$
+DECLARE
+  v_profile public.profiles;
+  v_done public.pamp_transfers;
+  v_today INTEGER;
+BEGIN
+  -- Locked first: a concurrent retry of the same ref waits here, then finds it.
+  SELECT * INTO v_profile FROM public.profiles p WHERE p.id = p_profile FOR UPDATE;
+
+  SELECT * INTO v_done FROM public.pamp_transfers t WHERE t.ref = p_ref;
+  IF v_done.ref IS NOT NULL THEN
+    IF v_done.profile_id = p_profile AND v_done.points = p_points THEN
+      RETURN QUERY SELECT 'ok'::TEXT, coalesce(v_profile.loyalty_points, 0);
+    ELSE
+      RETURN QUERY SELECT 'bad_request'::TEXT, NULL::INTEGER;
+    END IF;
+    RETURN;
+  END IF;
+
+  IF v_profile.id IS NULL OR v_profile.pamp_user_id IS DISTINCT FROM p_pamp_user THEN
+    RETURN QUERY SELECT 'not_linked'::TEXT, NULL::INTEGER;
+    RETURN;
+  END IF;
+  IF coalesce(v_profile.is_suspended, false) THEN
+    RETURN QUERY SELECT 'suspended'::TEXT, NULL::INTEGER;
+    RETURN;
+  END IF;
+  IF p_points IS NULL OR p_points < 1 OR p_points > 100000 OR p_ref IS NULL THEN
+    RETURN QUERY SELECT 'bad_request'::TEXT, NULL::INTEGER;
+    RETURN;
+  END IF;
+  -- A request PAMP issued more than 90 seconds ago is refused, so PAMP can
+  -- safely give up on one it heard nothing about after three minutes.
+  IF p_issued_at IS NULL OR p_issued_at < now() - interval '90 seconds' OR p_issued_at > now() + interval '30 seconds' THEN
+    RETURN QUERY SELECT 'expired'::TEXT, NULL::INTEGER;
+    RETURN;
+  END IF;
+  -- At most 2,000 points (K200) a day leave an account, which caps what any
+  -- mistake or abuse can cost.
+  SELECT coalesce(sum(t.points), 0) INTO v_today FROM public.pamp_transfers t
+   WHERE t.profile_id = p_profile AND t.created_at > now() - interval '24 hours';
+  IF v_today + p_points > 2000 THEN
+    RETURN QUERY SELECT 'daily_limit'::TEXT, NULL::INTEGER;
+    RETURN;
+  END IF;
+  -- Checked here, under the lock: apply_points would floor at 0 instead.
+  IF coalesce(v_profile.loyalty_points, 0) < p_points THEN
+    RETURN QUERY SELECT 'insufficient'::TEXT, coalesce(v_profile.loyalty_points, 0);
+    RETURN;
+  END IF;
+
+  INSERT INTO public.pamp_transfers (ref, profile_id, pamp_user_id, points)
+  VALUES (p_ref, p_profile, p_pamp_user, p_points);
+  PERFORM public.apply_points(p_profile, -p_points, 'Used on PAMP');
+
+  RETURN QUERY SELECT 'ok'::TEXT, (SELECT p.loyalty_points FROM public.profiles p WHERE p.id = p_profile);
+END;
+$$;
+
+-- Bridge: did the debit with this ref happen?
+CREATE OR REPLACE FUNCTION public.pamp_bridge_check(p_ref UUID)
+RETURNS TABLE (taken BOOLEAN, points INTEGER)
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = '' AS $$
+  SELECT EXISTS (SELECT 1 FROM public.pamp_transfers t WHERE t.ref = p_ref),
+         (SELECT t.points FROM public.pamp_transfers t WHERE t.ref = p_ref)
+$$;
+
+-- Bridge: PAMP unlinked. Only clears a link to that same PAMP account.
+CREATE OR REPLACE FUNCTION public.pamp_bridge_unlink(p_profile UUID, p_pamp_user UUID)
+RETURNS void LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = '' AS $$
+BEGIN
+  PERFORM set_config('app.unihair_trusted', 'on', true);
+  UPDATE public.profiles SET pamp_user_id = NULL WHERE id = p_profile AND pamp_user_id = p_pamp_user;
+END;
+$$;
+
+REVOKE EXECUTE ON FUNCTION public.protect_pamp_link() FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.pamp_bridge_claim(TEXT, UUID) FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.pamp_bridge_balance(UUID, UUID) FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.pamp_bridge_take(UUID, UUID, INTEGER, UUID, TIMESTAMPTZ) FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.pamp_bridge_check(UUID) FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.pamp_bridge_unlink(UUID, UUID) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.pamp_bridge_claim(TEXT, UUID) TO service_role;
+GRANT EXECUTE ON FUNCTION public.pamp_bridge_balance(UUID, UUID) TO service_role;
+GRANT EXECUTE ON FUNCTION public.pamp_bridge_take(UUID, UUID, INTEGER, UUID, TIMESTAMPTZ) TO service_role;
+GRANT EXECUTE ON FUNCTION public.pamp_bridge_check(UUID) TO service_role;
+GRANT EXECUTE ON FUNCTION public.pamp_bridge_unlink(UUID, UUID) TO service_role;
+REVOKE EXECUTE ON FUNCTION public.create_pamp_link_code() FROM PUBLIC, anon;
+REVOKE EXECUTE ON FUNCTION public.unlink_pamp() FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.create_pamp_link_code() TO authenticated;
+GRANT EXECUTE ON FUNCTION public.unlink_pamp() TO authenticated;
