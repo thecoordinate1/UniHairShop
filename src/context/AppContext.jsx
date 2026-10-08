@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { supabase, isSupabaseConfigured } from '../lib/supabaseClient';
+import { supabase, isSupabaseConfigured, initialAuthLinkType } from '../lib/supabaseClient';
 import { isPushSupported, subscribeToPush, unsubscribeFromPush, getCurrentPushEndpoint } from '../lib/pushNotifications';
 import {
   initialServices,
@@ -169,7 +169,9 @@ export const AppProvider = ({ children }) => {
 
   // Full-screen takeover shown after an email confirmation or password recovery link
   // is clicked: null | 'verified' | 'reset'. Takes priority over the normal auth gate.
-  const [postAuthScreen, setPostAuthScreen] = useState(null);
+  // A password-reset link must land on "Set a New Password" from the very first
+  // render, never on the logged-in app the recovery session would otherwise open.
+  const [postAuthScreen, setPostAuthScreen] = useState(() => (initialAuthLinkType === 'recovery' ? 'reset' : null));
 
   // Which tab AuthWall should open on when it next mounts (e.g. after "Sign In Now").
   const [authWallDefaultMode, setAuthWallDefaultMode] = useState('signup');
@@ -468,7 +470,7 @@ export const AppProvider = ({ children }) => {
           addToast(decodeURIComponent(errorDesc.replace(/\+/g, ' ')), 'error');
           window.history.replaceState(null, '', window.location.pathname);
         } catch { /* ignore */ }
-      } else if (hash.includes('type=signup') || hash.includes('type=email_change')) {
+      } else if (initialAuthLinkType === 'signup' || initialAuthLinkType === 'email_change') {
         justConfirmedEmail = true;
         window.history.replaceState(null, '', window.location.pathname);
         // The confirmation link auto-establishes a session; sign back out so the
@@ -478,7 +480,7 @@ export const AppProvider = ({ children }) => {
           supabase.auth.signOut().catch(() => {});
         }
         setPostAuthScreen('verified');
-      } else if (hash.includes('type=recovery')) {
+      } else if (initialAuthLinkType === 'recovery') {
         window.history.replaceState(null, '', window.location.pathname);
         // Supabase's recovery link auto-establishes a temporary session that the
         // reset-password screen uses via supabase.auth.updateUser() — let the normal
@@ -487,9 +489,22 @@ export const AppProvider = ({ children }) => {
       }
     }
 
+    // An auth link opened into an already-running page (e.g. an installed app
+    // that captures the link) only changes the hash, without a reload, so
+    // neither supabase-js nor the checks above ever see it. Reload so the link
+    // gets processed like a fresh visit.
+    const handleAuthHashChange = () => {
+      if (window.location.hash.includes('access_token=') || window.location.hash.includes('error_description=')) {
+        window.location.reload();
+      }
+    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener('hashchange', handleAuthHashChange);
+    }
+
     if (!isSupabaseConfigured || !supabase) {
       setAuthLoading(false);
-      return;
+      return () => window.removeEventListener('hashchange', handleAuthHashChange);
     }
 
     if (justConfirmedEmail) {
@@ -563,6 +578,11 @@ export const AppProvider = ({ children }) => {
 
     // Listen for auth state changes
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
+      // Second, independent signal: supabase-js emits this whenever it consumes a
+      // recovery link, however the URL arrived.
+      if (event === 'PASSWORD_RECOVERY') {
+        setPostAuthScreen('reset');
+      }
       setSession(currentSession);
       if (currentSession?.user) {
         const { data: profile } = await supabase
@@ -734,6 +754,7 @@ export const AppProvider = ({ children }) => {
       .subscribe();
 
     return () => {
+      window.removeEventListener('hashchange', handleAuthHashChange);
       supabase.removeChannel(bookingChannel);
       supabase.removeChannel(messagesChannel);
     };

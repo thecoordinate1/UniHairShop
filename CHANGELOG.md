@@ -4,6 +4,15 @@ All notable changes to UniHairShop are recorded here, newest first. Versions fol
 
 Each release is tagged in git as `vX.Y.Z` — refer to that tag instead of a commit hash when talking about "which version."
 
+## [0.13.3] — 2026-10-08
+
+### Fixed
+- **Password-reset links logged people straight in instead of showing "Set a New Password".** The app only recognised a reset link by reading `#…type=recovery` from the URL in a React startup effect. But supabase-js reads the same hash during its own async startup, establishes the recovery session and then clears the hash, and it can finish first. When it did, the app saw no reset marker and opened the logged-in app on the recovery session. Reproduced deterministically on the live site by making supabase-js win that race.
+  - The link type is now captured synchronously when the Supabase client module loads, before anything can touch the URL (`initialAuthLinkType`). The reset screen is the initial state from the very first render.
+  - As a second, independent signal, the app now handles supabase-js's `PASSWORD_RECOVERY` event, which it previously ignored.
+  - A reset link opened into an already-open page (only the hash changes, e.g. an installed app capturing the link) now triggers a reload, so it gets processed like a fresh visit instead of being ignored.
+  - The email-verified link uses the same captured value, so it can't lose the same race.
+
 ## [0.13.2] — 2026-10-07
 
 ### Fixed

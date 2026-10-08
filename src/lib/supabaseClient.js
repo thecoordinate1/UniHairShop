@@ -5,6 +5,16 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
 export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
 
+// What kind of auth email link opened this page ('recovery', 'signup', ...), read
+// before createClient below: supabase-js consumes and clears the URL hash during
+// its own async startup, so anything reading it later (a React effect) can lose
+// the race and treat a password-reset link as a plain sign-in.
+export const initialAuthLinkType = (() => {
+  if (typeof window === 'undefined') return null;
+  const params = new URLSearchParams((window.location.hash || '').replace(/^#/, ''));
+  return params.get('access_token') ? params.get('type') : null;
+})();
+
 export const supabase = isSupabaseConfigured
   ? createClient(supabaseUrl, supabaseAnonKey, {
       auth: {
